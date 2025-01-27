@@ -30,3 +30,9 @@
     c. For deletes, check if "soft deletes" should be enabled instead
 3. Might need to add a method for fetching all schemas relevant to a certain project
 4. Add an error handling endpoint
+
+## No warmup design
+1. Relations are cached lazily, on-demand, with no warm up call
+2. Negative cache is also managed, i.e. we cache the fact that a relationship does *not* exist as well
+3. The cache structure is therefore map between `resource:target:relationId`->`bool`
+4. Need to handle non-direct cache evicts, i.e. if a user is added to (or removed from) a group, and now their relations to many different resources have changed. Can we have the "diff" call return affected targets or resources that should be evicted? returning target:resource pairs might be very large, but perhaps if we only return the "target" the response will not be too big, even though it might remove more entitires from the cache.

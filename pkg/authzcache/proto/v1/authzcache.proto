@@ -1,0 +1,88 @@
+syntax = "proto3";
+package authzcv1;
+
+import "google/api/annotations.proto";
+import "mocker.proto";
+import "openapiv3/annotations.proto";
+import "validate.proto";
+import "v1/authz.proto";
+
+
+option go_package = "github.com/descope/authzcache/pkg/authzcache/proto/v1";
+
+option (mocker) = {
+	enabled: true
+	import_name: "grpcauthzcv1"
+	output_path: "pkg/authzcache/test/mocks"
+	output_file: "authzcacheclient"
+};
+
+service AuthzCache {
+  rpc CreateFGASchema(authzv1.SaveDSLSchemaRequest) returns(authzv1.SaveDSLSchemaResponse) {
+    option (google.api.http) = {
+      post: "/v1/mgmt/fga/schema"
+      body: "*"
+    };
+    option (openapi.v3.operation) = {
+      operation_id: "CreateFGASchema",
+      description: "Create the given FGA Schema.",
+      summary: "Create the given FGA Schema"
+      specification_extension: [
+        {name:"x-publishYaml",value:{yaml:"fga"}},
+        {name:"x-order",value:{yaml:"1"}}
+      ],
+      security: {additional_properties:{name:"AuthProjectIdMgmtKey",value:{}}}
+    };
+  }
+
+  rpc CreateFGARelations(authzv1.CreateTuplesRequest) returns(authzv1.CreateTuplesResponse) {
+    option (google.api.http) = {
+      post: "/v1/mgmt/fga/relations"
+      body: "*"
+    };
+    option (openapi.v3.operation) = {
+      operation_id: "CreateFGARelations",
+      description: "Create the given relations.",
+      summary: "Create the given relations"
+      specification_extension: [
+        {name:"x-publishYaml",value:{yaml:"fga"}},
+        {name:"x-order",value:{yaml:"2"}}
+      ],
+      security: {additional_properties:{name:"AuthProjectIdMgmtKey",value:{}}}
+    };
+  }
+
+  rpc DeleteFGARelations(authzv1.DeleteTuplesRequest) returns(authzv1.DeleteTuplesResponse) {
+    option (google.api.http) = {
+      post: "/v1/mgmt/fga/relations/delete"
+      body: "*"
+    };
+    option (openapi.v3.operation) = {
+      operation_id: "DeleteFGARelations",
+      description: "Delete the given relations.",
+      summary: "Delete the given relations"
+      specification_extension: [
+        {name:"x-publishYaml",value:{yaml:"fga"}},
+        {name:"x-order",value:{yaml:"3"}}
+      ],
+      security: {additional_properties:{name:"AuthProjectIdMgmtKey",value:{}}}
+    };
+  }
+
+  rpc Check(authzv1.CheckRequest) returns(authzv1.CheckResponse) {
+    option (google.api.http) = {
+      post: "/v1/mgmt/fga/check"
+      body: "*"
+    };
+    option (openapi.v3.operation) = {
+      operation_id: "Check",
+      description: "Check if the given relations are allowed.",
+      summary: "Check if the given relations are allowed"
+      specification_extension: [
+        {name:"x-publishYaml",value:{yaml:"fga"}},
+        {name:"x-order",value:{yaml:"3"}}
+      ],
+      security: {additional_properties:{name:"AuthProjectIdMgmtKey",value:{}}}
+    };
+  }
+}
