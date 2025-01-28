@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/descope/authzcache/internal/config"
 	"github.com/descope/authzcache/internal/controllers"
@@ -10,6 +11,7 @@ import (
 	cconfig "github.com/descope/common/pkg/common/config"
 	cctx "github.com/descope/common/pkg/common/context"
 	"github.com/descope/common/pkg/common/grpc/server"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
 )
 
@@ -35,8 +37,11 @@ func serve() {
 				return nil
 			},
 		},
-		// TODO: Do we need to add HTTP handlers in order to enable HTTP endpoints?
-		[]server.RegisterHTTPFunc{})
+		[]server.RegisterHTTPFunc{
+			func(ctx context.Context, mux *runtime.ServeMux, conn *grpc.ClientConn, _ *http.Server) error {
+				return authzcv1.RegisterAuthzCacheHandler(ctx, mux, conn)
+			},
+		})
 
 	if err != nil {
 		cctx.Logger(ctx).Fatal().Str(config.MetricsKeyResourceServiceName, cconfig.GetServiceName()).Err(err).Msg("Failed to start server")
