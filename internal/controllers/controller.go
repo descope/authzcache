@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"os"
 
 	"github.com/descope/authzcache/internal/services"
 	authczv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
@@ -19,7 +20,15 @@ type authzController struct {
 
 func New(authzCache *services.AuthzCache) *authzController {
 	// Leave projectId param empty to get it from DESCOPE_PROJECT_ID env variable
-	descopeClient, _ := client.NewWithConfig(&client.Config{SessionJWTViaCookie: true, ProjectID: ""}) // TODO: only used for scaffolidng, remove from controller
+	baseUrl := os.Getenv(descope.EnvironmentVariableBaseURL) // TODO: used for testing inside descope local env, should probably be removed
+	// TODO: sdk defined here is only used for scaffolidng, should be moved into service layer
+	descopeClient, err := client.NewWithConfig(&client.Config{
+		SessionJWTViaCookie: true,
+		DescopeBaseURL:      baseUrl,
+	})
+	if err != nil {
+		panic(err)
+	}
 	return &authzController{authzCache: authzCache, sdkClient: descopeClient}
 }
 
