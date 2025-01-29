@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/descope/authzcache/internal/services"
+	se "github.com/descope/authzcache/pkg/authzcache/errors"
 	authczv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
 	authzv1 "github.com/descope/authzservice/pkg/authzservice/proto/v1"
 	cctx "github.com/descope/common/pkg/common/context"
@@ -36,6 +37,9 @@ func (ac *authzController) CreateFGASchema(ctx context.Context, req *authzv1.Sav
 	cctx.Logger(ctx).Info().Msg("Saving authz DSL schema")
 
 	err := ac.sdkClient.Management.FGA().SaveSchema(ctx, &descope.FGASchema{Schema: req.Dsl})
+	if err != nil {
+		return nil, se.ServiceErrorFromSdkError(ctx, err)
+	}
 
 	return &authzv1.SaveDSLSchemaResponse{}, err
 }
@@ -56,7 +60,7 @@ func (ac *authzController) CreateFGARelations(ctx context.Context, req *authzv1.
 	err := ac.sdkClient.Management.FGA().CreateRelations(ctx, relations)
 
 	if err != nil {
-		return nil, err
+		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
 	return &authzv1.CreateTuplesResponse{}, nil
 }
@@ -77,7 +81,7 @@ func (ac *authzController) DeleteFGARelations(ctx context.Context, req *authzv1.
 	err := ac.sdkClient.Management.FGA().DeleteRelations(ctx, relations)
 
 	if err != nil {
-		return nil, err
+		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
 	return &authzv1.DeleteTuplesResponse{}, nil
 }
@@ -98,7 +102,7 @@ func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest)
 	checks, err := ac.sdkClient.Management.FGA().Check(ctx, relations)
 
 	if err != nil {
-		return nil, err
+		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
 	responseTuples := make([]*authzv1.CheckResponseTuple, len(checks))
 	for i := range req.Tuples {
