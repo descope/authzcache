@@ -746,12 +746,12 @@ github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 h1:rpfIENRNNilwHwZeG5+P150SMrnN
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0/go.mod h1:v57UDF4pDQJcEfFUCRop3lJL149eHGSe9Jvczhzjo/0=
 github.com/descope/authzservice v0.0.0-20250126024417-3abb5246d683 h1:ag492btBacHgryQo8I+vU2akPp5cXRfObmJKQajeIEE=
 github.com/descope/authzservice v0.0.0-20250126024417-3abb5246d683/go.mod h1:lkdW6YVvHXPBtS5B0tj68z8c9aekV4BGZ3yPUeLTN90=
-github.com/descope/common v0.0.9-0.20250126065428-8c6c7f0db8ac h1:+kuaUTeSQaD+JXe9ofotApESbxJRHPVZBb8AipkkbHE=
-github.com/descope/common v0.0.9-0.20250126065428-8c6c7f0db8ac/go.mod h1:AIkhnK519NAkhNDYPoBr0Bk/ZJZVHsXGiWwjvD3RMp4=
+github.com/descope/common v0.0.9-0.20250129113710-ba07fc6837d9 h1:qKtTodpzA9wZIPUtSDl6yA3PJXEB15zgEca1UztAx8E=
+github.com/descope/common v0.0.9-0.20250129113710-ba07fc6837d9/go.mod h1:bFUKjuQWFf+mQb1MUhLNYgTx8CogpdmV/BSjGJ7ve0A=
 github.com/descope/go-sdk v1.6.9 h1:r8THGqlv7nobtIPWP6FCCMYnUIXOfuzeKgRtrMBK/a0=
 github.com/descope/go-sdk v1.6.9/go.mod h1:qVeiEfz1G25YmOt8wAd/OIws16M60rTAv8CGqnMh/qo=
-github.com/descope/protoc-gen-mocker v1.0.1-0.20241225174241-987c739ac339 h1:PVipKNcmEPMgrJk4Ph0ttnIgGYBw301QN7Q+HNp3t6E=
-github.com/descope/protoc-gen-mocker v1.0.1-0.20241225174241-987c739ac339/go.mod h1:hmCwC0wJNhRt7OiTSXDAlpFfSwJXXyUQmC50Lo7IKrY=
+github.com/descope/protoc-gen-mocker v1.0.1-0.20250127200540-611164390420 h1:wr+aI+TFmGUWOGTVpBHpJBuO9W5JVae2xickyUyDuh4=
+github.com/descope/protoc-gen-mocker v1.0.1-0.20250127200540-611164390420/go.mod h1:hmCwC0wJNhRt7OiTSXDAlpFfSwJXXyUQmC50Lo7IKrY=
 github.com/descope/protoc-gen-validate v1.6.4-0.20250113163315-6900e2c3778a h1:SxZODptcGP6/S8nixYeUFkn1B76JZDTpceA/r9K+qPs=
 github.com/descope/protoc-gen-validate v1.6.4-0.20250113163315-6900e2c3778a/go.mod h1:RO2esGzLi8IFuhtjn0s0fqsZjwUgo5gJ2TeNcSUigGY=
 github.com/descope/redismock/v9 v9.0.0-20231127135359-af23fe373805 h1:uM+fU1h5LH9NG2mqBDecFUqVOOfamD9mJiQVF3uAe6s=
@@ -1868,8 +1868,8 @@ google.golang.org/protobuf v1.28.1/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqw
 google.golang.org/protobuf v1.29.1/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqwMG9pJV4I=
 google.golang.org/protobuf v1.30.0/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqwMG9pJV4I=
 google.golang.org/protobuf v1.33.0/go.mod h1:c6P6GXX6sHbq/GpV6MGZEdwhWPcYBgnhAHhKbcUYpos=
-google.golang.org/protobuf v1.36.3 h1:82DV7MYdb8anAVi3qge1wSnMDrnKK7ebr+I0hHRN1BU=
-google.golang.org/protobuf v1.36.3/go.mod h1:9fA7Ob0pmnwhb644+1+CVWFRbNajQ6iRojtC/QF5bRE=
+google.golang.org/protobuf v1.36.4 h1:6A3ZDJHn/eNqc1i+IdefRzy/9PokBTPvcqMySR7NNIM=
+google.golang.org/protobuf v1.36.4/go.mod h1:9fA7Ob0pmnwhb644+1+CVWFRbNajQ6iRojtC/QF5bRE=
 gopkg.in/DataDog/dd-trace-go.v1 v1.70.1 h1:ZIRxAKlr3xr6xbMUDs3IDa6xq+ISv9zxyjaDCfwDjMY=
 gopkg.in/DataDog/dd-trace-go.v1 v1.70.1/go.mod h1:PMOSkeY4VfXiuPvGodeNLCZCFYU2VfOvjVI6cX5bGrc=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
