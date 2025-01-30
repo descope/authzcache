@@ -50,13 +50,11 @@ func New(ctx context.Context) (*AuthzCache, error) {
 	// 	if err != nil {
 	// 		return nil, err // notest
 	// 	}
-	// Leave projectId param empty to get it from DESCOPE_PROJECT_ID env variable
-	baseUrl := os.Getenv(descope.EnvironmentVariableBaseURL) // TODO: used for testing inside descope local env, should probably be removed
-	// TODO: sdk defined here is only used for scaffolidng, should be moved into service layer
+	baseURL := os.Getenv(descope.EnvironmentVariableBaseURL) // TODO: used for testing inside descope local env, should probably be removed
 	descopeClient, err := client.NewWithConfig(&client.Config{
 		SessionJWTViaCookie: true,
-		DescopeBaseURL:      baseUrl,
-		LogLevel:            logger.LogDebugLevel,
+		DescopeBaseURL:      baseURL,
+		LogLevel:            logger.LogDebugLevel, // TODO: extract to env var
 	})
 	if err != nil {
 		return nil, err
@@ -73,16 +71,16 @@ func (a *AuthzCache) CreateFGASchema(ctx context.Context, dsl string) error {
 	return a.sdkClient.Management.FGA().SaveSchema(ctx, &descope.FGASchema{Schema: dsl})
 }
 
-func (as *AuthzCache) CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
-	return as.sdkClient.Management.FGA().CreateRelations(ctx, relations)
+func (a *AuthzCache) CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
+	return a.sdkClient.Management.FGA().CreateRelations(ctx, relations)
 }
 
-func (as *AuthzCache) DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
-	return as.sdkClient.Management.FGA().DeleteRelations(ctx, relations)
+func (a *AuthzCache) DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
+	return a.sdkClient.Management.FGA().DeleteRelations(ctx, relations)
 }
 
-func (as *AuthzCache) Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
-	return as.sdkClient.Management.FGA().Check(ctx, relations)
+func (a *AuthzCache) Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
+	return a.sdkClient.Management.FGA().Check(ctx, relations)
 }
 
 // func (as *AuthzCache) ListRelations(ctx context.Context, pageNum, pageSize int) (*authzv1.ResourceRelationsResponse, error) {
