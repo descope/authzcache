@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"os"
+
 	// 	"fmt"
 	// 	"strings"
 	// 	"time"
@@ -12,6 +14,7 @@ import (
 	// 	"github.com/descope/authzservice/pkg/authzservice/dsl/parser"
 	// 	authzv1 "github.com/descope/authzservice/pkg/authzservice/proto/v1"
 	cctx "github.com/descope/common/pkg/common/context"
+
 	// ce "github.com/descope/common/pkg/common/errors"
 	// "github.com/descope/common/pkg/common/featureflags"
 	// "github.com/descope/common/pkg/common/messenger"
@@ -19,15 +22,18 @@ import (
 	// cutils "github.com/descope/common/pkg/common/utils"
 	// lru "github.com/descope/common/pkg/common/utils/monitoredlru"
 	// "github.com/descope/go-sdk/descope"
-	// "github.com/descope/go-sdk/descope/client"
 	// "google.golang.org/protobuf/types/known/structpb"
+
+	"github.com/descope/go-sdk/descope"
+	"github.com/descope/go-sdk/descope/client"
+	"github.com/descope/go-sdk/descope/logger"
 )
 
 type AuthzCache struct {
 	// 	schemaCache         *lru.MonitoredLRUCache[string, *domain.Schema]
 	// 	relationCache       *lru.MonitoredLRUCache[string, []*domain.Relation]
 	// 	targetRelationCache *lru.MonitoredLRUCache[string, []*domain.Relation]
-	// 	sdkClient           *client.DescopeClient
+	sdkClient *client.DescopeClient
 }
 
 func New(ctx context.Context) (*AuthzCache, error) {
@@ -44,15 +50,18 @@ func New(ctx context.Context) (*AuthzCache, error) {
 	// 	if err != nil {
 	// 		return nil, err // notest
 	// 	}
-	ac := &AuthzCache{}
-	//ac := &AuthzCache{schemaCache: schemaCache, relationCache: relationCache, targetRelationCache: relatedRelationCache}
-	// 	sdkClient, err := client.NewWithConfig()
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	ac.sdkClient = sdkClient
-
-	// return ac, err
+	// Leave projectId param empty to get it from DESCOPE_PROJECT_ID env variable
+	baseUrl := os.Getenv(descope.EnvironmentVariableBaseURL) // TODO: used for testing inside descope local env, should probably be removed
+	// TODO: sdk defined here is only used for scaffolidng, should be moved into service layer
+	descopeClient, err := client.NewWithConfig(&client.Config{
+		SessionJWTViaCookie: true,
+		DescopeBaseURL:      baseUrl,
+		LogLevel:            logger.LogDebugLevel,
+	})
+	if err != nil {
+		return nil, err
+	}
+	ac := &AuthzCache{sdkClient: descopeClient}
 	return ac, nil
 }
 
@@ -60,21 +69,21 @@ func New(ctx context.Context) (*AuthzCache, error) {
 // 	panic("unimplemented")
 // }
 
-// func (a *AuthzCache) SaveDSLSchema(ctx context.Context, dsl string) error {
-// 	panic("unimplemented")
-// }
+func (a *AuthzCache) CreateFGASchema(ctx context.Context, dsl string) error {
+	return a.sdkClient.Management.FGA().SaveSchema(ctx, &descope.FGASchema{Schema: dsl})
+}
 
-// func (as *AuthzCache) CreateTuples(ctx context.Context, req *authzv1.CreateTuplesRequest) (*authzv1.CreateTuplesResponse, error) {
-// 	panic("unimplemented")
-// }
+func (as *AuthzCache) CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
+	return as.sdkClient.Management.FGA().CreateRelations(ctx, relations)
+}
 
-// func (as *AuthzCache) DeleteTuples(ctx context.Context, req *authzv1.DeleteTuplesRequest) (*authzv1.DeleteTuplesResponse, error) {
-// 	panic("unimplemented")
-// }
+func (as *AuthzCache) DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
+	return as.sdkClient.Management.FGA().DeleteRelations(ctx, relations)
+}
 
-// func (as *AuthzCache) Check(ctx context.Context, req *authzv1.CheckRequest) (*authzv1.CheckResponse, error) {
-// 	panic("unimplemented")
-// }
+func (as *AuthzCache) Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
+	return as.sdkClient.Management.FGA().Check(ctx, relations)
+}
 
 // func (as *AuthzCache) ListRelations(ctx context.Context, pageNum, pageSize int) (*authzv1.ResourceRelationsResponse, error) {
 // 	panic("unimplemented")

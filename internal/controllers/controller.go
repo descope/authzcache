@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"os"
 
 	"github.com/descope/authzcache/internal/services"
 	se "github.com/descope/authzcache/pkg/authzcache/errors"
@@ -10,54 +9,33 @@ import (
 	authzv1 "github.com/descope/authzservice/pkg/authzservice/proto/v1"
 	cctx "github.com/descope/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
-	"github.com/descope/go-sdk/descope/client"
 )
 
 type authzController struct {
 	authzCache *services.AuthzCache
 	authczv1.UnsafeAuthzCacheServer
-	sdkClient *client.DescopeClient // TODO: only used for scaffolidng, remove from controller
 }
 
 func New(authzCache *services.AuthzCache) *authzController {
-	// Leave projectId param empty to get it from DESCOPE_PROJECT_ID env variable
-	baseUrl := os.Getenv(descope.EnvironmentVariableBaseURL) // TODO: used for testing inside descope local env, should probably be removed
-	// TODO: sdk defined here is only used for scaffolidng, should be moved into service layer
-	descopeClient, err := client.NewWithConfig(&client.Config{
-		SessionJWTViaCookie: true,
-		DescopeBaseURL:      baseUrl,
-	})
-	if err != nil {
-		panic(err)
-	}
-	return &authzController{authzCache: authzCache, sdkClient: descopeClient}
+	return &authzController{authzCache: authzCache}
 }
 
 func (ac *authzController) CreateFGASchema(ctx context.Context, req *authzv1.SaveDSLSchemaRequest) (*authzv1.SaveDSLSchemaResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Saving authz DSL schema")
 
-	err := ac.sdkClient.Management.FGA().SaveSchema(ctx, &descope.FGASchema{Schema: req.Dsl})
+	err := ac.authzCache.CreateFGASchema(ctx, req.Dsl)
+
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
-
 	return &authzv1.SaveDSLSchemaResponse{}, err
 }
 
 func (ac *authzController) CreateFGARelations(ctx context.Context, req *authzv1.CreateTuplesRequest) (*authzv1.CreateTuplesResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Creating authz tuples")
-	var relations []*descope.FGARelation
-	for _, t := range req.Tuples {
-		relations = append(relations, &descope.FGARelation{
-			Resource:     t.Resource,
-			ResourceType: t.ResourceType,
-			Relation:     t.Relation,
-			Target:       t.Target,
-			TargetType:   t.TargetType,
-		})
-	}
+	relations := relationsFromTuples(req.Tuples)
 
-	err := ac.sdkClient.Management.FGA().CreateRelations(ctx, relations)
+	err := ac.authzCache.CreateFGARelations(ctx, relations)
 
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
@@ -67,18 +45,9 @@ func (ac *authzController) CreateFGARelations(ctx context.Context, req *authzv1.
 
 func (ac *authzController) DeleteFGARelations(ctx context.Context, req *authzv1.DeleteTuplesRequest) (*authzv1.DeleteTuplesResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Deleting authz tuples")
-	var relations []*descope.FGARelation
-	for _, t := range req.Tuples {
-		relations = append(relations, &descope.FGARelation{
-			Resource:     t.Resource,
-			ResourceType: t.ResourceType,
-			Relation:     t.Relation,
-			Target:       t.Target,
-			TargetType:   t.TargetType,
-		})
-	}
+	relations := relationsFromTuples(req.Tuples)
 
-	err := ac.sdkClient.Management.FGA().DeleteRelations(ctx, relations)
+	err := ac.authzCache.DeleteFGARelations(ctx, relations)
 
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
@@ -88,24 +57,15 @@ func (ac *authzController) DeleteFGARelations(ctx context.Context, req *authzv1.
 
 func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest) (*authzv1.CheckResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Checking authz")
-	var relations []*descope.FGARelation
-	for _, t := range req.Tuples {
-		relations = append(relations, &descope.FGARelation{
-			Resource:     t.Resource,
-			ResourceType: t.ResourceType,
-			Relation:     t.Relation,
-			Target:       t.Target,
-			TargetType:   t.TargetType,
-		})
-	}
+	relations := relationsFromTuples(req.Tuples)
 
-	checks, err := ac.sdkClient.Management.FGA().Check(ctx, relations)
+	checks, err := ac.authzCache.Check(ctx, relations)
 
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
 	responseTuples := make([]*authzv1.CheckResponseTuple, len(checks))
-	for i := range req.Tuples {
+	for i := range checks {
 		check := checks[i]
 		responseTuples[i] = &authzv1.CheckResponseTuple{
 			Tuple: &authzv1.Tuple{
@@ -120,6 +80,20 @@ func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest)
 	}
 
 	return &authzv1.CheckResponse{Tuples: responseTuples}, nil
+}
+
+func relationsFromTuples(tuples []*authzv1.Tuple) []*descope.FGARelation {
+	relations := make([]*descope.FGARelation, len(tuples))
+	for i, t := range tuples {
+		relations[i] = &descope.FGARelation{
+			Resource:     t.Resource,
+			ResourceType: t.ResourceType,
+			Relation:     t.Relation,
+			Target:       t.Target,
+			TargetType:   t.TargetType,
+		}
+	}
+	return relations
 }
 
 // func (ac *authzController) LoadDSLSchema(ctx context.Context, _ *authzv1.LoadDSLSchemaRequest) (*authzv1.LoadDSLSchemaResponse, error) {
