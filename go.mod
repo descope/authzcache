@@ -6,9 +6,9 @@ toolchain go1.23.4
 
 require (
 	github.com/descope/common v0.0.9-0.20250129113710-ba07fc6837d9
-	github.com/descope/go-sdk v1.6.9
+	github.com/descope/go-sdk v1.6.10-0.20250130113819-1976646f19c7
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250127200540-611164390420
-	github.com/descope/protoc-gen-validate v1.6.4-0.20250113163315-6900e2c3778a
+	github.com/descope/protoc-gen-validate v1.6.4-0.20250128110522-4087f4457ac6
 	github.com/stretchr/testify v1.10.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/protobuf v1.36.4
@@ -50,7 +50,7 @@ require (
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
-	github.com/descope/authzservice v0.0.0-20250126024417-3abb5246d683
+	github.com/descope/authzservice v0.0.0-20250128235450-381878b8ce18
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eapache/queue/v2 v2.0.0-20230407133247-75960ed334e4 // indirect
