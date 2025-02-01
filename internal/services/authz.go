@@ -13,6 +13,7 @@ import (
 	// 	"github.com/descope/authzservice/pkg/authzservice/domain"
 	// 	"github.com/descope/authzservice/pkg/authzservice/dsl/parser"
 	// 	authzv1 "github.com/descope/authzservice/pkg/authzservice/proto/v1"
+	"github.com/descope/authzcache/internal/config"
 	cctx "github.com/descope/common/pkg/common/context"
 
 	// ce "github.com/descope/common/pkg/common/errors"
@@ -20,7 +21,7 @@ import (
 	// "github.com/descope/common/pkg/common/messenger"
 	// "github.com/descope/common/pkg/common/messenger/events"
 	// cutils "github.com/descope/common/pkg/common/utils"
-	// lru "github.com/descope/common/pkg/common/utils/monitoredlru"
+	lru "github.com/descope/common/pkg/common/utils/monitoredlru"
 	// "github.com/descope/go-sdk/descope"
 	// "google.golang.org/protobuf/types/known/structpb"
 
@@ -30,26 +31,28 @@ import (
 )
 
 type AuthzCache struct {
-	// 	schemaCache         *lru.MonitoredLRUCache[string, *domain.Schema]
-	// 	relationCache       *lru.MonitoredLRUCache[string, []*domain.Relation]
-	// 	targetRelationCache *lru.MonitoredLRUCache[string, []*domain.Relation]
-	sdkClient *client.DescopeClient
+	schemaCache                      *lru.MonitoredLRUCache[string, *descope.FGASchema] // projectID -> schema
+	directRelationCache              *lru.MonitoredLRUCache[string, []string]           // projectID:resource:target -> [relation, relation, ...], e.g. p1:file1:user1 -> [owner, reader]
+	indirectAndNegativeRelationCache *lru.MonitoredLRUCache[string, bool]               // projectID:resource:target:relation -> true/false, e.g. p1:file1:user2:owner -> false
+	sdkClient                        *client.DescopeClient
 }
 
 func New(ctx context.Context) (*AuthzCache, error) {
 	cctx.Logger(ctx).Info().Msg("Starting new authz cache")
-	// 	schemaCache, err := lru.New[string, *domain.Schema](config.GetSchemaCacheSize(), "authz-schemas")
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	relationCache, err := lru.New[string, []*domain.Relation](config.GetRelationCacheSize(), "authz-relations")
-	// 	if err != nil {
-	// 		return nil, err // notest
-	// 	}
-	// 	relatedRelationCache, err := lru.New[string, []*domain.Relation](config.GetRelatedRelationCacheSize(), "authz-rel-relations")
-	// 	if err != nil {
-	// 		return nil, err // notest
-	// 	}
+	// cache init
+	schemaCache, err := lru.New[string, *descope.FGASchema](config.GetSchemaCacheSize(), "authz-schemas")
+	if err != nil {
+		return nil, err
+	}
+	directRelationCache, err := lru.New[string, []string](config.GetDirectRelationCacheSize(), "authz-direct-relations")
+	if err != nil {
+		return nil, err
+	}
+	indirectAndNegativeRelationCache, err := lru.New[string, bool](config.GetInderectAndNegativeRelationCacheSize(), "authz-indirect-and-negative-relations")
+	if err != nil {
+		return nil, err
+	}
+	// sdk init
 	baseURL := os.Getenv(descope.EnvironmentVariableBaseURL) // TODO: used for testing inside descope local env, should probably be removed
 	descopeClient, err := client.NewWithConfig(&client.Config{
 		SessionJWTViaCookie: true,
@@ -59,7 +62,8 @@ func New(ctx context.Context) (*AuthzCache, error) {
 	if err != nil {
 		return nil, err
 	}
-	ac := &AuthzCache{sdkClient: descopeClient}
+	// service init
+	ac := &AuthzCache{sdkClient: descopeClient, schemaCache: schemaCache, directRelationCache: directRelationCache, indirectAndNegativeRelationCache: indirectAndNegativeRelationCache}
 	return ac, nil
 }
 
