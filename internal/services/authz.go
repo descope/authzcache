@@ -2,39 +2,27 @@ package services
 
 import (
 	"context"
-	"os"
 
 	"github.com/descope/authzcache/internal/services/caches"
 	cctx "github.com/descope/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
-	"github.com/descope/go-sdk/descope/client"
-	"github.com/descope/go-sdk/descope/logger"
+	"github.com/descope/go-sdk/descope/sdk"
 )
 
 type AuthzCache struct {
-	sdkClient          *client.DescopeClient
+	mgmtSdk            sdk.Management
 	projectAuthzCaches map[string]*caches.ProjectAuthzCache // projectID -> caches
 }
 
-func New(ctx context.Context) (*AuthzCache, error) {
+func New(ctx context.Context, mgmtSdk sdk.Management) (*AuthzCache, error) {
 	cctx.Logger(ctx).Info().Msg("Starting new authz cache")
-	// sdk init
-	baseURL := os.Getenv(descope.EnvironmentVariableBaseURL) // TODO: used for testing inside descope local env, should probably be removed
-	descopeClient, err := client.NewWithConfig(&client.Config{
-		SessionJWTViaCookie: true,
-		DescopeBaseURL:      baseURL,
-		LogLevel:            logger.LogDebugLevel, // TODO: extract to env var
-	})
-	if err != nil {
-		return nil, err
-	}
 	// service init
-	ac := &AuthzCache{sdkClient: descopeClient, projectAuthzCaches: make(map[string]*caches.ProjectAuthzCache)}
+	ac := &AuthzCache{mgmtSdk: mgmtSdk, projectAuthzCaches: make(map[string]*caches.ProjectAuthzCache)}
 	return ac, nil
 }
 
 func (a *AuthzCache) CreateFGASchema(ctx context.Context, dsl string) error {
-	err := a.sdkClient.Management.FGA().SaveSchema(ctx, &descope.FGASchema{Schema: dsl})
+	err := a.mgmtSdk.FGA().SaveSchema(ctx, &descope.FGASchema{Schema: dsl})
 	if err != nil {
 		return err
 	}
@@ -48,7 +36,7 @@ func (a *AuthzCache) CreateFGASchema(ctx context.Context, dsl string) error {
 }
 
 func (a *AuthzCache) CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
-	err := a.sdkClient.Management.FGA().CreateRelations(ctx, relations)
+	err := a.mgmtSdk.FGA().CreateRelations(ctx, relations)
 	if err != nil {
 		return err
 	}
@@ -65,7 +53,7 @@ func (a *AuthzCache) CreateFGARelations(ctx context.Context, relations []*descop
 }
 
 func (a *AuthzCache) DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
-	err := a.sdkClient.Management.FGA().DeleteRelations(ctx, relations)
+	err := a.mgmtSdk.FGA().DeleteRelations(ctx, relations)
 	if err != nil {
 		return err
 	}
@@ -105,7 +93,7 @@ func (a *AuthzCache) Check(ctx context.Context, relations []*descope.FGARelation
 		return cachedChecks, nil
 	}
 	// fetch missing relations from sdk
-	sdkChecks, err := a.sdkClient.Management.FGA().Check(ctx, toCheckViaSDK)
+	sdkChecks, err := a.mgmtSdk.FGA().Check(ctx, toCheckViaSDK)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +120,7 @@ func (a *AuthzCache) getOrCreateProjectCache(ctx context.Context) (*caches.Proje
 		return projectCache, nil
 	}
 	cctx.Logger(ctx).Info().Msg("Creating new project cache")
-	projectCache, err := caches.NewProjectAuthzCache(ctx, a.sdkClient.Management.Authz())
+	projectCache, err := caches.NewProjectAuthzCache(ctx, a.mgmtSdk.Authz())
 	if err != nil {
 		return nil, err
 	}

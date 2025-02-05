@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"os"
 
 	"github.com/descope/authzcache/internal/config"
 	"github.com/descope/authzcache/internal/controllers"
@@ -11,6 +12,9 @@ import (
 	cconfig "github.com/descope/common/pkg/common/config"
 	cctx "github.com/descope/common/pkg/common/context"
 	"github.com/descope/common/pkg/common/grpc/server"
+	"github.com/descope/go-sdk/descope"
+	"github.com/descope/go-sdk/descope/client"
+	"github.com/descope/go-sdk/descope/logger"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
 )
@@ -27,7 +31,17 @@ func serve() {
 	ctx, err := server.StartServerWithGateway(
 		[]server.RegisterGRPCFunc{
 			func(ctx context.Context, s *grpc.Server) error {
-				as, err := services.New(ctx)
+				// sdk init
+				baseURL := os.Getenv(descope.EnvironmentVariableBaseURL) // TODO: used for testing inside descope local env, should probably be removed
+				descopeClient, err := client.NewWithConfig(&client.Config{
+					SessionJWTViaCookie: true,
+					DescopeBaseURL:      baseURL,
+					LogLevel:            logger.LogDebugLevel, // TODO: extract to env var
+				})
+				if err != nil {
+					return err
+				}
+				as, err := services.New(ctx, descopeClient.Management)
 				if err != nil {
 					cctx.Logger(ctx).Err(err).Msg("Failed creating authz cache")
 					return err
