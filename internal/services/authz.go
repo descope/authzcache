@@ -13,7 +13,8 @@ import (
 	// 	"github.com/descope/authzservice/pkg/authzservice/domain"
 	// 	"github.com/descope/authzservice/pkg/authzservice/dsl/parser"
 	// 	authzv1 "github.com/descope/authzservice/pkg/authzservice/proto/v1"
-	"github.com/descope/authzcache/internal/config"
+
+	"github.com/descope/authzcache/internal/services/caches"
 	cctx "github.com/descope/common/pkg/common/context"
 
 	// ce "github.com/descope/common/pkg/common/errors"
@@ -21,7 +22,7 @@ import (
 	// "github.com/descope/common/pkg/common/messenger"
 	// "github.com/descope/common/pkg/common/messenger/events"
 	// cutils "github.com/descope/common/pkg/common/utils"
-	lru "github.com/descope/common/pkg/common/utils/monitoredlru"
+
 	// "github.com/descope/go-sdk/descope"
 	// "google.golang.org/protobuf/types/known/structpb"
 
@@ -31,27 +32,12 @@ import (
 )
 
 type AuthzCache struct {
-	schemaCache                      *lru.MonitoredLRUCache[string, *descope.FGASchema] // projectID -> schema
-	directRelationCache              *lru.MonitoredLRUCache[string, []string]           // projectID:resource:target -> [relation, relation, ...], e.g. p1:file1:user1 -> [owner, reader]
-	indirectAndNegativeRelationCache *lru.MonitoredLRUCache[string, bool]               // projectID:resource:target:relation -> true/false, e.g. p1:file1:user2:owner -> false
-	sdkClient                        *client.DescopeClient
+	sdkClient          *client.DescopeClient
+	projectAuthzCaches map[string]*caches.ProjectAuthzCache // projectID -> caches
 }
 
 func New(ctx context.Context) (*AuthzCache, error) {
 	cctx.Logger(ctx).Info().Msg("Starting new authz cache")
-	// cache init
-	schemaCache, err := lru.New[string, *descope.FGASchema](config.GetSchemaCacheSize(), "authz-schemas")
-	if err != nil {
-		return nil, err
-	}
-	directRelationCache, err := lru.New[string, []string](config.GetDirectRelationCacheSize(), "authz-direct-relations")
-	if err != nil {
-		return nil, err
-	}
-	indirectAndNegativeRelationCache, err := lru.New[string, bool](config.GetInderectAndNegativeRelationCacheSize(), "authz-indirect-and-negative-relations")
-	if err != nil {
-		return nil, err
-	}
 	// sdk init
 	baseURL := os.Getenv(descope.EnvironmentVariableBaseURL) // TODO: used for testing inside descope local env, should probably be removed
 	descopeClient, err := client.NewWithConfig(&client.Config{
@@ -63,7 +49,7 @@ func New(ctx context.Context) (*AuthzCache, error) {
 		return nil, err
 	}
 	// service init
-	ac := &AuthzCache{sdkClient: descopeClient, schemaCache: schemaCache, directRelationCache: directRelationCache, indirectAndNegativeRelationCache: indirectAndNegativeRelationCache}
+	ac := &AuthzCache{sdkClient: descopeClient, projectAuthzCaches: make(map[string]*caches.ProjectAuthzCache)}
 	return ac, nil
 }
 
@@ -72,19 +58,110 @@ func New(ctx context.Context) (*AuthzCache, error) {
 // }
 
 func (a *AuthzCache) CreateFGASchema(ctx context.Context, dsl string) error {
-	return a.sdkClient.Management.FGA().SaveSchema(ctx, &descope.FGASchema{Schema: dsl})
+	err := a.sdkClient.Management.FGA().SaveSchema(ctx, &descope.FGASchema{Schema: dsl})
+	if err != nil {
+		return err
+	}
+	// update cache
+	projectCache, err := a.getOrCreateProjectCache(ctx)
+	if err != nil {
+		return err
+	}
+	projectCache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: dsl})
+	return nil
 }
 
 func (a *AuthzCache) CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
-	return a.sdkClient.Management.FGA().CreateRelations(ctx, relations)
+	err := a.sdkClient.Management.FGA().CreateRelations(ctx, relations)
+	if err != nil {
+		return err
+	}
+	// update cache
+	if len(relations) == 0 {
+		return nil
+	}
+	projectCache, err := a.getOrCreateProjectCache(ctx)
+	if err != nil {
+		return err
+	}
+	projectCache.UpdateCacheWithAddedRelations(ctx, relations)
+	return nil
 }
 
 func (a *AuthzCache) DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
-	return a.sdkClient.Management.FGA().DeleteRelations(ctx, relations)
+	err := a.sdkClient.Management.FGA().DeleteRelations(ctx, relations)
+	if err != nil {
+		return err
+	}
+	// update cache
+	if len(relations) == 0 {
+		return nil
+	}
+	projectCache, err := a.getOrCreateProjectCache(ctx)
+	if err != nil {
+		return err
+	}
+	projectCache.UpdateCacheWithDeletedRelations(ctx, relations)
+	return nil
 }
 
 func (a *AuthzCache) Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
-	return a.sdkClient.Management.FGA().Check(ctx, relations)
+	// get cache
+	projectCache, err := a.getOrCreateProjectCache(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// iterate over relations and check cache, if not found, check later in sdk
+	var cachedChecks []*descope.FGACheck
+	var toCheckViaSDK []*descope.FGARelation
+	var indexToCachedChecks map[int]*descope.FGACheck = make(map[int]*descope.FGACheck, len(relations)) // map "relations index" -> check, used to retain same order of relations in checks response
+	for i, r := range relations {
+		if allowed, ok := projectCache.CheckRelation(ctx, r); ok {
+			check := &descope.FGACheck{Allowed: allowed, Relation: r}
+			cachedChecks = append(cachedChecks, check)
+			indexToCachedChecks[i] = check
+		} else {
+			toCheckViaSDK = append(toCheckViaSDK, r)
+		}
+	}
+	// if all relations were found in cache, return
+	if len(toCheckViaSDK) == 0 {
+		return cachedChecks, nil
+	}
+	// fetch missing relations from sdk
+	sdkChecks, err := a.sdkClient.Management.FGA().Check(ctx, toCheckViaSDK)
+	if err != nil {
+		return nil, err
+	}
+	// update cache
+	projectCache.UpdateCacheWithChecks(ctx, sdkChecks)
+	// merge cached and sdk checks in the same order as input relations and return them
+	var result []*descope.FGACheck
+	var j int
+	for i := range relations {
+		if check, ok := indexToCachedChecks[i]; ok {
+			result = append(result, check)
+		} else {
+			result = append(result, sdkChecks[j])
+			j++
+		}
+	}
+	return result, nil
+}
+
+func (a *AuthzCache) getOrCreateProjectCache(ctx context.Context) (*caches.ProjectAuthzCache, error) {
+	projectID := cctx.ProjectID(ctx)
+	projectCache, ok := a.projectAuthzCaches[projectID]
+	if ok {
+		return projectCache, nil
+	}
+	cctx.Logger(ctx).Info().Msg("Creating new project cache")
+	projectCache, err := caches.NewProjectAuthzCache(ctx, a.sdkClient.Management.Authz())
+	if err != nil {
+		return nil, err
+	}
+	a.projectAuthzCaches[projectID] = projectCache
+	return projectCache, nil
 }
 
 // func (as *AuthzCache) ListRelations(ctx context.Context, pageNum, pageSize int) (*authzv1.ResourceRelationsResponse, error) {
