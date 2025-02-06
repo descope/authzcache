@@ -144,3 +144,119 @@ func TestDeleteFGAEmptyRelations(t *testing.T) {
 	err = ac.DeleteFGARelations(context.TODO(), []*descope.FGARelation{})
 	require.NoError(t, err)
 }
+
+func TestCheckAllInCache(t *testing.T) {
+	// setup mocks
+	ac, mockSDK, mockCache := injectAuthzMocks(t)
+	// setup test data
+	relations := []*descope.FGARelation{{Resource: "mario", Target: "luigi", Relation: "bigBro"}, {Resource: "luigi", Target: "mario", Relation: "bigBro"}}
+	expected := []*descope.FGACheck{
+		{
+			Allowed:  true,
+			Relation: relations[0],
+		},
+		{
+			Allowed:  false,
+			Relation: relations[1],
+		},
+	}
+	mockSDK.MockFGA.CheckAssert = func(_ []*descope.FGARelation) {
+		require.Fail(t, "should not be called")
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
+		if r.Resource == "mario" {
+			return true, true
+		}
+		return false, true
+	}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {
+		require.Fail(t, "should not be called")
+	}
+	// run test
+	result, err := ac.Check(context.TODO(), relations)
+	require.NoError(t, err)
+	require.Equal(t, expected, result)
+	// run test with nil relations
+	result, err = ac.Check(context.TODO(), nil)
+	require.NoError(t, err)
+	require.Empty(t, result)
+	// run test with empty relations
+	result, err = ac.Check(context.TODO(), []*descope.FGARelation{})
+	require.NoError(t, err)
+	require.Empty(t, result)
+}
+
+func TestCheckAllInSDK(t *testing.T) {
+	// setup mocks
+	ac, mockSDK, mockCache := injectAuthzMocks(t)
+	// setup test data
+	relations := []*descope.FGARelation{{Resource: "mario", Target: "luigi", Relation: "bigBro"}, {Resource: "luigi", Target: "mario", Relation: "bigBro"}}
+	expected := []*descope.FGACheck{
+		{
+			Allowed:  true,
+			Relation: relations[0],
+		},
+		{
+			Allowed:  false,
+			Relation: relations[1],
+		},
+	}
+	mockSDK.MockFGA.CheckAssert = func(rels []*descope.FGARelation) {
+		require.Equal(t, relations, rels)
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (allowed bool, ok bool) {
+		return false, false
+	}
+	mockSDK.MockFGA.CheckResponse = expected
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, checks []*descope.FGACheck) {
+		require.Equal(t, expected, checks)
+	}
+	// run test
+	result, err := ac.Check(context.TODO(), relations)
+	require.NoError(t, err)
+	require.Equal(t, expected, result)
+}
+
+func TestCheckMixed(t *testing.T) {
+	// setup mocks
+	ac, mockSDK, mockCache := injectAuthzMocks(t)
+	// setup test data
+	relations := []*descope.FGARelation{
+		{Resource: "mario", Target: "luigi", Relation: "bigBro"},
+		{Resource: "luigi", Target: "mario", Relation: "bigBro"},
+		{Resource: "mario", Target: "bowser", Relation: "enemy"},
+	}
+	expectedSdkRelations := []*descope.FGARelation{relations[0], relations[2]} // only the 1st and 3rd relations should be checked via sdk
+	expected := []*descope.FGACheck{
+		{
+			Allowed:  true,
+			Relation: relations[0],
+		},
+		{
+			Allowed:  false,
+			Relation: relations[1],
+		},
+		{
+			Allowed:  true,
+			Relation: relations[2],
+		},
+	}
+	mockSDK.MockFGA.CheckAssert = func(rels []*descope.FGARelation) {
+		require.Equal(t, expectedSdkRelations, rels)
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
+		if r.Resource == "luigi" && r.Target == "mario" { // only the second relation is in cache
+			return false, true
+		}
+		return false, false
+	}
+	sdkChecks := []*descope.FGACheck{expected[0], expected[2]}
+	mockSDK.MockFGA.CheckResponse = sdkChecks
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, checks []*descope.FGACheck) {
+		require.Equal(t, sdkChecks, checks) // only the checks returning from sdk should be updated in cache
+	}
+	// run test
+	result, err := ac.Check(context.TODO(), relations)
+	require.NoError(t, err)
+	require.Equal(t, expected, result)
+}

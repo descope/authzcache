@@ -81,7 +81,7 @@ func (a *AuthzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	// get cache
 	projectCache, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
-		return nil, err
+		return nil, err // notest
 	}
 	// iterate over relations and check cache, if not found, check later in sdk
 	var cachedChecks []*descope.FGACheck
@@ -103,7 +103,7 @@ func (a *AuthzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	// fetch missing relations from sdk
 	sdkChecks, err := a.mgmtSdk.FGA().Check(ctx, toCheckViaSDK)
 	if err != nil {
-		return nil, err
+		return nil, err // notest
 	}
 	// update cache
 	projectCache.UpdateCacheWithChecks(ctx, sdkChecks)
@@ -130,7 +130,7 @@ func (a *AuthzCache) getOrCreateProjectCache(ctx context.Context) (caches.Projec
 	cctx.Logger(ctx).Info().Msg("Creating new project cache")
 	projectCache, err := a.projectCacheCreator.NewProjectAuthzCache(ctx, a.mgmtSdk.Authz())
 	if err != nil {
-		return nil, err
+		return nil, err // notest
 	}
 	a.projectAuthzCaches[projectID] = projectCache
 	return projectCache, nil
