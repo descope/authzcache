@@ -1,0 +1,364 @@
+package caches
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/descope/authzcache/internal/config"
+	"github.com/descope/go-sdk/descope"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+type mockRemoteChangesChecker struct {
+	GetModifiedFunc func(ctx context.Context, since time.Time) (*descope.AuthzModified, error)
+}
+
+func (m *mockRemoteChangesChecker) GetModified(ctx context.Context, since time.Time) (*descope.AuthzModified, error) {
+	return m.GetModifiedFunc(ctx, since)
+}
+
+var _ RemoteChangesChecker = &mockRemoteChangesChecker{} // ensure mockRemoteChangesChecker implements RemoteChangesChecker
+
+type mockError struct {
+}
+
+func (m *mockError) Error() string {
+	return "mock error"
+}
+
+// helper struct to hold a cached relation and its expected allowed value
+type cachedRelation struct {
+	allowed bool
+	direct  bool
+	r       *descope.FGARelation
+}
+
+func TestNewProjectAuthzCache(t *testing.T) {
+	ctx := context.TODO()
+	remoteChecker := &mockRemoteChangesChecker{}
+	cache, err := ProjectAuthzCacheCreator{}.NewProjectAuthzCache(ctx, remoteChecker)
+	require.NoError(t, err)
+	require.NotNil(t, cache)
+}
+
+func TestSchemaUpdate(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	schemaDef := "schema definition"
+	schema := &descope.FGASchema{
+		Schema: schemaDef,
+	}
+	// prepare some data in the caches
+	updateBothCachesWithChecks(ctx, t, cache)
+	// update the schema
+	cache.UpdateCacheWithSchema(ctx, schema)
+	// check that all caches are now empty
+	assert.Equal(t, 0, cache.directRelationCache.Len(ctx))
+	assert.Equal(t, 0, cache.indirectOrNegativeRelationCache.Len(ctx))
+	// check that the schema is updated
+	fromCache := cache.GetSchema()
+	require.Equal(t, schemaDef, fromCache.Schema)
+}
+
+func TestUpdateCacheWithChecks(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
+	// validate CheckRelation results
+	for _, cr := range cachedRelations {
+		allowed, ok := cache.CheckRelation(ctx, cr.r)
+		assert.True(t, ok)
+		assert.Equal(t, cr.allowed, allowed)
+	}
+	// call UpdateCacheWithChecks using the already cached relations, verify that no new entries are added to the cache and that the cache is not invalidated
+	directSize := cache.directRelationCache.Len(ctx)
+	indirectSize := cache.indirectOrNegativeRelationCache.Len(ctx)
+	for _, cr := range cachedRelations {
+		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: cr.allowed, Relation: cr.r, Direct: cr.direct}})
+		// validate CheckRelation after the 2nd update, should return the same results
+		allowed, ok := cache.CheckRelation(ctx, cr.r)
+		assert.True(t, ok)
+		assert.Equal(t, cr.allowed, allowed)
+	}
+	assert.Equal(t, directSize, cache.directRelationCache.Len(ctx))
+	assert.Equal(t, indirectSize, cache.indirectOrNegativeRelationCache.Len(ctx))
+}
+
+func TestUpdateCacheWithAddedRelations(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	// prepare some data in the caches
+	oldRelations := updateBothCachesWithChecks(ctx, t, cache)
+	// add new relations
+	newRelations := []*descope.FGARelation{
+		{Resource: "p1:file1", Target: "user1", Relation: "owner"},
+		{Resource: "p1:file1", Target: "user2", Relation: "owner"},
+		{Resource: "p1:file1", Target: "user3", Relation: "owner"},
+		{Resource: "p1:file1", Target: "user4", Relation: "owner"},
+	}
+	cache.UpdateCacheWithAddedRelations(ctx, newRelations)
+	// direct old relations should still be there, indirect or false should now be removed
+	for _, old := range oldRelations {
+		expectedToRemainInCache := old.direct && old.allowed // non direct and false relations should have been removed, direct should still be there
+		allowed, ok := cache.CheckRelation(ctx, old.r)
+		assert.Equal(t, expectedToRemainInCache, ok)
+		expectedAllowed := expectedToRemainInCache && old.allowed
+		assert.Equal(t, expectedAllowed, allowed) // if the relation is still in the cache, it should have the same allowed value
+	}
+	// all new relations should be allowed
+	for _, r := range newRelations {
+		allowed, ok := cache.CheckRelation(ctx, r)
+		assert.True(t, ok)
+		assert.True(t, allowed)
+	}
+}
+
+func TestUpdateCacheWithDeletedRelations(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	// prepare some data in the caches
+	oldRelations := updateBothCachesWithChecks(ctx, t, cache)
+	// delete 1 true relation
+	toDelete := oldRelations[0]
+	require.True(t, toDelete.allowed && toDelete.direct) // sanity check, verify that the relation is true and direct
+	cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{toDelete.r})
+	// verify that:
+	// 1. deleted relation is not in the cache anymore
+	// 2. all other direct relations are still in the cache
+	// 3. all indirect or false relations are removed
+	for _, old := range oldRelations {
+		expectedToRemainInCache := old.direct && old.allowed && old.r != toDelete.r
+		allowed, ok := cache.CheckRelation(ctx, old.r)
+		assert.Equal(t, expectedToRemainInCache, ok)
+		expectedAllowed := expectedToRemainInCache && old.allowed
+		assert.Equal(t, expectedAllowed, allowed)
+	}
+	// delete all remaining direct relations + perform re-deletes
+	for _, old := range oldRelations {
+		cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{old.r})
+		allowed, ok := cache.CheckRelation(ctx, old.r)
+		assert.False(t, ok)
+		assert.False(t, allowed)
+	}
+	// verify that the cache is empty
+	assert.Equal(t, 0, cache.directRelationCache.Len(ctx))
+	assert.Equal(t, 0, cache.indirectOrNegativeRelationCache.Len(ctx))
+}
+
+func TestEmptyActions(t *testing.T) {
+	ctx := context.TODO()
+	// pre populate the cache
+	cache, _ := setup(t)
+	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
+	// get the initial cache size
+	expectedDirectSize := cache.directRelationCache.Len(ctx)
+	expectedIndirectSize := cache.indirectOrNegativeRelationCache.Len(ctx)
+	// perform empty updates
+	cache.UpdateCacheWithAddedRelations(ctx, nil)
+	cache.UpdateCacheWithDeletedRelations(ctx, nil)
+	cache.UpdateCacheWithChecks(ctx, nil)
+	// cache should not change
+	assert.Equal(t, expectedDirectSize, cache.directRelationCache.Len(ctx))
+	assert.Equal(t, expectedIndirectSize, cache.indirectOrNegativeRelationCache.Len(ctx))
+	for _, cr := range cachedRelations {
+		allowed, ok := cache.CheckRelation(ctx, cr.r)
+		assert.True(t, ok)
+		assert.Equal(t, cr.allowed, allowed)
+	}
+}
+
+func TestRemotePolling_NoCachedRelations(t *testing.T) {
+	// use context with cancel to avoid goroutine leak
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	// set the polling interval to 10ms
+	t.Setenv(config.ConfigKeyRemotePollingIntervalInMillis, "10")
+	cache, remoteChecker := setup(t)
+	// populate the schema cache only
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
+	// remote changes checker should not be called since there are no cached relations
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		require.Fail(t, "should not be called since there are no cached relations")
+		return nil, nil
+	}
+	// wait for the polling interval to pass
+	cache.StartRemoteChangesPolling(ctx)
+	time.Sleep(15 * time.Millisecond)
+	// verify that the schema cache was invalidated
+	assert.Nil(t, cache.schemaCache)
+}
+
+func TestRemotePolling_RemoteChangesError(t *testing.T) {
+	// use context with cancel to avoid goroutine leak
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	// set the polling interval to 10ms
+	t.Setenv(config.ConfigKeyRemotePollingIntervalInMillis, "10")
+	cache, remoteChecker := setup(t)
+	// simulate an error from remote changes checker
+	var remoteCalled bool
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		remoteCalled = true
+		return nil, &mockError{}
+	}
+	// populate the cache with some relations
+	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
+	// wait for the polling interval to pass
+	cache.StartRemoteChangesPolling(ctx)
+	time.Sleep(15 * time.Millisecond)
+	// sanity: verify that the remote was called
+	require.True(t, remoteCalled)
+	// verify that the cache was not invalidated
+	for _, cr := range cachedRelations {
+		allowed, ok := cache.CheckRelation(ctx, cr.r)
+		assert.True(t, ok)
+		assert.Equal(t, cr.allowed, allowed)
+	}
+}
+
+func TestRemotePolling_RemoteSchemaChange(t *testing.T) {
+	// use context with cancel to avoid goroutine leak
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	// set the polling interval to 10ms
+	t.Setenv(config.ConfigKeyRemotePollingIntervalInMillis, "10")
+	cache, remoteChecker := setup(t)
+	// populate the cache with some relations
+	updateBothCachesWithChecks(ctx, t, cache)
+	// sanity check: the cache is now populated
+	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
+	require.Greater(t, cache.indirectOrNegativeRelationCache.Len(ctx), 0)
+	// Simulate a schema change in the remote
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		return &descope.AuthzModified{SchemaChanged: true}, nil
+	}
+	// wait for the polling interval to pass
+	cache.StartRemoteChangesPolling(ctx)
+	time.Sleep(15 * time.Millisecond)
+	// verify that the schema cache was invalidated
+	assert.Nil(t, cache.GetSchema())
+	// verify that all relations were invalidated
+	assert.Equal(t, 0, cache.directRelationCache.Len(ctx))
+	assert.Equal(t, 0, cache.indirectOrNegativeRelationCache.Len(ctx))
+}
+
+func TestRemotePolling_RemoteRelationChange(t *testing.T) {
+	// use context with cancel to avoid goroutine leak
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	// set the polling interval to 10ms
+	t.Setenv(config.ConfigKeyRemotePollingIntervalInMillis, "10")
+	cache, remoteChecker := setup(t)
+	// populate the cache with a schema and some relations
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
+	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
+	// sanity check: the cache is now populated
+	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
+	require.Greater(t, cache.indirectOrNegativeRelationCache.Len(ctx), 0)
+	// get one of the cached relations resource and target
+	resourceChanged := cachedRelations[0].r.Resource
+	targetChanged := cachedRelations[0].r.Target
+	// Simulate a relation change in the remote
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		return &descope.AuthzModified{
+			Resources: []string{resourceChanged},
+			Targets:   []string{targetChanged},
+		}, nil
+	}
+	// Wait for the polling interval to pass
+	cache.StartRemoteChangesPolling(ctx)
+	time.Sleep(15 * time.Millisecond)
+	// Verify that the schema cache was not invalidated
+	assert.NotNil(t, cache.GetSchema())
+	// Verify that all indirect relations are now invalidated
+	assert.Equal(t, 0, cache.indirectOrNegativeRelationCache.Len(ctx))
+	// verify that all relations not changed remotely are still in the cache
+	var atLeastOneStillInCache bool
+	for _, cr := range cachedRelations {
+		expectedToRemainInCache := cr.direct && cr.allowed && cr.r.Resource != resourceChanged && cr.r.Target != targetChanged
+		atLeastOneStillInCache = atLeastOneStillInCache || expectedToRemainInCache
+		allowed, ok := cache.CheckRelation(ctx, cr.r)
+		assert.Equal(t, expectedToRemainInCache, ok)
+		// if the relation is still in the cache, it should have the same allowed value
+		expectedAllowed := expectedToRemainInCache && cr.allowed
+		assert.Equal(t, expectedAllowed, allowed)
+	}
+	// we know that there is one direct relation that should still be in the cache since it has different resource and target
+	assert.True(t, atLeastOneStillInCache)
+}
+
+func TestRemotePolling_NoRemoteChanges(t *testing.T) {
+	// use context with cancel to avoid goroutine leak
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	// set the polling interval to 10ms
+	t.Setenv(config.ConfigKeyRemotePollingIntervalInMillis, "10")
+	cache, remoteChecker := setup(t)
+	// populate the cache with a schema and some relations
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
+	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
+	// sanity check: the cache is now populated
+	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
+	require.Greater(t, cache.indirectOrNegativeRelationCache.Len(ctx), 0)
+	// Simulate no changes in the remote
+	var remoteCalled bool
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		remoteCalled = true
+		return &descope.AuthzModified{}, nil
+	}
+	// wait for the polling interval to pass
+	cache.StartRemoteChangesPolling(ctx)
+	time.Sleep(15 * time.Millisecond)
+	// sanity: verify that the remote was called
+	require.True(t, remoteCalled)
+	// verify that the schema cache was not invalidated
+	assert.NotNil(t, cache.GetSchema())
+	// verify that all relations are still in the cache
+	for _, cr := range cachedRelations {
+		allowed, ok := cache.CheckRelation(ctx, cr.r)
+		assert.True(t, ok)
+		assert.Equal(t, cr.allowed, allowed)
+	}
+}
+
+func setup(t *testing.T) (*projectAuthzCache, *mockRemoteChangesChecker) {
+	ctx := context.TODO()
+	remoteChecker := &mockRemoteChangesChecker{}
+	cache, err := ProjectAuthzCacheCreator{}.NewProjectAuthzCache(ctx, remoteChecker)
+	require.NoError(t, err)
+	require.NotNil(t, cache)
+	return cache.(*projectAuthzCache), remoteChecker
+}
+
+func updateBothCachesWithChecks(ctx context.Context, t *testing.T, cache *projectAuthzCache) []*cachedRelation {
+	resourceOneID := "1_" + uuid.NewString()
+	directTrueRelation := &descope.FGARelation{Resource: resourceOneID, Target: "user1", Relation: "owner"}
+	indirectTrueRelation := &descope.FGARelation{Resource: "2_" + uuid.NewString(), Target: "user3", Relation: "owner"}
+	directFalseRelation := &descope.FGARelation{Resource: "3_" + uuid.NewString(), Target: "user2", Relation: "owner"}
+	indirectFalseRelation := &descope.FGARelation{Resource: "4_" + uuid.NewString(), Target: "user4", Relation: "owner"}
+	extraDirectTrueRelation := &descope.FGARelation{Resource: resourceOneID, Target: "user1", Relation: "parent"}
+	differentResourceAndTargetDirectTrueRelation := &descope.FGARelation{Resource: "5_" + uuid.NewString(), Target: uuid.NewString(), Relation: "parent"}
+	checks := []*descope.FGACheck{
+		{Allowed: true, Relation: directTrueRelation, Direct: true},
+		{Allowed: true, Relation: indirectTrueRelation, Direct: false},
+		{Allowed: false, Relation: directFalseRelation, Direct: true},
+		{Allowed: false, Relation: indirectFalseRelation, Direct: false},
+		{Allowed: true, Relation: extraDirectTrueRelation, Direct: true},
+		{Allowed: true, Relation: differentResourceAndTargetDirectTrueRelation, Direct: true},
+	}
+	cache.UpdateCacheWithChecks(ctx, checks)
+	// validate cache distribution
+	require.Equal(t, 2, cache.directRelationCache.Len(ctx)) // 2 relations are saved under the same key (resourceOneID:user1) in the direct cache
+	require.Equal(t, 3, cache.indirectOrNegativeRelationCache.Len(ctx))
+	return []*cachedRelation{
+		{allowed: true, direct: true, r: directTrueRelation},
+		{allowed: false, direct: true, r: directFalseRelation},
+		{allowed: true, direct: false, r: indirectTrueRelation},
+		{allowed: false, direct: false, r: indirectFalseRelation},
+		{allowed: true, direct: true, r: extraDirectTrueRelation},
+		{allowed: true, direct: true, r: differentResourceAndTargetDirectTrueRelation},
+	}
+}

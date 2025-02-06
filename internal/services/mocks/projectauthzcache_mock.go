@@ -17,34 +17,33 @@ type ProjectAuthzCacheMock struct {
 	UpdateCacheWithAddedRelationsFunc   func(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithDeletedRelationsFunc func(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithChecksFunc           func(ctx context.Context, sdkChecks []*descope.FGACheck)
+	StartRemoteChangesPollingFunc       func(ctx context.Context)
 }
 
-// GetSchema provides a mock function with given fields:
 func (m *ProjectAuthzCacheMock) GetSchema() *descope.FGASchema {
 	return m.GetSchemaFunc()
 }
 
-// CheckRelation provides a mock function with given fields: ctx, r
 func (m *ProjectAuthzCacheMock) CheckRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
 	return m.CheckRelationFunc(ctx, r)
 }
 
-// UpdateCacheWithSchema provides a mock function with given fields: ctx, schema
 func (m *ProjectAuthzCacheMock) UpdateCacheWithSchema(ctx context.Context, schema *descope.FGASchema) {
 	m.UpdateCacheWithSchemaFunc(ctx, schema)
 }
 
-// UpdateCacheWithAddedRelations provides a mock function with given fields: ctx, relations
 func (m *ProjectAuthzCacheMock) UpdateCacheWithAddedRelations(ctx context.Context, relations []*descope.FGARelation) {
 	m.UpdateCacheWithAddedRelationsFunc(ctx, relations)
 }
 
-// UpdateCacheWithDeletedRelations provides a mock function with given fields: ctx, relations
 func (m *ProjectAuthzCacheMock) UpdateCacheWithDeletedRelations(ctx context.Context, relations []*descope.FGARelation) {
 	m.UpdateCacheWithDeletedRelationsFunc(ctx, relations)
 }
 
-// UpdateCacheWithChecks provides a mock function with given fields: ctx, sdkChecks
 func (m *ProjectAuthzCacheMock) UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck) {
 	m.UpdateCacheWithChecksFunc(ctx, sdkChecks)
+}
+
+func (m *ProjectAuthzCacheMock) StartRemoteChangesPolling(ctx context.Context) {
+	m.StartRemoteChangesPollingFunc(ctx)
 }

@@ -133,5 +133,6 @@ func (a *AuthzCache) getOrCreateProjectCache(ctx context.Context) (caches.Projec
 		return nil, err // notest
 	}
 	a.projectAuthzCaches[projectID] = projectCache
+	projectCache.StartRemoteChangesPolling(ctx)
 	return projectCache, nil
 }

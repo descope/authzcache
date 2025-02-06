@@ -11,6 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type mockCache struct {
+	mocks.ProjectAuthzCacheMock
+	pollingStarted bool
+}
+
 type mockCacheCreator struct {
 	mockCache caches.ProjectAuthzCache
 }
@@ -29,12 +34,15 @@ func TestNewAuthzCache(t *testing.T) {
 	require.NotNil(t, ac.projectAuthzCaches)
 }
 
-func injectAuthzMocks(t *testing.T) (*AuthzCache, *mocksmgmt.MockManagement, *mocks.ProjectAuthzCacheMock) {
+func injectAuthzMocks(t *testing.T) (*AuthzCache, *mocksmgmt.MockManagement, *mockCache) {
 	mockSDK := &mocksmgmt.MockManagement{
 		MockFGA:   &mocksmgmt.MockFGA{},
 		MockAuthz: &mocksmgmt.MockAuthz{},
 	}
-	mockCache := &mocks.ProjectAuthzCacheMock{}
+	mockCache := &mockCache{}
+	mockCache.StartRemoteChangesPollingFunc = func(_ context.Context) {
+		mockCache.pollingStarted = true
+	}
 	mockProjectCacheCreator := &mockCacheCreator{mockCache: mockCache}
 	// create AuthzCache with mocks
 	ac, err := New(context.TODO(), mockSDK, mockProjectCacheCreator)
@@ -63,6 +71,7 @@ func TestCreateFGASchema(t *testing.T) {
 	// check call counts
 	require.Equal(t, 1, cacheUpdateCallCount)
 	require.Equal(t, 1, sdkUpdateCallCount)
+	require.True(t, mockCache.pollingStarted)
 }
 
 func TestCreateFGARelations(t *testing.T) {
@@ -86,6 +95,7 @@ func TestCreateFGARelations(t *testing.T) {
 	// check call counts
 	require.Equal(t, 1, cacheUpdateCallCount)
 	require.Equal(t, 1, sdkUpdateCallCount)
+	require.True(t, mockCache.pollingStarted)
 }
 
 func TestCreateFGAEmptyRelations(t *testing.T) {
@@ -103,6 +113,7 @@ func TestCreateFGAEmptyRelations(t *testing.T) {
 	require.NoError(t, err)
 	err = ac.CreateFGARelations(context.TODO(), []*descope.FGARelation{})
 	require.NoError(t, err)
+	require.False(t, mockCache.pollingStarted)
 }
 
 func TestDeleteFGARelations(t *testing.T) {
@@ -126,6 +137,7 @@ func TestDeleteFGARelations(t *testing.T) {
 	// check call counts
 	require.Equal(t, 1, cacheUpdateCallCount)
 	require.Equal(t, 1, sdkUpdateCallCount)
+	require.True(t, mockCache.pollingStarted)
 }
 
 func TestDeleteFGAEmptyRelations(t *testing.T) {
@@ -143,6 +155,7 @@ func TestDeleteFGAEmptyRelations(t *testing.T) {
 	require.NoError(t, err)
 	err = ac.DeleteFGARelations(context.TODO(), []*descope.FGARelation{})
 	require.NoError(t, err)
+	require.False(t, mockCache.pollingStarted)
 }
 
 func TestCheckEmptyRelations(t *testing.T) {
@@ -152,7 +165,7 @@ func TestCheckEmptyRelations(t *testing.T) {
 	mockSDK.MockFGA.CheckAssert = func(_ []*descope.FGARelation) {
 		require.Fail(t, "should not be called")
 	}
-	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
+	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (allowed bool, ok bool) {
 		require.Fail(t, "should not be called")
 		return false, false
 	}
@@ -167,6 +180,7 @@ func TestCheckEmptyRelations(t *testing.T) {
 	result, err = ac.Check(context.TODO(), []*descope.FGARelation{})
 	require.NoError(t, err)
 	require.Empty(t, result)
+	require.True(t, mockCache.pollingStarted)
 }
 
 func TestCheckAllInCache(t *testing.T) {
@@ -200,6 +214,7 @@ func TestCheckAllInCache(t *testing.T) {
 	result, err := ac.Check(context.TODO(), relations)
 	require.NoError(t, err)
 	require.Equal(t, expected, result)
+	require.True(t, mockCache.pollingStarted)
 }
 
 func TestCheckAllInSDK(t *testing.T) {
@@ -231,6 +246,7 @@ func TestCheckAllInSDK(t *testing.T) {
 	result, err := ac.Check(context.TODO(), relations)
 	require.NoError(t, err)
 	require.Equal(t, expected, result)
+	require.True(t, mockCache.pollingStarted)
 }
 
 func TestCheckMixed(t *testing.T) {
@@ -275,4 +291,5 @@ func TestCheckMixed(t *testing.T) {
 	result, err := ac.Check(context.TODO(), relations)
 	require.NoError(t, err)
 	require.Equal(t, expected, result)
+	require.True(t, mockCache.pollingStarted)
 }

@@ -7,7 +7,7 @@ import (
 const (
 	ConfigKeyDirectRelationCacheSizePerProject              = "AUTHZCACHE_DIRECT_RELATION_CACHE_SIZE_PER_PROJECT"
 	ConfigKeyIndirectAndNegativeRelationCacheSizePerProject = "AUTHZCACHE_INDIRECT_AND_NEGATIVE_RELATION_CACHE_SIZE_PER_PROJECT"
-	ConfigKeyRemotePollingIntervalInSeconds                 = "AUTHZCACHE_REMOTE_POLLING_INTERVAL_IN_SECONDS"
+	ConfigKeyRemotePollingIntervalInMillis                  = "AUTHZCACHE_REMOTE_POLLING_INTERVAL_IN_MILLIS"
 	MetricsKeyResourceServiceName                           = "service_name"
 )
 
@@ -19,6 +19,6 @@ func GetInderectAndNegativeRelationCacheSizePerProject() int {
 	return cconfig.GetIntOrProvidedLocal(ConfigKeyIndirectAndNegativeRelationCacheSizePerProject, 1_000_000)
 }
 
-func GetRemotePollingIntervalInSeconds() int {
-	return cconfig.GetIntOrProvidedLocal(ConfigKeyRemotePollingIntervalInSeconds, 15)
+func GetRemotePollingIntervalInMillis() int {
+	return cconfig.GetIntOrProvidedLocal(ConfigKeyRemotePollingIntervalInMillis, 15_000)
 }

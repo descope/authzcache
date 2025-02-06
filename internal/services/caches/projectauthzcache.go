@@ -38,6 +38,7 @@ type ProjectAuthzCache interface {
 	UpdateCacheWithAddedRelations(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithDeletedRelations(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck)
+	StartRemoteChangesPolling(ctx context.Context)
 }
 
 var _ ProjectAuthzCache = &projectAuthzCache{} // ensure projectAuthzCache implements ProjectAuthzCache
@@ -47,11 +48,11 @@ type ProjectAuthzCacheCreator struct{}
 func (p ProjectAuthzCacheCreator) NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChangesChecker) (ProjectAuthzCache, error) {
 	directRelationCache, err := lru.New[resourceTargetKey, []string](config.GetDirectRelationCacheSizePerProject(), "authz-direct-relations-"+cctx.ProjectID(ctx))
 	if err != nil {
-		return nil, err
+		return nil, err // notest
 	}
 	indirectOrNegativeRelationCache, err := lru.New[resourceTargetRelationKey, bool](config.GetInderectAndNegativeRelationCacheSizePerProject(), "authz-indirect-or-negative-relations-"+cctx.ProjectID(ctx))
 	if err != nil {
-		return nil, err
+		return nil, err // notest
 	}
 	pc := &projectAuthzCache{
 		directRelationCache:             directRelationCache,
@@ -59,10 +60,9 @@ func (p ProjectAuthzCacheCreator) NewProjectAuthzCache(ctx context.Context, remo
 		remoteChanges: &remoteChangesTracking{
 			lastPollTime:          time.Now(),
 			remote:                remoteChangesChecker,
-			remotePollingInterval: time.Second * time.Duration(config.GetRemotePollingIntervalInSeconds()),
+			remotePollingInterval: time.Millisecond * time.Duration(config.GetRemotePollingIntervalInMillis()),
 		},
 	}
-	pc.invalidateCacheOnRemoteChanges(ctx)
 	return pc, nil
 }
 
@@ -120,11 +120,12 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 	}
 }
 
-func (pc *projectAuthzCache) invalidateCacheOnRemoteChanges(ctx context.Context) {
+func (pc *projectAuthzCache) StartRemoteChangesPolling(ctx context.Context) {
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
+				cctx.Logger(ctx).Info().Msg("Remote changes polling stopped due to context cancellation")
 				return
 			case <-time.After(pc.remoteChanges.remotePollingInterval):
 				// in case of no cached relations, we skip the server call but invalidate the schema cache to make sure we don't miss schema changes
