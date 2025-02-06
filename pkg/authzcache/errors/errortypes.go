@@ -37,5 +37,8 @@ func ServiceErrorFromSdkError(ctx context.Context, err error) ce.ServiceError {
 		return builder.NewErrorWithLogLevelWarn(ctx, de, de.Message)
 	}
 	// got malformed or non descope error
+	if err == nil {
+		return ce.InternalError.NewErrorWithLog(ctx, err, "nil error")
+	}
 	return ce.InternalError.NewErrorWithLog(ctx, err, err.Error())
 }
