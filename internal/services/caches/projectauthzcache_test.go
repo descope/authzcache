@@ -22,13 +22,6 @@ func (m *mockRemoteChangesChecker) GetModified(ctx context.Context, since time.T
 
 var _ RemoteChangesChecker = &mockRemoteChangesChecker{} // ensure mockRemoteChangesChecker implements RemoteChangesChecker
 
-type mockError struct {
-}
-
-func (m *mockError) Error() string {
-	return "mock error"
-}
-
 // helper struct to hold a cached relation and its expected allowed value
 type cachedRelation struct {
 	allowed bool
@@ -202,7 +195,7 @@ func TestRemotePolling_RemoteChangesError(t *testing.T) {
 	var remoteCalled bool
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		remoteCalled = true
-		return nil, &mockError{}
+		return nil, assert.AnError
 	}
 	// populate the cache with some relations
 	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
