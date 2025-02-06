@@ -145,6 +145,30 @@ func TestDeleteFGAEmptyRelations(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCheckEmptyRelations(t *testing.T) {
+	// setup mocks
+	ac, mockSDK, mockCache := injectAuthzMocks(t)
+	// setup test data
+	mockSDK.MockFGA.CheckAssert = func(_ []*descope.FGARelation) {
+		require.Fail(t, "should not be called")
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
+		require.Fail(t, "should not be called")
+		return false, false
+	}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {
+		require.Fail(t, "should not be called")
+	}
+	// run test with nil relations
+	result, err := ac.Check(context.TODO(), nil)
+	require.NoError(t, err)
+	require.Empty(t, result)
+	// run test with empty relations
+	result, err = ac.Check(context.TODO(), []*descope.FGARelation{})
+	require.NoError(t, err)
+	require.Empty(t, result)
+}
+
 func TestCheckAllInCache(t *testing.T) {
 	// setup mocks
 	ac, mockSDK, mockCache := injectAuthzMocks(t)
@@ -176,14 +200,6 @@ func TestCheckAllInCache(t *testing.T) {
 	result, err := ac.Check(context.TODO(), relations)
 	require.NoError(t, err)
 	require.Equal(t, expected, result)
-	// run test with nil relations
-	result, err = ac.Check(context.TODO(), nil)
-	require.NoError(t, err)
-	require.Empty(t, result)
-	// run test with empty relations
-	result, err = ac.Check(context.TODO(), []*descope.FGARelation{})
-	require.NoError(t, err)
-	require.Empty(t, result)
 }
 
 func TestCheckAllInSDK(t *testing.T) {
