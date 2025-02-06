@@ -5,14 +5,13 @@ import (
 	"testing"
 
 	"github.com/descope/authzcache/internal/services/caches"
-	"github.com/descope/authzcache/internal/services/mocks"
 	"github.com/descope/go-sdk/descope"
 	mocksmgmt "github.com/descope/go-sdk/descope/tests/mocks/mgmt"
 	"github.com/stretchr/testify/require"
 )
 
 type mockCache struct {
-	mocks.ProjectAuthzCacheMock
+	caches.ProjectAuthzCacheMock
 	pollingStarted bool
 }
 
