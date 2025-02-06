@@ -28,46 +28,50 @@ func New(ctx context.Context, mgmtSdk sdk.Management, projectCacheCreator Projec
 func (a *AuthzCache) CreateFGASchema(ctx context.Context, dsl string) error {
 	err := a.mgmtSdk.FGA().SaveSchema(ctx, &descope.FGASchema{Schema: dsl})
 	if err != nil {
-		return err
+		return err // notest
 	}
 	// update cache
 	projectCache, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
-		return err
+		return err // notest
 	}
 	projectCache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: dsl})
 	return nil
 }
 
 func (a *AuthzCache) CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
-	err := a.mgmtSdk.FGA().CreateRelations(ctx, relations)
-	if err != nil {
-		return err
-	}
-	// update cache
+	// nothing to do
 	if len(relations) == 0 {
 		return nil
 	}
+	// update remote
+	err := a.mgmtSdk.FGA().CreateRelations(ctx, relations)
+	if err != nil {
+		return err // notest
+	}
+	// update cache
 	projectCache, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
-		return err
+		return err // notest
 	}
 	projectCache.UpdateCacheWithAddedRelations(ctx, relations)
 	return nil
 }
 
 func (a *AuthzCache) DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
-	err := a.mgmtSdk.FGA().DeleteRelations(ctx, relations)
-	if err != nil {
-		return err
-	}
-	// update cache
+	// nothing to do
 	if len(relations) == 0 {
 		return nil
 	}
+	// update remote
+	err := a.mgmtSdk.FGA().DeleteRelations(ctx, relations)
+	if err != nil {
+		return err // notest
+	}
+	// update cache
 	projectCache, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
-		return err
+		return err // notest
 	}
 	projectCache.UpdateCacheWithDeletedRelations(ctx, relations)
 	return nil
