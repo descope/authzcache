@@ -19,7 +19,7 @@ func setup() (*authzController, *services.AuthzCacheMock) {
 func TestCreateFGASchema(t *testing.T) {
 	controller, mockAuthzCache := setup()
 	var authzCalled bool
-	mockAuthzCache.CreateFGASchemaFunc = func(ctx context.Context, dsl string) error {
+	mockAuthzCache.CreateFGASchemaFunc = func(_ context.Context, dsl string) error {
 		require.Equal(t, "test-dsl", dsl)
 		authzCalled = true
 		return nil
@@ -35,7 +35,7 @@ func TestCreateFGASchema(t *testing.T) {
 
 func TestCreateFGASchemaError(t *testing.T) {
 	controller, mockAuthzCache := setup()
-	mockAuthzCache.CreateFGASchemaFunc = func(ctx context.Context, dsl string) error {
+	mockAuthzCache.CreateFGASchemaFunc = func(_ context.Context, _ string) error {
 		return assert.AnError
 	}
 
@@ -52,7 +52,7 @@ func TestCreateFGARelations(t *testing.T) {
 	tuples := []*authzv1.Tuple{
 		{Resource: "testR", Target: "testT", ResourceType: "testRT", Relation: "testRel", TargetType: "testTT"},
 	}
-	mockAuthzCache.CreateFGARelationsFunc = func(ctx context.Context, relations []*descope.FGARelation) error {
+	mockAuthzCache.CreateFGARelationsFunc = func(_ context.Context, relations []*descope.FGARelation) error {
 		authzCalled = true
 		require.Equal(t, 1, len(relations))
 		require.Equal(t, tuples[0].Resource, relations[0].Resource)
@@ -73,7 +73,7 @@ func TestCreateFGARelations(t *testing.T) {
 
 func TestCreateFGARelationsError(t *testing.T) {
 	controller, mockAuthzCache := setup()
-	mockAuthzCache.CreateFGARelationsFunc = func(ctx context.Context, relations []*descope.FGARelation) error {
+	mockAuthzCache.CreateFGARelationsFunc = func(_ context.Context, _ []*descope.FGARelation) error {
 		return assert.AnError
 	}
 
@@ -90,7 +90,7 @@ func TestDeleteFGARelations(t *testing.T) {
 	tuples := []*authzv1.Tuple{
 		{Resource: "testR", Target: "testT", ResourceType: "testRT", Relation: "testRel", TargetType: "testTT"},
 	}
-	mockAuthzCache.DeleteFGARelationsFunc = func(ctx context.Context, relations []*descope.FGARelation) error {
+	mockAuthzCache.DeleteFGARelationsFunc = func(_ context.Context, relations []*descope.FGARelation) error {
 		require.Equal(t, 1, len(relations))
 		require.Equal(t, tuples[0].Resource, relations[0].Resource)
 		require.Equal(t, tuples[0].Target, relations[0].Target)
@@ -111,7 +111,7 @@ func TestDeleteFGARelations(t *testing.T) {
 
 func TestDeleteFGARelationsError(t *testing.T) {
 	controller, mockAuthzCache := setup()
-	mockAuthzCache.DeleteFGARelationsFunc = func(ctx context.Context, relations []*descope.FGARelation) error {
+	mockAuthzCache.DeleteFGARelationsFunc = func(_ context.Context, _ []*descope.FGARelation) error {
 		return assert.AnError
 	}
 
@@ -128,7 +128,7 @@ func TestCheck(t *testing.T) {
 	tuples := []*authzv1.Tuple{
 		{Resource: "testR", Target: "testT", ResourceType: "testRT", Relation: "testRel", TargetType: "testTT"},
 	}
-	mockAuthzCache.CheckFunc = func(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
+	mockAuthzCache.CheckFunc = func(_ context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
 		require.Equal(t, 1, len(relations))
 		require.Equal(t, tuples[0].Resource, relations[0].Resource)
 		require.Equal(t, tuples[0].Target, relations[0].Target)
@@ -159,7 +159,7 @@ func TestCheck(t *testing.T) {
 
 func TestCheckError(t *testing.T) {
 	controller, mockAuthzCache := setup()
-	mockAuthzCache.CheckFunc = func(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
+	mockAuthzCache.CheckFunc = func(_ context.Context, _ []*descope.FGARelation) ([]*descope.FGACheck, error) {
 		return nil, assert.AnError
 	}
 
