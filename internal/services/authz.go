@@ -9,15 +9,19 @@ import (
 	"github.com/descope/go-sdk/descope/sdk"
 )
 
-type AuthzCache struct {
-	mgmtSdk            sdk.Management
-	projectAuthzCaches map[string]*caches.ProjectAuthzCache // projectID -> caches
+type ProjectAuthzCacheCreator interface {
+	NewProjectAuthzCache(ctx context.Context, remoteChangesChecker caches.RemoteChangesChecker) (caches.ProjectAuthzCache, error)
 }
 
-func New(ctx context.Context, mgmtSdk sdk.Management) (*AuthzCache, error) {
+type AuthzCache struct {
+	mgmtSdk             sdk.Management
+	projectAuthzCaches  map[string]caches.ProjectAuthzCache // projectID -> caches
+	projectCacheCreator ProjectAuthzCacheCreator
+}
+
+func New(ctx context.Context, mgmtSdk sdk.Management, projectCacheCreator ProjectAuthzCacheCreator) (*AuthzCache, error) {
 	cctx.Logger(ctx).Info().Msg("Starting new authz cache")
-	// service init
-	ac := &AuthzCache{mgmtSdk: mgmtSdk, projectAuthzCaches: make(map[string]*caches.ProjectAuthzCache)}
+	ac := &AuthzCache{mgmtSdk: mgmtSdk, projectAuthzCaches: make(map[string]caches.ProjectAuthzCache), projectCacheCreator: projectCacheCreator}
 	return ac, nil
 }
 
@@ -113,14 +117,14 @@ func (a *AuthzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	return result, nil
 }
 
-func (a *AuthzCache) getOrCreateProjectCache(ctx context.Context) (*caches.ProjectAuthzCache, error) {
+func (a *AuthzCache) getOrCreateProjectCache(ctx context.Context) (caches.ProjectAuthzCache, error) {
 	projectID := cctx.ProjectID(ctx)
 	projectCache, ok := a.projectAuthzCaches[projectID]
 	if ok {
 		return projectCache, nil
 	}
 	cctx.Logger(ctx).Info().Msg("Creating new project cache")
-	projectCache, err := caches.NewProjectAuthzCache(ctx, a.mgmtSdk.Authz())
+	projectCache, err := a.projectCacheCreator.NewProjectAuthzCache(ctx, a.mgmtSdk.Authz())
 	if err != nil {
 		return nil, err
 	}

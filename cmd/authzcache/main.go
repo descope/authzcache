@@ -8,6 +8,7 @@ import (
 	"github.com/descope/authzcache/internal/config"
 	"github.com/descope/authzcache/internal/controllers"
 	"github.com/descope/authzcache/internal/services"
+	"github.com/descope/authzcache/internal/services/caches"
 	authzcv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
 	cconfig "github.com/descope/common/pkg/common/config"
 	cctx "github.com/descope/common/pkg/common/context"
@@ -41,7 +42,8 @@ func serve() {
 				if err != nil {
 					return err
 				}
-				as, err := services.New(ctx, descopeClient.Management)
+				//authz cache service init
+				as, err := services.New(ctx, descopeClient.Management, caches.ProjectAuthzCacheCreator{})
 				if err != nil {
 					cctx.Logger(ctx).Err(err).Msg("Failed creating authz cache")
 					return err
