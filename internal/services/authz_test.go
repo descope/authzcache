@@ -30,11 +30,11 @@ func TestNewAuthzCache(t *testing.T) {
 	ac, err := New(context.TODO(), mockSdk, mockCacheCreator)
 	require.NoError(t, err)
 	require.NotNil(t, ac)
-	require.NotNil(t, ac.mgmtSdk)
-	require.NotNil(t, ac.projectAuthzCaches)
+	require.NotNil(t, ac.(*authzCache).mgmtSdk)
+	require.NotNil(t, ac.(*authzCache).projectAuthzCaches)
 }
 
-func injectAuthzMocks(t *testing.T) (*AuthzCache, *mocksmgmt.MockManagement, *mockCache) {
+func injectAuthzMocks(t *testing.T) (AuthzCache, *mocksmgmt.MockManagement, *mockCache) {
 	mockSDK := &mocksmgmt.MockManagement{
 		MockFGA:   &mocksmgmt.MockFGA{},
 		MockAuthz: &mocksmgmt.MockAuthz{},

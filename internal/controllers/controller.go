@@ -12,11 +12,11 @@ import (
 )
 
 type authzController struct {
-	authzCache *services.AuthzCache
+	authzCache services.AuthzCache
 	authczv1.UnsafeAuthzCacheServer
 }
 
-func New(authzCache *services.AuthzCache) *authzController {
+func New(authzCache services.AuthzCache) *authzController {
 	return &authzController{authzCache: authzCache}
 }
 

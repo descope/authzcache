@@ -13,19 +13,28 @@ type ProjectAuthzCacheCreator interface {
 	NewProjectAuthzCache(ctx context.Context, remoteChangesChecker caches.RemoteChangesChecker) (caches.ProjectAuthzCache, error)
 }
 
-type AuthzCache struct {
+type AuthzCache interface {
+	CreateFGASchema(ctx context.Context, dsl string) error
+	CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error
+	DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error
+	Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error)
+}
+
+type authzCache struct {
 	mgmtSdk             sdk.Management
 	projectAuthzCaches  map[string]caches.ProjectAuthzCache // projectID -> caches
 	projectCacheCreator ProjectAuthzCacheCreator
 }
 
-func New(ctx context.Context, mgmtSdk sdk.Management, projectCacheCreator ProjectAuthzCacheCreator) (*AuthzCache, error) {
+var _ AuthzCache = &authzCache{} // validate interface implementation
+
+func New(ctx context.Context, mgmtSdk sdk.Management, projectCacheCreator ProjectAuthzCacheCreator) (AuthzCache, error) {
 	cctx.Logger(ctx).Info().Msg("Starting new authz cache")
-	ac := &AuthzCache{mgmtSdk: mgmtSdk, projectAuthzCaches: make(map[string]caches.ProjectAuthzCache), projectCacheCreator: projectCacheCreator}
+	ac := &authzCache{mgmtSdk: mgmtSdk, projectAuthzCaches: make(map[string]caches.ProjectAuthzCache), projectCacheCreator: projectCacheCreator}
 	return ac, nil
 }
 
-func (a *AuthzCache) CreateFGASchema(ctx context.Context, dsl string) error {
+func (a *authzCache) CreateFGASchema(ctx context.Context, dsl string) error {
 	err := a.mgmtSdk.FGA().SaveSchema(ctx, &descope.FGASchema{Schema: dsl})
 	if err != nil {
 		return err // notest
@@ -39,7 +48,7 @@ func (a *AuthzCache) CreateFGASchema(ctx context.Context, dsl string) error {
 	return nil
 }
 
-func (a *AuthzCache) CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
+func (a *authzCache) CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
 	// nothing to do
 	if len(relations) == 0 {
 		return nil
@@ -58,7 +67,7 @@ func (a *AuthzCache) CreateFGARelations(ctx context.Context, relations []*descop
 	return nil
 }
 
-func (a *AuthzCache) DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
+func (a *authzCache) DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
 	// nothing to do
 	if len(relations) == 0 {
 		return nil
@@ -77,7 +86,7 @@ func (a *AuthzCache) DeleteFGARelations(ctx context.Context, relations []*descop
 	return nil
 }
 
-func (a *AuthzCache) Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
+func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
 	// get cache
 	projectCache, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
@@ -121,7 +130,7 @@ func (a *AuthzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	return result, nil
 }
 
-func (a *AuthzCache) getOrCreateProjectCache(ctx context.Context) (caches.ProjectAuthzCache, error) {
+func (a *authzCache) getOrCreateProjectCache(ctx context.Context) (caches.ProjectAuthzCache, error) {
 	projectID := cctx.ProjectID(ctx)
 	projectCache, ok := a.projectAuthzCaches[projectID]
 	if ok {
