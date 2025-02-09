@@ -317,6 +317,27 @@ func TestRemotePolling_NoRemoteChanges(t *testing.T) {
 	}
 }
 
+// benchmark cache checks with 1,000,000 direct relations
+func BenchmarkCheckRelation(b *testing.B) {
+	ctx := context.TODO()
+	remoteChecker := &mockRemoteChangesChecker{}
+	cache, _ := ProjectAuthzCacheCreator{}.NewProjectAuthzCache(ctx, remoteChecker)
+	resources := make([]string, 1_000_000)
+	targets := make([]string, 1_000_000)
+	// instert 1,000,000 direct relation keys with 1 relation each into the cache
+	for i := 0; i < 1_000_000; i++ {
+		resources[i] = uuid.NewString()
+		targets[i] = uuid.NewString()
+		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: true, Relation: &descope.FGARelation{Resource: resources[i], Target: targets[i], Relation: "owner"}, Direct: true}})
+	}
+	// benchmark the CheckRelation function
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cache.CheckRelation(ctx, &descope.FGARelation{Resource: resources[i], Target: targets[i], Relation: "owner"})           // true
+		cache.CheckRelation(ctx, &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"}) // false
+	}
+}
+
 func setup(t *testing.T) (*projectAuthzCache, *mockRemoteChangesChecker) {
 	ctx := context.TODO()
 	remoteChecker := &mockRemoteChangesChecker{}
