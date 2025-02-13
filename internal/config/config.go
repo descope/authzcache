@@ -20,5 +20,5 @@ func GetIndirectRelationCacheSizePerProject() int {
 }
 
 func GetRemotePollingIntervalInMillis() int {
-	return cconfig.GetIntOrProvidedLocal(ConfigKeyRemotePollingIntervalInMillis, 15_000)
+	return max(15_000, cconfig.GetIntOrProvidedLocal(ConfigKeyRemotePollingIntervalInMillis, 15_000))
 }
