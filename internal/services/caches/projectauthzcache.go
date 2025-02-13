@@ -124,13 +124,14 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 }
 
 func (pc *projectAuthzCache) StartRemoteChangesPolling(ctx context.Context) {
+	ticker := time.NewTicker(pc.remoteChanges.remotePollingInterval)
 	cctx.Go(ctx, func(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
 				cctx.Logger(ctx).Info().Msg("Remote changes polling stopped due to context cancellation")
 				return
-			case <-time.After(pc.remoteChanges.remotePollingInterval):
+			case <-ticker.C:
 				pc.remoteChanges.tickHandler(ctx)
 			}
 		}
