@@ -20,7 +20,7 @@ func TestNewAuthzCache(t *testing.T) {
 	mockCacheCreator := func(_ context.Context, _ caches.RemoteChangesChecker) (caches.ProjectAuthzCache, error) {
 		return nil, nil
 	}
-	mockRemoteClientCreator := func(projectID string) (sdk.Management, error) {
+	mockRemoteClientCreator := func(_ string) (sdk.Management, error) {
 		return nil, nil
 	}
 	ac, err := New(context.TODO(), mockCacheCreator, mockRemoteClientCreator)
@@ -36,7 +36,7 @@ func injectAuthzMocks(t *testing.T) (AuthzCache, *mocksmgmt.MockManagement, *moc
 		MockFGA:   &mocksmgmt.MockFGA{},
 		MockAuthz: &mocksmgmt.MockAuthz{},
 	}
-	mockRemoteClientCreator := func(projectID string) (sdk.Management, error) {
+	mockRemoteClientCreator := func(_ string) (sdk.Management, error) {
 		return mockSDK, nil
 	}
 	mockCache := &mockCache{}

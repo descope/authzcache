@@ -311,7 +311,7 @@ func TestRemotePolling(t *testing.T) {
 	// mock tick handler func
 	var mutex sync.Mutex
 	var tickHandlerCalled bool
-	cache.remoteChanges.tickHandler = func(ctx context.Context) {
+	cache.remoteChanges.tickHandler = func(_ context.Context) {
 		mutex.Lock() // must lock to avoid race condition between the test and the goroutine started in StartRemoteChangesPolling
 		defer mutex.Unlock()
 		tickHandlerCalled = true
