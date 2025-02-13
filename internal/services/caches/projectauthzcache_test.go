@@ -344,7 +344,7 @@ func BenchmarkCheckRelation(b *testing.B) {
 		approxTotalSize := sizeOfMap + 1_000_000*(sizeOfKey+sizeOfValue)
 		b.ReportMetric(float64(approxTotalSize)/(1024*1024), "approx_direct_cache_MB")
 	})
-	b.Run("CheckRelationInCache", func(b *testing.B) {
+	b.Run("CheckRelation_CacheHit", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			// set j to an int between 0 and 999,999
@@ -352,7 +352,7 @@ func BenchmarkCheckRelation(b *testing.B) {
 			cache.CheckRelation(ctx, &descope.FGARelation{Resource: resources[j], Target: targets[j], Relation: "owner"}) // true
 		}
 	})
-	b.Run("CheckRelationCacheMiss", func(b *testing.B) {
+	b.Run("CheckRelation_CacheMiss", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			cache.CheckRelation(ctx, &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"}) // false
