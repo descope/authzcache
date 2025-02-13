@@ -6,6 +6,7 @@ import (
 
 	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/go-sdk/descope"
+	"github.com/descope/go-sdk/descope/sdk"
 	mocksmgmt "github.com/descope/go-sdk/descope/tests/mocks/mgmt"
 	"github.com/stretchr/testify/require"
 )
@@ -15,22 +16,19 @@ type mockCache struct {
 	pollingStarted bool
 }
 
-type mockCacheCreator struct {
-	mockCache caches.ProjectAuthzCache
-}
-
-func (m mockCacheCreator) NewProjectAuthzCache(_ context.Context, _ caches.RemoteChangesChecker) (caches.ProjectAuthzCache, error) {
-	return m.mockCache, nil
-}
-
 func TestNewAuthzCache(t *testing.T) {
-	mockSdk := &mocksmgmt.MockManagement{}
-	mockCacheCreator := &mockCacheCreator{}
-	ac, err := New(context.TODO(), mockSdk, mockCacheCreator)
+	mockCacheCreator := func(_ context.Context, _ caches.RemoteChangesChecker) (caches.ProjectAuthzCache, error) {
+		return nil, nil
+	}
+	mockRemoteClientCreator := func(projectID string) (sdk.Management, error) {
+		return nil, nil
+	}
+	ac, err := New(context.TODO(), mockCacheCreator, mockRemoteClientCreator)
 	require.NoError(t, err)
 	require.NotNil(t, ac)
-	require.NotNil(t, ac.(*authzCache).mgmtSdk)
-	require.NotNil(t, ac.(*authzCache).projectAuthzCaches)
+	require.NotNil(t, ac.(*authzCache).projects)
+	require.NotNil(t, ac.(*authzCache).projectCacheCreator)
+	require.NotNil(t, ac.(*authzCache).remoteClientCreator)
 }
 
 func injectAuthzMocks(t *testing.T) (AuthzCache, *mocksmgmt.MockManagement, *mockCache) {
@@ -38,13 +36,18 @@ func injectAuthzMocks(t *testing.T) (AuthzCache, *mocksmgmt.MockManagement, *moc
 		MockFGA:   &mocksmgmt.MockFGA{},
 		MockAuthz: &mocksmgmt.MockAuthz{},
 	}
+	mockRemoteClientCreator := func(projectID string) (sdk.Management, error) {
+		return mockSDK, nil
+	}
 	mockCache := &mockCache{}
 	mockCache.StartRemoteChangesPollingFunc = func(_ context.Context) {
 		mockCache.pollingStarted = true
 	}
-	mockProjectCacheCreator := &mockCacheCreator{mockCache: mockCache}
+	mockCacheCreator := func(_ context.Context, _ caches.RemoteChangesChecker) (caches.ProjectAuthzCache, error) {
+		return mockCache, nil
+	}
 	// create AuthzCache with mocks
-	ac, err := New(context.TODO(), mockSDK, mockProjectCacheCreator)
+	ac, err := New(context.TODO(), mockCacheCreator, mockRemoteClientCreator)
 	require.NoError(t, err)
 	return ac, mockSDK, mockCache
 }
@@ -164,9 +167,9 @@ func TestCheckEmptyRelations(t *testing.T) {
 	mockSDK.MockFGA.CheckAssert = func(_ []*descope.FGARelation) {
 		require.Fail(t, "should not be called")
 	}
-	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (allowed bool, ok bool) {
+	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (allowed bool, direct bool, ok bool) {
 		require.Fail(t, "should not be called")
-		return false, false
+		return false, false, false
 	}
 	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {
 		require.Fail(t, "should not be called")
@@ -191,20 +194,22 @@ func TestCheckAllInCache(t *testing.T) {
 		{
 			Allowed:  true,
 			Relation: relations[0],
+			Info:     &descope.FGACheckInfo{Direct: true},
 		},
 		{
 			Allowed:  false,
 			Relation: relations[1],
+			Info:     &descope.FGACheckInfo{Direct: true},
 		},
 	}
 	mockSDK.MockFGA.CheckAssert = func(_ []*descope.FGARelation) {
 		require.Fail(t, "should not be called")
 	}
-	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
+	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
 		if r.Resource == "mario" {
-			return true, true
+			return true, true, true
 		}
-		return false, true
+		return false, true, true
 	}
 	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {
 		require.Fail(t, "should not be called")
@@ -225,17 +230,19 @@ func TestCheckAllInSDK(t *testing.T) {
 		{
 			Allowed:  true,
 			Relation: relations[0],
+			Info:     &descope.FGACheckInfo{Direct: true},
 		},
 		{
 			Allowed:  false,
 			Relation: relations[1],
+			Info:     &descope.FGACheckInfo{Direct: true},
 		},
 	}
 	mockSDK.MockFGA.CheckAssert = func(rels []*descope.FGARelation) {
 		require.Equal(t, relations, rels)
 	}
-	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (allowed bool, ok bool) {
-		return false, false
+	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (allowed bool, direct bool, ok bool) {
+		return false, false, false
 	}
 	mockSDK.MockFGA.CheckResponse = expected
 	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, checks []*descope.FGACheck) {
@@ -262,24 +269,27 @@ func TestCheckMixed(t *testing.T) {
 		{
 			Allowed:  true,
 			Relation: relations[0],
+			Info:     &descope.FGACheckInfo{Direct: true},
 		},
 		{
 			Allowed:  false,
 			Relation: relations[1],
+			Info:     &descope.FGACheckInfo{Direct: true},
 		},
 		{
 			Allowed:  true,
 			Relation: relations[2],
+			Info:     &descope.FGACheckInfo{Direct: true},
 		},
 	}
 	mockSDK.MockFGA.CheckAssert = func(rels []*descope.FGARelation) {
 		require.Equal(t, expectedSdkRelations, rels)
 	}
-	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
+	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
 		if r.Resource == "luigi" && r.Target == "mario" { // only the second relation is in cache
-			return false, true
+			return false, true, true
 		}
-		return false, false
+		return false, false, false
 	}
 	sdkChecks := []*descope.FGACheck{expected[0], expected[2]}
 	mockSDK.MockFGA.CheckResponse = sdkChecks

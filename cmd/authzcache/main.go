@@ -3,19 +3,17 @@ package main
 import (
 	"context"
 	"net/http"
-	"os"
 
 	"github.com/descope/authzcache/internal/config"
 	"github.com/descope/authzcache/internal/controllers"
 	"github.com/descope/authzcache/internal/services"
 	"github.com/descope/authzcache/internal/services/caches"
+	"github.com/descope/authzcache/internal/services/remote"
 	authzcv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
 	cconfig "github.com/descope/common/pkg/common/config"
 	cctx "github.com/descope/common/pkg/common/context"
 	"github.com/descope/common/pkg/common/grpc/server"
-	"github.com/descope/go-sdk/descope"
-	"github.com/descope/go-sdk/descope/client"
-	"github.com/descope/go-sdk/descope/logger"
+	"github.com/descope/common/pkg/common/http/middlewares"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
 )
@@ -29,21 +27,11 @@ func main() {
 func serve() {
 	server.InitServiceName(defaultServiceName)
 
-	ctx, err := server.StartServerWithGateway(
+	ctx, err := server.StartServerWithGatewayAndOptions(
 		[]server.RegisterGRPCFunc{
 			func(ctx context.Context, s *grpc.Server) error {
-				// sdk init
-				baseURL := os.Getenv(descope.EnvironmentVariableBaseURL) // TODO: used for testing inside descope local env, should probably be removed
-				descopeClient, err := client.NewWithConfig(&client.Config{
-					SessionJWTViaCookie: true,
-					DescopeBaseURL:      baseURL,
-					LogLevel:            logger.LogDebugLevel, // TODO: extract to env var
-				})
-				if err != nil {
-					return err
-				}
 				//authz cache service init
-				as, err := services.New(ctx, descopeClient.Management, caches.ProjectAuthzCacheCreator{})
+				as, err := services.New(ctx, caches.NewProjectAuthzCache, remote.NewDescopeClientWithProjectID)
 				if err != nil {
 					cctx.Logger(ctx).Err(err).Msg("Failed creating authz cache")
 					return err
@@ -56,6 +44,11 @@ func serve() {
 		[]server.RegisterHTTPFunc{
 			func(ctx context.Context, mux *runtime.ServeMux, conn *grpc.ClientConn, _ *http.Server) error {
 				return authzcv1.RegisterAuthzCacheHandler(ctx, mux, conn)
+			},
+		},
+		server.ServerOptions{
+			ServiceMiddlwares: []func(context.Context) func(h http.Handler) http.Handler{
+				middlewares.ProjectIDHandler,
 			},
 		})
 

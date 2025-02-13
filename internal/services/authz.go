@@ -9,10 +9,6 @@ import (
 	"github.com/descope/go-sdk/descope/sdk"
 )
 
-type ProjectAuthzCacheCreator interface {
-	NewProjectAuthzCache(ctx context.Context, remoteChangesChecker caches.RemoteChangesChecker) (caches.ProjectAuthzCache, error)
-}
-
 type AuthzCache interface {
 	CreateFGASchema(ctx context.Context, dsl string) error
 	CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error
@@ -20,30 +16,42 @@ type AuthzCache interface {
 	Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error)
 }
 
+type RemoteClientCreator func(projectID string) (sdk.Management, error)
+type ProjectAuthzCacheCreator func(ctx context.Context, remoteChangesChecker caches.RemoteChangesChecker) (caches.ProjectAuthzCache, error)
+
+type projectIDKey string
+
+type project struct {
+	cache   caches.ProjectAuthzCache // projectID -> caches
+	mgmtSDK sdk.Management
+}
+
 type authzCache struct {
-	mgmtSdk             sdk.Management
-	projectAuthzCaches  map[string]caches.ProjectAuthzCache // projectID -> caches
+	projects            map[projectIDKey]project
 	projectCacheCreator ProjectAuthzCacheCreator
+	remoteClientCreator RemoteClientCreator
 }
 
 var _ AuthzCache = &authzCache{} // validate interface implementation
 
-func New(ctx context.Context, mgmtSdk sdk.Management, projectCacheCreator ProjectAuthzCacheCreator) (AuthzCache, error) {
+func New(ctx context.Context, projectCacheCreator ProjectAuthzCacheCreator, remoteClientCreator RemoteClientCreator) (AuthzCache, error) {
 	cctx.Logger(ctx).Info().Msg("Starting new authz cache")
-	ac := &authzCache{mgmtSdk: mgmtSdk, projectAuthzCaches: make(map[string]caches.ProjectAuthzCache), projectCacheCreator: projectCacheCreator}
+	ac := &authzCache{projectCacheCreator: projectCacheCreator, projects: make(map[projectIDKey]project), remoteClientCreator: remoteClientCreator}
 	return ac, nil
 }
 
 func (a *authzCache) CreateFGASchema(ctx context.Context, dsl string) error {
-	err := a.mgmtSdk.FGA().SaveSchema(ctx, &descope.FGASchema{Schema: dsl})
+	// get cache and mgmt sdk
+	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
+	if err != nil {
+		return err // notest
+	}
+	// update remote
+	err = mgmtSDK.FGA().SaveSchema(ctx, &descope.FGASchema{Schema: dsl})
 	if err != nil {
 		return err // notest
 	}
 	// update cache
-	projectCache, err := a.getOrCreateProjectCache(ctx)
-	if err != nil {
-		return err // notest
-	}
 	projectCache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: dsl})
 	return nil
 }
@@ -53,16 +61,17 @@ func (a *authzCache) CreateFGARelations(ctx context.Context, relations []*descop
 	if len(relations) == 0 {
 		return nil
 	}
+	// get cache and mgmt sdk
+	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
+	if err != nil {
+		return err // notest
+	}
 	// update remote
-	err := a.mgmtSdk.FGA().CreateRelations(ctx, relations)
+	err = mgmtSDK.FGA().CreateRelations(ctx, relations)
 	if err != nil {
 		return err // notest
 	}
 	// update cache
-	projectCache, err := a.getOrCreateProjectCache(ctx)
-	if err != nil {
-		return err // notest
-	}
 	projectCache.UpdateCacheWithAddedRelations(ctx, relations)
 	return nil
 }
@@ -72,23 +81,24 @@ func (a *authzCache) DeleteFGARelations(ctx context.Context, relations []*descop
 	if len(relations) == 0 {
 		return nil
 	}
+	// get cache and mgmt sdk
+	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
+	if err != nil {
+		return err // notest
+	}
 	// update remote
-	err := a.mgmtSdk.FGA().DeleteRelations(ctx, relations)
+	err = mgmtSDK.FGA().DeleteRelations(ctx, relations)
 	if err != nil {
 		return err // notest
 	}
 	// update cache
-	projectCache, err := a.getOrCreateProjectCache(ctx)
-	if err != nil {
-		return err // notest
-	}
 	projectCache.UpdateCacheWithDeletedRelations(ctx, relations)
 	return nil
 }
 
 func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
-	// get cache
-	projectCache, err := a.getOrCreateProjectCache(ctx)
+	// get cache and mgmt sdk
+	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
 		return nil, err // notest
 	}
@@ -97,8 +107,8 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	var toCheckViaSDK []*descope.FGARelation
 	var indexToCachedChecks map[int]*descope.FGACheck = make(map[int]*descope.FGACheck, len(relations)) // map "relations index" -> check, used to retain same order of relations in checks response
 	for i, r := range relations {
-		if allowed, ok := projectCache.CheckRelation(ctx, r); ok {
-			check := &descope.FGACheck{Allowed: allowed, Relation: r}
+		if allowed, direct, ok := projectCache.CheckRelation(ctx, r); ok {
+			check := &descope.FGACheck{Allowed: allowed, Relation: r, Info: &descope.FGACheckInfo{Direct: direct}}
 			cachedChecks = append(cachedChecks, check)
 			indexToCachedChecks[i] = check
 		} else {
@@ -110,7 +120,7 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 		return cachedChecks, nil
 	}
 	// fetch missing relations from sdk
-	sdkChecks, err := a.mgmtSdk.FGA().Check(ctx, toCheckViaSDK)
+	sdkChecks, err := mgmtSDK.FGA().Check(ctx, toCheckViaSDK)
 	if err != nil {
 		return nil, err // notest
 	}
@@ -130,18 +140,26 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	return result, nil
 }
 
-func (a *authzCache) getOrCreateProjectCache(ctx context.Context) (caches.ProjectAuthzCache, error) {
-	projectID := cctx.ProjectID(ctx)
-	projectCache, ok := a.projectAuthzCaches[projectID]
-	if ok {
-		return projectCache, nil
+func (a *authzCache) getOrCreateProjectCache(ctx context.Context) (caches.ProjectAuthzCache, sdk.Management, error) {
+	projectID := projectIDKey(cctx.ProjectID(ctx))
+	if project, ok := a.projects[projectID]; ok {
+		return project.cache, project.mgmtSDK, nil
 	}
 	cctx.Logger(ctx).Info().Msg("Creating new project cache")
-	projectCache, err := a.projectCacheCreator.NewProjectAuthzCache(ctx, a.mgmtSdk.Authz())
+	// create project mgmt sdk
+	mgmtSdk, err := a.remoteClientCreator(string(projectID))
 	if err != nil {
-		return nil, err // notest
+		return nil, nil, err // notest
 	}
-	a.projectAuthzCaches[projectID] = projectCache
+	// create project cache
+	projectCache, err := a.projectCacheCreator(ctx, mgmtSdk.Authz())
+	if err != nil {
+		return nil, nil, err // notest
+	}
+	// start remote changes polling
 	projectCache.StartRemoteChangesPolling(ctx)
-	return projectCache, nil
+	// save cache and sdk
+	a.projects[projectID] = project{cache: projectCache, mgmtSDK: mgmtSdk}
+	// return cache and sdk
+	return projectCache, mgmtSdk, nil
 }

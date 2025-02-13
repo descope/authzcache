@@ -32,7 +32,7 @@ type cachedRelation struct {
 func TestNewProjectAuthzCache(t *testing.T) {
 	ctx := context.TODO()
 	remoteChecker := &mockRemoteChangesChecker{}
-	cache, err := ProjectAuthzCacheCreator{}.NewProjectAuthzCache(ctx, remoteChecker)
+	cache, err := NewProjectAuthzCache(ctx, remoteChecker)
 	require.NoError(t, err)
 	require.NotNil(t, cache)
 }
@@ -62,9 +62,10 @@ func TestUpdateCacheWithChecks(t *testing.T) {
 	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
 	// validate CheckRelation results
 	for _, cr := range cachedRelations {
-		allowed, ok := cache.CheckRelation(ctx, cr.r)
+		allowed, direct, ok := cache.CheckRelation(ctx, cr.r)
 		assert.True(t, ok)
 		assert.Equal(t, cr.allowed, allowed)
+		assert.Equal(t, cr.direct, direct)
 	}
 	// call UpdateCacheWithChecks using the already cached relations, verify that no new entries are added to the cache and that the cache is not invalidated
 	directSize := cache.directRelationCache.Len(ctx)
@@ -72,9 +73,10 @@ func TestUpdateCacheWithChecks(t *testing.T) {
 	for _, cr := range cachedRelations {
 		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: cr.allowed, Relation: cr.r, Info: &descope.FGACheckInfo{Direct: cr.direct}}})
 		// validate CheckRelation after the 2nd update, should return the same results
-		allowed, ok := cache.CheckRelation(ctx, cr.r)
+		allowed, direct, ok := cache.CheckRelation(ctx, cr.r)
 		assert.True(t, ok)
 		assert.Equal(t, cr.allowed, allowed)
+		assert.Equal(t, cr.direct, direct)
 	}
 	assert.Equal(t, directSize, cache.directRelationCache.Len(ctx))
 	assert.Equal(t, indirectSize, cache.indirectRelationCache.Len(ctx))
@@ -96,14 +98,14 @@ func TestUpdateCacheWithAddedRelations(t *testing.T) {
 	// direct old relations should still be there, indirect should now be removed
 	for _, old := range oldRelations {
 		expectedToRemainInCache := old.direct // non direct relations should have been removed, direct should still be there
-		allowed, ok := cache.CheckRelation(ctx, old.r)
+		allowed, _, ok := cache.CheckRelation(ctx, old.r)
 		assert.Equal(t, expectedToRemainInCache, ok)
 		expectedAllowed := expectedToRemainInCache && old.allowed
 		assert.Equal(t, expectedAllowed, allowed) // if the relation is still in the cache, it should have the same allowed value
 	}
 	// all new relations should be allowed
 	for _, r := range newRelations {
-		allowed, ok := cache.CheckRelation(ctx, r)
+		allowed, _, ok := cache.CheckRelation(ctx, r)
 		assert.True(t, ok)
 		assert.True(t, allowed)
 	}
@@ -124,7 +126,7 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 	// 3. all indirect relations are removed
 	for _, old := range oldRelations {
 		expectedToRemainInCache := old.direct && old.r != toDelete.r
-		allowed, ok := cache.CheckRelation(ctx, old.r)
+		allowed, _, ok := cache.CheckRelation(ctx, old.r)
 		assert.Equal(t, expectedToRemainInCache, ok)
 		expectedAllowed := expectedToRemainInCache && old.allowed
 		assert.Equal(t, expectedAllowed, allowed)
@@ -132,9 +134,10 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 	// delete all remaining direct relations + perform re-deletes
 	for _, old := range oldRelations {
 		cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{old.r})
-		allowed, ok := cache.CheckRelation(ctx, old.r)
+		allowed, direct, ok := cache.CheckRelation(ctx, old.r)
 		assert.False(t, ok)
 		assert.False(t, allowed)
+		assert.False(t, direct)
 	}
 }
 
@@ -154,9 +157,10 @@ func TestEmptyActions(t *testing.T) {
 	assert.Equal(t, expectedDirectSize, cache.directRelationCache.Len(ctx))
 	assert.Equal(t, expectedIndirectSize, cache.indirectRelationCache.Len(ctx))
 	for _, cr := range cachedRelations {
-		allowed, ok := cache.CheckRelation(ctx, cr.r)
+		allowed, direct, ok := cache.CheckRelation(ctx, cr.r)
 		assert.True(t, ok)
 		assert.Equal(t, cr.allowed, allowed)
+		assert.Equal(t, cr.direct, direct)
 	}
 }
 
@@ -203,9 +207,10 @@ func TestRemotePolling_RemoteChangesError(t *testing.T) {
 	require.True(t, remoteCalled)
 	// verify that the cache was not invalidated
 	for _, cr := range cachedRelations {
-		allowed, ok := cache.CheckRelation(ctx, cr.r)
+		allowed, direct, ok := cache.CheckRelation(ctx, cr.r)
 		assert.True(t, ok)
 		assert.Equal(t, cr.allowed, allowed)
+		assert.Equal(t, cr.direct, direct)
 	}
 }
 
@@ -270,7 +275,7 @@ func TestRemotePolling_RemoteRelationChange(t *testing.T) {
 	for _, cr := range cachedRelations {
 		expectedToRemainInCache := cr.direct && cr.r.Resource != resourceChanged && cr.r.Target != targetChanged
 		atLeastOneStillInCache = atLeastOneStillInCache || expectedToRemainInCache
-		allowed, ok := cache.CheckRelation(ctx, cr.r)
+		allowed, _, ok := cache.CheckRelation(ctx, cr.r)
 		assert.Equal(t, expectedToRemainInCache, ok)
 		// if the relation is still in the cache, it should have the same allowed value
 		expectedAllowed := expectedToRemainInCache && cr.allowed
@@ -308,17 +313,19 @@ func TestRemotePolling_NoRemoteChanges(t *testing.T) {
 	assert.NotNil(t, cache.GetSchema())
 	// verify that all relations are still in the cache
 	for _, cr := range cachedRelations {
-		allowed, ok := cache.CheckRelation(ctx, cr.r)
+		allowed, direct, ok := cache.CheckRelation(ctx, cr.r)
 		assert.True(t, ok)
 		assert.Equal(t, cr.allowed, allowed)
+		assert.Equal(t, cr.direct, direct)
 	}
 }
 
 // benchmark cache checks with 1,000,000 direct relations
 func BenchmarkCheckRelation(b *testing.B) {
+	// TODO: print memory size
 	ctx := context.TODO()
 	remoteChecker := &mockRemoteChangesChecker{}
-	cache, _ := ProjectAuthzCacheCreator{}.NewProjectAuthzCache(ctx, remoteChecker)
+	cache, _ := NewProjectAuthzCache(ctx, remoteChecker)
 	resources := make([]string, 1_000_000)
 	targets := make([]string, 1_000_000)
 	// insert 1,000,000 direct relation keys with 1 relation each into the cache
@@ -338,7 +345,7 @@ func BenchmarkCheckRelation(b *testing.B) {
 func setup(t *testing.T) (*projectAuthzCache, *mockRemoteChangesChecker) {
 	ctx := context.TODO()
 	remoteChecker := &mockRemoteChangesChecker{}
-	cache, err := ProjectAuthzCacheCreator{}.NewProjectAuthzCache(ctx, remoteChecker)
+	cache, err := NewProjectAuthzCache(ctx, remoteChecker)
 	require.NoError(t, err)
 	require.NotNil(t, cache)
 	return cache.(*projectAuthzCache), remoteChecker

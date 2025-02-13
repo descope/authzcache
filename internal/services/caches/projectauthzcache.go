@@ -35,7 +35,7 @@ type projectAuthzCache struct {
 
 type ProjectAuthzCache interface {
 	GetSchema() *descope.FGASchema
-	CheckRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, ok bool)
+	CheckRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool)
 	UpdateCacheWithSchema(ctx context.Context, schema *descope.FGASchema)
 	UpdateCacheWithAddedRelations(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithDeletedRelations(ctx context.Context, relations []*descope.FGARelation)
@@ -45,9 +45,7 @@ type ProjectAuthzCache interface {
 
 var _ ProjectAuthzCache = &projectAuthzCache{} // ensure projectAuthzCache implements ProjectAuthzCache
 
-type ProjectAuthzCacheCreator struct{}
-
-func (p ProjectAuthzCacheCreator) NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChangesChecker) (ProjectAuthzCache, error) {
+func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChangesChecker) (ProjectAuthzCache, error) {
 	directRelationCache, err := lru.New[resourceTarget, map[relation]bool](config.GetDirectRelationCacheSizePerProject(), "authz-direct-relations-"+cctx.ProjectID(ctx))
 	if err != nil {
 		return nil, err // notest
@@ -72,16 +70,17 @@ func (pc *projectAuthzCache) GetSchema() *descope.FGASchema {
 	return pc.schemaCache
 }
 
-func (pc *projectAuthzCache) CheckRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
+func (pc *projectAuthzCache) CheckRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
 	if allowed, ok := pc.checkDirectRelation(ctx, r); ok {
-		return allowed, true
+		return allowed, true, true
 	}
 	if allowed, ok := pc.checkIndirectRelation(ctx, r); ok {
-		return allowed, true
+		return allowed, false, true
 	}
-	return false, false
+	return false, false, false
 }
 
+// TODO: think about concurrent updates, might need to add locks and stuff since go maps are not safe for concurrent reads/writes
 func (pc *projectAuthzCache) UpdateCacheWithSchema(ctx context.Context, schema *descope.FGASchema) {
 	pc.schemaCache = schema
 	// on schema update, we need to purge all relations
