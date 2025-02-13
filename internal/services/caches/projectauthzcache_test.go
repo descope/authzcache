@@ -325,6 +325,7 @@ func TestRemotePolling_NoRemoteChanges(t *testing.T) {
 
 // benchmark cache checks with 1,000,000 direct relations
 func BenchmarkCheckRelation(b *testing.B) {
+	// prepare the cache with 1,000,000 direct relations
 	ctx := context.TODO()
 	remoteChecker := &mockRemoteChangesChecker{}
 	cache, _ := NewProjectAuthzCache(ctx, remoteChecker)
@@ -336,19 +337,27 @@ func BenchmarkCheckRelation(b *testing.B) {
 		targets[i] = uuid.NewString()
 		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: true, Relation: &descope.FGARelation{Resource: resources[i], Target: targets[i], Relation: "owner"}, Info: &descope.FGACheckInfo{Direct: true}}})
 	}
-	// benchmark the CheckRelation function
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		cache.CheckRelation(ctx, &descope.FGARelation{Resource: resources[i], Target: targets[i], Relation: "owner"})           // true
-		cache.CheckRelation(ctx, &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"}) // false
-	}
-
-	sizeOfMap := unsafe.Sizeof(cache.(*projectAuthzCache).directRelationCache)
-	sizeOfKey := unsafe.Sizeof(uuid.NewString()) * 2 // ~  resource:target
-	sizeOfValue := unsafe.Sizeof(map[string]bool{}) + unsafe.Sizeof("owner") + unsafe.Sizeof(true)
-	approxTotalSize := sizeOfMap + 1_000_000*(sizeOfKey+sizeOfValue)
-	// report approximate memory usage in MB
-	b.ReportMetric(float64(approxTotalSize)/(1024*1024), "approx_direct_cache_MB")
+	b.Run("ApproximateCacheSize", func(b *testing.B) {
+		sizeOfMap := unsafe.Sizeof(cache.(*projectAuthzCache).directRelationCache)
+		sizeOfKey := unsafe.Sizeof(uuid.NewString()) * 2 // ~  resource:target
+		sizeOfValue := unsafe.Sizeof(map[string]bool{}) + unsafe.Sizeof("owner") + unsafe.Sizeof(true)
+		approxTotalSize := sizeOfMap + 1_000_000*(sizeOfKey+sizeOfValue)
+		b.ReportMetric(float64(approxTotalSize)/(1024*1024), "approx_direct_cache_MB")
+	})
+	b.Run("CheckRelationInCache", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			// set j to an int between 0 and 999,999
+			j := i % 1_000_000
+			cache.CheckRelation(ctx, &descope.FGARelation{Resource: resources[j], Target: targets[j], Relation: "owner"}) // true
+		}
+	})
+	b.Run("CheckRelationCacheMiss", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			cache.CheckRelation(ctx, &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"}) // false
+		}
+	})
 }
 
 func setup(t *testing.T) (*projectAuthzCache, *mockRemoteChangesChecker) {
