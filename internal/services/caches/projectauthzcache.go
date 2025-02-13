@@ -19,6 +19,7 @@ type remoteChangesTracking struct {
 	lastPollTime          time.Time
 	remotePollingInterval time.Duration
 	remote                RemoteChangesChecker
+	tickHandler           func(ctx context.Context)
 }
 
 // cache key type aliases
@@ -63,6 +64,7 @@ func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChange
 			remotePollingInterval: time.Millisecond * time.Duration(config.GetRemotePollingIntervalInMillis()),
 		},
 	}
+	pc.remoteChanges.tickHandler = pc.handleRemotePollingTick // set the tick handler (to be used in the polling goroutine)
 	return pc, nil
 }
 
@@ -129,44 +131,47 @@ func (pc *projectAuthzCache) StartRemoteChangesPolling(ctx context.Context) {
 				cctx.Logger(ctx).Info().Msg("Remote changes polling stopped due to context cancellation")
 				return
 			case <-time.After(pc.remoteChanges.remotePollingInterval):
-				// in case of no cached relations, we skip the server call but invalidate the schema cache to make sure we don't miss schema changes
-				if noRelations := pc.directRelationCache.Len(ctx) == 0 && pc.indirectRelationCache.Len(ctx) == 0; noRelations {
-					pc.remoteChanges.lastPollTime = time.Now()
-					pc.schemaCache = nil
-					cctx.Logger(ctx).Debug().Msg("No cached relations, skipping remote changes check")
-					continue
-				}
-				// get the changes since the last poll time
-				cctx.Logger(ctx).Debug().Msg("Checking for remote changes...")
-				remoteChanges, err := pc.fetchRemoteChanges(ctx)
-				if err != nil {
-					cctx.Logger(ctx).Error().Err(err).Msg("Failed to get new remote changes")
-					continue
-				}
-				// if the schema changed, we need to purge all caches
-				if remoteChanges.SchemaChanged {
-					cctx.Logger(ctx).Info().Msg("Remote changes show schema changed, purging all caches")
-					pc.schemaCache = nil
-					pc.directRelationCache.Purge(ctx)
-					pc.indirectRelationCache.Purge(ctx)
-					continue
-				}
-				// update the local cache only if there are missing remote changes
-				if len(remoteChanges.Resources) > 0 || len(remoteChanges.Targets) > 0 {
-					cctx.Logger(ctx).Debug().Msg(fmt.Sprintf("Remote changes found, Resources: %v, Targets: %v, updating caches", remoteChanges.Resources, remoteChanges.Targets))
-					pc.indirectRelationCache.Purge(ctx)
-					for _, r := range remoteChanges.Resources {
-						for _, t := range remoteChanges.Targets {
-							pc.directRelationCache.Remove(ctx, directKey(&descope.FGARelation{Resource: r, Target: t}))
-						}
-					}
-				} else {
-					cctx.Logger(ctx).Debug().Msg("No new remote changes, skipping cache update")
-				}
-				continue
+				pc.remoteChanges.tickHandler(ctx)
 			}
 		}
 	}()
+}
+
+func (pc *projectAuthzCache) handleRemotePollingTick(ctx context.Context) {
+	// in case of no cached relations, we skip the server call but invalidate the schema cache to make sure we don't miss schema changes
+	if noRelations := pc.directRelationCache.Len(ctx) == 0 && pc.indirectRelationCache.Len(ctx) == 0; noRelations {
+		pc.remoteChanges.lastPollTime = time.Now()
+		pc.schemaCache = nil
+		cctx.Logger(ctx).Debug().Msg("No cached relations, skipping remote changes check")
+		return
+	}
+	// get the changes since the last poll time
+	cctx.Logger(ctx).Debug().Msg("Checking for remote changes...")
+	remoteChanges, err := pc.fetchRemoteChanges(ctx)
+	if err != nil {
+		cctx.Logger(ctx).Error().Err(err).Msg("Failed to get new remote changes")
+		return
+	}
+	// if the schema changed, we need to purge all caches
+	if remoteChanges.SchemaChanged {
+		cctx.Logger(ctx).Info().Msg("Remote changes show schema changed, purging all caches")
+		pc.schemaCache = nil
+		pc.directRelationCache.Purge(ctx)
+		pc.indirectRelationCache.Purge(ctx)
+		return
+	}
+	// update the local cache only if there are missing remote changes
+	if len(remoteChanges.Resources) <= 0 && len(remoteChanges.Targets) <= 0 {
+		cctx.Logger(ctx).Debug().Msg("No new remote changes, skipping cache update")
+		return
+	}
+	cctx.Logger(ctx).Debug().Msg(fmt.Sprintf("Remote changes found, Resources: %v, Targets: %v, updating caches", remoteChanges.Resources, remoteChanges.Targets))
+	pc.indirectRelationCache.Purge(ctx)
+	for _, r := range remoteChanges.Resources {
+		for _, t := range remoteChanges.Targets {
+			pc.directRelationCache.Remove(ctx, directKey(&descope.FGARelation{Resource: r, Target: t}))
+		}
+	}
 }
 
 func (pc *projectAuthzCache) fetchRemoteChanges(ctx context.Context) (*descope.AuthzModified, error) {

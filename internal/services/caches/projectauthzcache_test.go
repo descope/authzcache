@@ -2,6 +2,7 @@ package caches
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 	"unsafe"
@@ -165,12 +166,8 @@ func TestEmptyActions(t *testing.T) {
 	}
 }
 
-func TestRemotePolling_NoCachedRelations(t *testing.T) {
-	// use context with cancel to avoid goroutine leak
-	ctx, cancel := context.WithCancel(context.TODO())
-	defer cancel()
-	// set the polling interval to 10ms
-	t.Setenv(config.ConfigKeyRemotePollingIntervalInMillis, "10")
+func TestHandleRemotePollingTick_NoCachedRelations(t *testing.T) {
+	ctx := context.TODO()
 	cache, remoteChecker := setup(t)
 	// populate the schema cache only
 	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
@@ -179,19 +176,14 @@ func TestRemotePolling_NoCachedRelations(t *testing.T) {
 		require.Fail(t, "should not be called since there are no cached relations")
 		return nil, nil
 	}
-	// wait for the polling interval to pass
-	cache.StartRemoteChangesPolling(ctx)
-	time.Sleep(15 * time.Millisecond)
+	// call the tick handler directly (for testing purposes)
+	cache.handleRemotePollingTick(ctx)
 	// verify that the schema cache was invalidated
 	assert.Nil(t, cache.schemaCache)
 }
 
-func TestRemotePolling_RemoteChangesError(t *testing.T) {
-	// use context with cancel to avoid goroutine leak
-	ctx, cancel := context.WithCancel(context.TODO())
-	defer cancel()
-	// set the polling interval to 10ms
-	t.Setenv(config.ConfigKeyRemotePollingIntervalInMillis, "10")
+func TestHandleRemotePollingTick_RemoteChangesError(t *testing.T) {
+	ctx := context.TODO()
 	cache, remoteChecker := setup(t)
 	// simulate an error from remote changes checker
 	var remoteCalled bool
@@ -201,9 +193,8 @@ func TestRemotePolling_RemoteChangesError(t *testing.T) {
 	}
 	// populate the cache with some relations
 	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
-	// wait for the polling interval to pass
-	cache.StartRemoteChangesPolling(ctx)
-	time.Sleep(15 * time.Millisecond)
+	// call the tick handler directly (for testing purposes)
+	cache.handleRemotePollingTick(ctx)
 	// sanity: verify that the remote was called
 	require.True(t, remoteCalled)
 	// verify that the cache was not invalidated
@@ -215,15 +206,11 @@ func TestRemotePolling_RemoteChangesError(t *testing.T) {
 	}
 }
 
-func TestRemotePolling_RemoteSchemaChange(t *testing.T) {
-	// use context with cancel to avoid goroutine leak
-	ctx, cancel := context.WithCancel(context.TODO())
-	defer cancel()
-	// set the polling interval to 10ms
-	t.Setenv(config.ConfigKeyRemotePollingIntervalInMillis, "10")
+func TestHandleRemotePollingTick_RemoteSchemaChange(t *testing.T) {
+	ctx := context.TODO()
 	cache, remoteChecker := setup(t)
 	// populate the cache with some relations
-	updateBothCachesWithChecks(ctx, t, cache)
+	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
 	// sanity check: the cache is now populated
 	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
 	require.Greater(t, cache.indirectRelationCache.Len(ctx), 0)
@@ -231,22 +218,21 @@ func TestRemotePolling_RemoteSchemaChange(t *testing.T) {
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		return &descope.AuthzModified{SchemaChanged: true}, nil
 	}
-	// wait for the polling interval to pass
-	cache.StartRemoteChangesPolling(ctx)
-	time.Sleep(15 * time.Millisecond)
+	// call the tick handler directly (for testing purposes)
+	cache.handleRemotePollingTick(ctx)
 	// verify that the schema cache was invalidated
 	assert.Nil(t, cache.GetSchema())
 	// verify that all relations were invalidated
-	assert.Equal(t, 0, cache.directRelationCache.Len(ctx))
-	assert.Equal(t, 0, cache.indirectRelationCache.Len(ctx))
+	for _, cr := range cachedRelations {
+		allowed, direct, ok := cache.CheckRelation(ctx, cr.r)
+		assert.False(t, ok)
+		assert.False(t, allowed)
+		assert.False(t, direct)
+	}
 }
 
-func TestRemotePolling_RemoteRelationChange(t *testing.T) {
-	// use context with cancel to avoid goroutine leak
-	ctx, cancel := context.WithCancel(context.TODO())
-	defer cancel()
-	// set the polling interval to 10ms
-	t.Setenv(config.ConfigKeyRemotePollingIntervalInMillis, "10")
+func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {
+	ctx := context.TODO()
 	cache, remoteChecker := setup(t)
 	// populate the cache with a schema and some relations
 	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
@@ -264,9 +250,8 @@ func TestRemotePolling_RemoteRelationChange(t *testing.T) {
 			Targets:   []string{targetChanged},
 		}, nil
 	}
-	// Wait for the polling interval to pass
-	cache.StartRemoteChangesPolling(ctx)
-	time.Sleep(15 * time.Millisecond)
+	// call the tick handler directly (for testing purposes)
+	cache.handleRemotePollingTick(ctx)
 	// Verify that the schema cache was not invalidated
 	assert.NotNil(t, cache.GetSchema())
 	// Verify that all indirect relations are now invalidated
@@ -286,12 +271,8 @@ func TestRemotePolling_RemoteRelationChange(t *testing.T) {
 	assert.True(t, atLeastOneStillInCache)
 }
 
-func TestRemotePolling_NoRemoteChanges(t *testing.T) {
-	// use context with cancel to avoid goroutine leak
-	ctx, cancel := context.WithCancel(context.TODO())
-	defer cancel()
-	// set the polling interval to 10ms
-	t.Setenv(config.ConfigKeyRemotePollingIntervalInMillis, "10")
+func TestHandleRemotePollingTick_NoRemoteChanges(t *testing.T) {
+	ctx := context.TODO()
 	cache, remoteChecker := setup(t)
 	// populate the cache with a schema and some relations
 	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
@@ -305,9 +286,8 @@ func TestRemotePolling_NoRemoteChanges(t *testing.T) {
 		remoteCalled = true
 		return &descope.AuthzModified{}, nil
 	}
-	// wait for the polling interval to pass
-	cache.StartRemoteChangesPolling(ctx)
-	time.Sleep(15 * time.Millisecond)
+	// call the tick handler directly (for testing purposes)
+	cache.handleRemotePollingTick(ctx)
 	// sanity: verify that the remote was called
 	require.True(t, remoteCalled)
 	// verify that the schema cache was not invalidated
@@ -321,7 +301,29 @@ func TestRemotePolling_NoRemoteChanges(t *testing.T) {
 	}
 }
 
-// TODO: fix data race test failures
+func TestRemotePolling(t *testing.T) {
+	// use context with cancel to avoid goroutine leak
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	// set the polling interval to 10ms
+	t.Setenv(config.ConfigKeyRemotePollingIntervalInMillis, "10")
+	cache, _ := setup(t)
+	// mock tick handler func
+	var mutex sync.Mutex
+	var tickHandlerCalled bool
+	cache.remoteChanges.tickHandler = func(ctx context.Context) {
+		mutex.Lock() // must lock to avoid race condition between the test and the goroutine started in StartRemoteChangesPolling
+		defer mutex.Unlock()
+		tickHandlerCalled = true
+	}
+	// wait for the polling interval to pass
+	cache.StartRemoteChangesPolling(ctx)
+	time.Sleep(15 * time.Millisecond)
+	// verify that the remote was called
+	mutex.Lock() // must lock to avoid race condition between the test and the goroutine started in StartRemoteChangesPolling
+	defer mutex.Unlock()
+	assert.True(t, tickHandlerCalled)
+}
 
 // benchmark cache checks with 1,000,000 direct relations
 func BenchmarkCheckRelation(b *testing.B) {
