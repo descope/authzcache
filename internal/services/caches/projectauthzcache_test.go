@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/descope/authzcache/internal/config"
 	"github.com/descope/go-sdk/descope"
@@ -320,9 +321,10 @@ func TestRemotePolling_NoRemoteChanges(t *testing.T) {
 	}
 }
 
+// TODO: fix data race test failures
+
 // benchmark cache checks with 1,000,000 direct relations
 func BenchmarkCheckRelation(b *testing.B) {
-	// TODO: print memory size
 	ctx := context.TODO()
 	remoteChecker := &mockRemoteChangesChecker{}
 	cache, _ := NewProjectAuthzCache(ctx, remoteChecker)
@@ -340,6 +342,13 @@ func BenchmarkCheckRelation(b *testing.B) {
 		cache.CheckRelation(ctx, &descope.FGARelation{Resource: resources[i], Target: targets[i], Relation: "owner"})           // true
 		cache.CheckRelation(ctx, &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"}) // false
 	}
+
+	sizeOfMap := unsafe.Sizeof(cache.(*projectAuthzCache).directRelationCache)
+	sizeOfKey := unsafe.Sizeof(uuid.NewString()) * 2 // ~  resource:target
+	sizeOfValue := unsafe.Sizeof(map[string]bool{}) + unsafe.Sizeof("owner") + unsafe.Sizeof(true)
+	approxTotalSize := sizeOfMap + 1_000_000*(sizeOfKey+sizeOfValue)
+	// report approximate memory usage in MB
+	b.ReportMetric(float64(approxTotalSize)/(1024*1024), "approx_direct_cache_MB")
 }
 
 func setup(t *testing.T) (*projectAuthzCache, *mockRemoteChangesChecker) {
