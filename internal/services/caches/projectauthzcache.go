@@ -124,7 +124,7 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 }
 
 func (pc *projectAuthzCache) StartRemoteChangesPolling(ctx context.Context) {
-	go func() {
+	cctx.Go(ctx, func(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
@@ -134,7 +134,7 @@ func (pc *projectAuthzCache) StartRemoteChangesPolling(ctx context.Context) {
 				pc.remoteChanges.tickHandler(ctx)
 			}
 		}
-	}()
+	})
 }
 
 func (pc *projectAuthzCache) handleRemotePollingTick(ctx context.Context) {
