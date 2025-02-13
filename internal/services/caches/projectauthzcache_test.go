@@ -50,7 +50,7 @@ func TestSchemaUpdate(t *testing.T) {
 	cache.UpdateCacheWithSchema(ctx, schema)
 	// check that all caches are now empty
 	assert.Equal(t, 0, cache.directRelationCache.Len(ctx))
-	assert.Equal(t, 0, cache.indirectOrNegativeRelationCache.Len(ctx))
+	assert.Equal(t, 0, cache.indirectRelationCache.Len(ctx))
 	// check that the schema is updated
 	fromCache := cache.GetSchema()
 	require.Equal(t, schemaDef, fromCache.Schema)
@@ -68,16 +68,16 @@ func TestUpdateCacheWithChecks(t *testing.T) {
 	}
 	// call UpdateCacheWithChecks using the already cached relations, verify that no new entries are added to the cache and that the cache is not invalidated
 	directSize := cache.directRelationCache.Len(ctx)
-	indirectSize := cache.indirectOrNegativeRelationCache.Len(ctx)
+	indirectSize := cache.indirectRelationCache.Len(ctx)
 	for _, cr := range cachedRelations {
-		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: cr.allowed, Relation: cr.r, Direct: cr.direct}})
+		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: cr.allowed, Relation: cr.r, Info: &descope.FGACheckInfo{Direct: cr.direct}}})
 		// validate CheckRelation after the 2nd update, should return the same results
 		allowed, ok := cache.CheckRelation(ctx, cr.r)
 		assert.True(t, ok)
 		assert.Equal(t, cr.allowed, allowed)
 	}
 	assert.Equal(t, directSize, cache.directRelationCache.Len(ctx))
-	assert.Equal(t, indirectSize, cache.indirectOrNegativeRelationCache.Len(ctx))
+	assert.Equal(t, indirectSize, cache.indirectRelationCache.Len(ctx))
 }
 
 func TestUpdateCacheWithAddedRelations(t *testing.T) {
@@ -93,9 +93,9 @@ func TestUpdateCacheWithAddedRelations(t *testing.T) {
 		{Resource: "p1:file1", Target: "user4", Relation: "owner"},
 	}
 	cache.UpdateCacheWithAddedRelations(ctx, newRelations)
-	// direct old relations should still be there, indirect or false should now be removed
+	// direct old relations should still be there, indirect should now be removed
 	for _, old := range oldRelations {
-		expectedToRemainInCache := old.direct && old.allowed // non direct and false relations should have been removed, direct should still be there
+		expectedToRemainInCache := old.direct // non direct relations should have been removed, direct should still be there
 		allowed, ok := cache.CheckRelation(ctx, old.r)
 		assert.Equal(t, expectedToRemainInCache, ok)
 		expectedAllowed := expectedToRemainInCache && old.allowed
@@ -114,16 +114,16 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 	cache, _ := setup(t)
 	// prepare some data in the caches
 	oldRelations := updateBothCachesWithChecks(ctx, t, cache)
-	// delete 1 true relation
+	// delete 1 direct relation
 	toDelete := oldRelations[0]
-	require.True(t, toDelete.allowed && toDelete.direct) // sanity check, verify that the relation is true and direct
+	require.True(t, toDelete.direct) // sanity check, verify that the relation is direct
 	cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{toDelete.r})
 	// verify that:
 	// 1. deleted relation is not in the cache anymore
 	// 2. all other direct relations are still in the cache
-	// 3. all indirect or false relations are removed
+	// 3. all indirect relations are removed
 	for _, old := range oldRelations {
-		expectedToRemainInCache := old.direct && old.allowed && old.r != toDelete.r
+		expectedToRemainInCache := old.direct && old.r != toDelete.r
 		allowed, ok := cache.CheckRelation(ctx, old.r)
 		assert.Equal(t, expectedToRemainInCache, ok)
 		expectedAllowed := expectedToRemainInCache && old.allowed
@@ -136,9 +136,6 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 		assert.False(t, ok)
 		assert.False(t, allowed)
 	}
-	// verify that the cache is empty
-	assert.Equal(t, 0, cache.directRelationCache.Len(ctx))
-	assert.Equal(t, 0, cache.indirectOrNegativeRelationCache.Len(ctx))
 }
 
 func TestEmptyActions(t *testing.T) {
@@ -148,14 +145,14 @@ func TestEmptyActions(t *testing.T) {
 	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
 	// get the initial cache size
 	expectedDirectSize := cache.directRelationCache.Len(ctx)
-	expectedIndirectSize := cache.indirectOrNegativeRelationCache.Len(ctx)
+	expectedIndirectSize := cache.indirectRelationCache.Len(ctx)
 	// perform empty updates
 	cache.UpdateCacheWithAddedRelations(ctx, nil)
 	cache.UpdateCacheWithDeletedRelations(ctx, nil)
 	cache.UpdateCacheWithChecks(ctx, nil)
 	// cache should not change
 	assert.Equal(t, expectedDirectSize, cache.directRelationCache.Len(ctx))
-	assert.Equal(t, expectedIndirectSize, cache.indirectOrNegativeRelationCache.Len(ctx))
+	assert.Equal(t, expectedIndirectSize, cache.indirectRelationCache.Len(ctx))
 	for _, cr := range cachedRelations {
 		allowed, ok := cache.CheckRelation(ctx, cr.r)
 		assert.True(t, ok)
@@ -223,7 +220,7 @@ func TestRemotePolling_RemoteSchemaChange(t *testing.T) {
 	updateBothCachesWithChecks(ctx, t, cache)
 	// sanity check: the cache is now populated
 	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
-	require.Greater(t, cache.indirectOrNegativeRelationCache.Len(ctx), 0)
+	require.Greater(t, cache.indirectRelationCache.Len(ctx), 0)
 	// Simulate a schema change in the remote
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		return &descope.AuthzModified{SchemaChanged: true}, nil
@@ -235,7 +232,7 @@ func TestRemotePolling_RemoteSchemaChange(t *testing.T) {
 	assert.Nil(t, cache.GetSchema())
 	// verify that all relations were invalidated
 	assert.Equal(t, 0, cache.directRelationCache.Len(ctx))
-	assert.Equal(t, 0, cache.indirectOrNegativeRelationCache.Len(ctx))
+	assert.Equal(t, 0, cache.indirectRelationCache.Len(ctx))
 }
 
 func TestRemotePolling_RemoteRelationChange(t *testing.T) {
@@ -250,8 +247,8 @@ func TestRemotePolling_RemoteRelationChange(t *testing.T) {
 	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
 	// sanity check: the cache is now populated
 	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
-	require.Greater(t, cache.indirectOrNegativeRelationCache.Len(ctx), 0)
-	// get one of the cached relations resource and target
+	require.Greater(t, cache.indirectRelationCache.Len(ctx), 0)
+	// get one of the cached (direct) relations resource and target
 	resourceChanged := cachedRelations[0].r.Resource
 	targetChanged := cachedRelations[0].r.Target
 	// Simulate a relation change in the remote
@@ -267,11 +264,11 @@ func TestRemotePolling_RemoteRelationChange(t *testing.T) {
 	// Verify that the schema cache was not invalidated
 	assert.NotNil(t, cache.GetSchema())
 	// Verify that all indirect relations are now invalidated
-	assert.Equal(t, 0, cache.indirectOrNegativeRelationCache.Len(ctx))
+	assert.Equal(t, 0, cache.indirectRelationCache.Len(ctx))
 	// verify that all relations not changed remotely are still in the cache
 	var atLeastOneStillInCache bool
 	for _, cr := range cachedRelations {
-		expectedToRemainInCache := cr.direct && cr.allowed && cr.r.Resource != resourceChanged && cr.r.Target != targetChanged
+		expectedToRemainInCache := cr.direct && cr.r.Resource != resourceChanged && cr.r.Target != targetChanged
 		atLeastOneStillInCache = atLeastOneStillInCache || expectedToRemainInCache
 		allowed, ok := cache.CheckRelation(ctx, cr.r)
 		assert.Equal(t, expectedToRemainInCache, ok)
@@ -295,7 +292,7 @@ func TestRemotePolling_NoRemoteChanges(t *testing.T) {
 	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
 	// sanity check: the cache is now populated
 	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
-	require.Greater(t, cache.indirectOrNegativeRelationCache.Len(ctx), 0)
+	require.Greater(t, cache.indirectRelationCache.Len(ctx), 0)
 	// Simulate no changes in the remote
 	var remoteCalled bool
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
@@ -324,11 +321,11 @@ func BenchmarkCheckRelation(b *testing.B) {
 	cache, _ := ProjectAuthzCacheCreator{}.NewProjectAuthzCache(ctx, remoteChecker)
 	resources := make([]string, 1_000_000)
 	targets := make([]string, 1_000_000)
-	// instert 1,000,000 direct relation keys with 1 relation each into the cache
+	// insert 1,000,000 direct relation keys with 1 relation each into the cache
 	for i := 0; i < 1_000_000; i++ {
 		resources[i] = uuid.NewString()
 		targets[i] = uuid.NewString()
-		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: true, Relation: &descope.FGARelation{Resource: resources[i], Target: targets[i], Relation: "owner"}, Direct: true}})
+		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: true, Relation: &descope.FGARelation{Resource: resources[i], Target: targets[i], Relation: "owner"}, Info: &descope.FGACheckInfo{Direct: true}}})
 	}
 	// benchmark the CheckRelation function
 	b.ResetTimer()
@@ -349,24 +346,27 @@ func setup(t *testing.T) (*projectAuthzCache, *mockRemoteChangesChecker) {
 
 func updateBothCachesWithChecks(ctx context.Context, t *testing.T, cache *projectAuthzCache) []*cachedRelation {
 	resourceOneID := "1_" + uuid.NewString()
+	// direct relations
 	directTrueRelation := &descope.FGARelation{Resource: resourceOneID, Target: "user1", Relation: "owner"}
-	indirectTrueRelation := &descope.FGARelation{Resource: "2_" + uuid.NewString(), Target: "user3", Relation: "owner"}
 	directFalseRelation := &descope.FGARelation{Resource: "3_" + uuid.NewString(), Target: "user2", Relation: "owner"}
-	indirectFalseRelation := &descope.FGARelation{Resource: "4_" + uuid.NewString(), Target: "user4", Relation: "owner"}
 	extraDirectTrueRelation := &descope.FGARelation{Resource: resourceOneID, Target: "user1", Relation: "parent"}
 	differentResourceAndTargetDirectTrueRelation := &descope.FGARelation{Resource: "5_" + uuid.NewString(), Target: uuid.NewString(), Relation: "parent"}
+	// indirect relations
+	indirectTrueRelation := &descope.FGARelation{Resource: "2_" + uuid.NewString(), Target: "user3", Relation: "owner"}
+	indirectFalseRelation := &descope.FGARelation{Resource: "4_" + uuid.NewString(), Target: "user4", Relation: "owner"}
+	// mock checks response
 	checks := []*descope.FGACheck{
-		{Allowed: true, Relation: directTrueRelation, Direct: true},
-		{Allowed: true, Relation: indirectTrueRelation, Direct: false},
-		{Allowed: false, Relation: directFalseRelation, Direct: true},
-		{Allowed: false, Relation: indirectFalseRelation, Direct: false},
-		{Allowed: true, Relation: extraDirectTrueRelation, Direct: true},
-		{Allowed: true, Relation: differentResourceAndTargetDirectTrueRelation, Direct: true},
+		{Allowed: true, Relation: directTrueRelation, Info: &descope.FGACheckInfo{Direct: true}},
+		{Allowed: true, Relation: indirectTrueRelation, Info: &descope.FGACheckInfo{Direct: false}},
+		{Allowed: false, Relation: directFalseRelation, Info: &descope.FGACheckInfo{Direct: true}},
+		{Allowed: false, Relation: indirectFalseRelation, Info: &descope.FGACheckInfo{Direct: false}},
+		{Allowed: true, Relation: extraDirectTrueRelation, Info: &descope.FGACheckInfo{Direct: true}},
+		{Allowed: true, Relation: differentResourceAndTargetDirectTrueRelation, Info: &descope.FGACheckInfo{Direct: true}},
 	}
 	cache.UpdateCacheWithChecks(ctx, checks)
 	// validate cache distribution
-	require.Equal(t, 2, cache.directRelationCache.Len(ctx)) // 2 relations are saved under the same key (resourceOneID:user1) in the direct cache
-	require.Equal(t, 3, cache.indirectOrNegativeRelationCache.Len(ctx))
+	require.Equal(t, 3, cache.directRelationCache.Len(ctx)) // 4 entries, but 2 relations are saved under the same key (resourceOneID:user1) in the direct cache
+	require.Equal(t, 2, cache.indirectRelationCache.Len(ctx))
 	return []*cachedRelation{
 		{allowed: true, direct: true, r: directTrueRelation},
 		{allowed: false, direct: true, r: directFalseRelation},

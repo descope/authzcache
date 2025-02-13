@@ -76,6 +76,9 @@ func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest)
 				TargetType:   check.Relation.TargetType,
 			},
 			Allowed: check.Allowed,
+			Info: &authzv1.CheckResponseInfo{
+				Direct: check.Info.Direct,
+			},
 		}
 	}
 

@@ -15,20 +15,22 @@ type RemoteChangesChecker interface {
 	GetModified(ctx context.Context, since time.Time) (*descope.AuthzModified, error)
 }
 
-type resourceTargetKey string
-type resourceTargetRelationKey string
-
 type remoteChangesTracking struct {
 	lastPollTime          time.Time
 	remotePollingInterval time.Duration
 	remote                RemoteChangesChecker
 }
 
+// cache key type aliases
+type relation string
+type resourceTarget string
+type resourceTargetRelation string
+
 type projectAuthzCache struct {
-	schemaCache                     *descope.FGASchema                                      // schema
-	directRelationCache             *lru.MonitoredLRUCache[resourceTargetKey, []string]     // resource:target -> [relation, relation, ...], e.g. p1:file1:user1 -> [owner, reader]
-	indirectOrNegativeRelationCache *lru.MonitoredLRUCache[resourceTargetRelationKey, bool] // resource:target:relation -> true/false, e.g. p1:file1:user2:owner -> false
-	remoteChanges                   *remoteChangesTracking
+	schemaCache           *descope.FGASchema                                        // schema
+	directRelationCache   *lru.MonitoredLRUCache[resourceTarget, map[relation]bool] // resource:target -> map[relation]bool, e.g. p1:file1:user2 -> {owner->false, read->true}
+	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, bool]      // resource:target:relation -> bool, e.g. p1:file1:user2:owner -> false
+	remoteChanges         *remoteChangesTracking
 }
 
 type ProjectAuthzCache interface {
@@ -46,17 +48,17 @@ var _ ProjectAuthzCache = &projectAuthzCache{} // ensure projectAuthzCache imple
 type ProjectAuthzCacheCreator struct{}
 
 func (p ProjectAuthzCacheCreator) NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChangesChecker) (ProjectAuthzCache, error) {
-	directRelationCache, err := lru.New[resourceTargetKey, []string](config.GetDirectRelationCacheSizePerProject(), "authz-direct-relations-"+cctx.ProjectID(ctx))
+	directRelationCache, err := lru.New[resourceTarget, map[relation]bool](config.GetDirectRelationCacheSizePerProject(), "authz-direct-relations-"+cctx.ProjectID(ctx))
 	if err != nil {
 		return nil, err // notest
 	}
-	indirectOrNegativeRelationCache, err := lru.New[resourceTargetRelationKey, bool](config.GetInderectAndNegativeRelationCacheSizePerProject(), "authz-indirect-or-negative-relations-"+cctx.ProjectID(ctx))
+	indirectRelationCache, err := lru.New[resourceTargetRelation, bool](config.GetIndirectRelationCacheSizePerProject(), "authz-indirect-relations-"+cctx.ProjectID(ctx))
 	if err != nil {
 		return nil, err // notest
 	}
 	pc := &projectAuthzCache{
-		directRelationCache:             directRelationCache,
-		indirectOrNegativeRelationCache: indirectOrNegativeRelationCache,
+		directRelationCache:   directRelationCache,
+		indirectRelationCache: indirectRelationCache,
 		remoteChanges: &remoteChangesTracking{
 			lastPollTime:          time.Now(),
 			remote:                remoteChangesChecker,
@@ -71,11 +73,11 @@ func (pc *projectAuthzCache) GetSchema() *descope.FGASchema {
 }
 
 func (pc *projectAuthzCache) CheckRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
-	if pc.checkDirectRelation(ctx, r) {
-		return true, true
+	if allowed, ok := pc.checkDirectRelation(ctx, r); ok {
+		return allowed, true
 	}
-	if allowed, ok := pc.checkIndirectOrNegativeRelation(ctx, r); ok {
-		return allowed, ok
+	if allowed, ok := pc.checkIndirectRelation(ctx, r); ok {
+		return allowed, true
 	}
 	return false, false
 }
@@ -83,7 +85,7 @@ func (pc *projectAuthzCache) CheckRelation(ctx context.Context, r *descope.FGARe
 func (pc *projectAuthzCache) UpdateCacheWithSchema(ctx context.Context, schema *descope.FGASchema) {
 	pc.schemaCache = schema
 	// on schema update, we need to purge all relations
-	pc.indirectOrNegativeRelationCache.Purge(ctx)
+	pc.indirectRelationCache.Purge(ctx)
 	pc.directRelationCache.Purge(ctx)
 }
 
@@ -91,9 +93,9 @@ func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, 
 	if len(relations) == 0 {
 		return
 	}
-	pc.indirectOrNegativeRelationCache.Purge(ctx) // added relations can change the result of indirect/negative checks
+	pc.indirectRelationCache.Purge(ctx) // added (direct) relations can change the result of indirect checks, so we must purge all indirect relations
 	for _, r := range relations {
-		pc.addDirectRelation(ctx, r)
+		pc.addDirectRelation(ctx, r, true)
 	}
 }
 
@@ -101,7 +103,7 @@ func (pc *projectAuthzCache) UpdateCacheWithDeletedRelations(ctx context.Context
 	if len(relations) == 0 {
 		return
 	}
-	pc.indirectOrNegativeRelationCache.Purge(ctx) // deleted relations can change the result of indirect/negative checks
+	pc.indirectRelationCache.Purge(ctx) // deleted (direct) relations can change the result of indirect checks, so we must purge all indirect relations
 	for _, r := range relations {
 		pc.removeDirectRelation(ctx, r)
 	}
@@ -112,10 +114,10 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 		return
 	}
 	for _, c := range sdkChecks {
-		if !c.Allowed || !c.Direct {
-			pc.addIndirectOrNegativeRelation(ctx, c.Relation, c.Allowed)
+		if c.Info.Direct {
+			pc.addDirectRelation(ctx, c.Relation, c.Allowed)
 		} else {
-			pc.addDirectRelation(ctx, c.Relation)
+			pc.addIndirectRelation(ctx, c.Relation, c.Allowed)
 		}
 	}
 }
@@ -129,7 +131,7 @@ func (pc *projectAuthzCache) StartRemoteChangesPolling(ctx context.Context) {
 				return
 			case <-time.After(pc.remoteChanges.remotePollingInterval):
 				// in case of no cached relations, we skip the server call but invalidate the schema cache to make sure we don't miss schema changes
-				if noRelations := pc.directRelationCache.Len(ctx) == 0 && pc.indirectOrNegativeRelationCache.Len(ctx) == 0; noRelations {
+				if noRelations := pc.directRelationCache.Len(ctx) == 0 && pc.indirectRelationCache.Len(ctx) == 0; noRelations {
 					pc.remoteChanges.lastPollTime = time.Now()
 					pc.schemaCache = nil
 					cctx.Logger(ctx).Debug().Msg("No cached relations, skipping remote changes check")
@@ -147,16 +149,16 @@ func (pc *projectAuthzCache) StartRemoteChangesPolling(ctx context.Context) {
 					cctx.Logger(ctx).Info().Msg("Remote changes show schema changed, purging all caches")
 					pc.schemaCache = nil
 					pc.directRelationCache.Purge(ctx)
-					pc.indirectOrNegativeRelationCache.Purge(ctx)
+					pc.indirectRelationCache.Purge(ctx)
 					continue
 				}
 				// update the local cache only if there are missing remote changes
 				if len(remoteChanges.Resources) > 0 || len(remoteChanges.Targets) > 0 {
 					cctx.Logger(ctx).Debug().Msg(fmt.Sprintf("Remote changes found, Resources: %v, Targets: %v, updating caches", remoteChanges.Resources, remoteChanges.Targets))
-					pc.indirectOrNegativeRelationCache.Purge(ctx)
+					pc.indirectRelationCache.Purge(ctx)
 					for _, r := range remoteChanges.Resources {
 						for _, t := range remoteChanges.Targets {
-							pc.directRelationCache.Remove(ctx, directRelationKey(&descope.FGARelation{Resource: r, Target: t}))
+							pc.directRelationCache.Remove(ctx, directKey(&descope.FGARelation{Resource: r, Target: t}))
 						}
 					}
 				} else {
@@ -182,68 +184,56 @@ func (pc *projectAuthzCache) fetchRemoteChanges(ctx context.Context) (*descope.A
 	return remoteChanges, nil
 }
 
-func (pc *projectAuthzCache) addDirectRelation(ctx context.Context, r *descope.FGARelation) {
-	key := directRelationKey(r)
+func (pc *projectAuthzCache) addDirectRelation(ctx context.Context, r *descope.FGARelation, isAllowed bool) {
+	key := directKey(r)
 	relations, ok := pc.directRelationCache.Get(ctx, key)
-	if !ok {
-		relations = []string{}
+	if ok {
+		relations[relationKey(r)] = isAllowed
+		return
 	}
-	relations = append(relations, r.Relation)
-	pc.directRelationCache.Add(ctx, key, relations)
+	pc.directRelationCache.Add(ctx, key, map[relation]bool{relationKey(r): isAllowed})
 }
 
-func (pc *projectAuthzCache) addIndirectOrNegativeRelation(ctx context.Context, r *descope.FGARelation, isAllowed bool) {
-	key := indirectOrNegativeRelationKey(r)
-	pc.indirectOrNegativeRelationCache.Add(ctx, key, isAllowed)
+func (pc *projectAuthzCache) addIndirectRelation(ctx context.Context, r *descope.FGARelation, isAllowed bool) {
+	key := indirectKey(r)
+	pc.indirectRelationCache.Add(ctx, key, isAllowed)
 }
 
 func (pc *projectAuthzCache) removeDirectRelation(ctx context.Context, r *descope.FGARelation) {
-	key := directRelationKey(r)
+	key := directKey(r)
 	relations, ok := pc.directRelationCache.Get(ctx, key)
 	if !ok {
 		return // nothing to remove
 	}
-	// overwrite the relations slice without the relation to remove
-	for i, relation := range relations {
-		if relation == r.Relation {
-			relations = append(relations[:i], relations[i+1:]...)
-			break
-		}
-	}
-	// update the cache with the new relations slice, or remove the key if there are no relations left
-	if len(relations) == 0 {
-		pc.directRelationCache.Remove(ctx, key)
-	} else {
-		pc.directRelationCache.Add(ctx, key, relations)
-	}
+	delete(relations, relationKey(r))
 }
 
-func (pc *projectAuthzCache) checkDirectRelation(ctx context.Context, r *descope.FGARelation) bool {
-	key := directRelationKey(r)
-	relations, ok := pc.directRelationCache.Get(ctx, key)
-	if !ok {
-		return false
-	}
-	for _, relation := range relations {
-		if relation == r.Relation {
-			return true
+func (pc *projectAuthzCache) checkDirectRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
+	key := directKey(r)
+	if relations, ok := pc.directRelationCache.Get(ctx, key); ok {
+		if allowed, ok := relations[relationKey(r)]; ok {
+			return allowed, true
 		}
-	}
-	return false
-}
-
-func (pc *projectAuthzCache) checkIndirectOrNegativeRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
-	key := indirectOrNegativeRelationKey(r)
-	if allowed, ok := pc.indirectOrNegativeRelationCache.Get(ctx, key); ok {
-		return allowed, ok
 	}
 	return false, false
 }
 
-func directRelationKey(r *descope.FGARelation) resourceTargetKey {
-	return resourceTargetKey(r.Resource + ":" + r.Target)
+func (pc *projectAuthzCache) checkIndirectRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
+	key := indirectKey(r)
+	if allowed, ok := pc.indirectRelationCache.Get(ctx, key); ok {
+		return allowed, true
+	}
+	return false, false
 }
 
-func indirectOrNegativeRelationKey(r *descope.FGARelation) resourceTargetRelationKey {
-	return resourceTargetRelationKey(r.Resource + ":" + r.Target + ":" + r.Relation)
+func relationKey(r *descope.FGARelation) relation {
+	return relation(r.Relation)
+}
+
+func directKey(r *descope.FGARelation) resourceTarget {
+	return resourceTarget(r.Resource + ":" + r.Target)
+}
+
+func indirectKey(r *descope.FGARelation) resourceTargetRelation {
+	return resourceTargetRelation(r.Resource + ":" + r.Target + ":" + r.Relation)
 }

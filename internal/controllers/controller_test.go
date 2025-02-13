@@ -137,7 +137,7 @@ func TestCheck(t *testing.T) {
 		require.Equal(t, tuples[0].TargetType, relations[0].TargetType)
 		authzCalled = true
 		return []*descope.FGACheck{
-			{Allowed: true, Relation: relations[0], Direct: true},
+			{Allowed: true, Relation: relations[0], Info: &descope.FGACheckInfo{Direct: true}},
 		}, nil
 	}
 
@@ -154,7 +154,7 @@ func TestCheck(t *testing.T) {
 	require.Equal(t, tuples[0].Relation, resp.Tuples[0].Tuple.Relation)
 	require.Equal(t, tuples[0].TargetType, resp.Tuples[0].Tuple.TargetType)
 	require.True(t, resp.Tuples[0].Allowed)
-	//require.True(t, resp.Tuples[0].Direct) // TODO: comment in when PR is merged in authzservice
+	require.True(t, resp.Tuples[0].Info.Direct)
 }
 
 func TestCheckError(t *testing.T) {
