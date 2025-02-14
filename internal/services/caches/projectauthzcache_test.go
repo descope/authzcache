@@ -347,39 +347,54 @@ func BenchmarkCheckRelation(b *testing.B) {
 	})
 	b.Run("AddRelations", func(b *testing.B) {
 		b.ResetTimer()
+		var wg sync.WaitGroup
+		wg.Add(b.N)
 		for i := 0; i < b.N; i++ {
 			go func() {
+				defer wg.Done()
 				cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"}})
 			}()
 		}
+		wg.Wait()
 	})
 	b.Run("CheckRelation_CacheHit", func(b *testing.B) {
 		b.ResetTimer()
+		var wg sync.WaitGroup
+		wg.Add(b.N)
 		for i := 0; i < b.N; i++ {
 			// set j to an int between 0 and 999,999
 			go func() {
+				defer wg.Done()
 				j := i % 1_000_000
 				cache.CheckRelation(ctx, &descope.FGARelation{Resource: resources[j], Target: targets[j], Relation: "owner"}) // true
 			}()
-
 		}
+		wg.Wait()
 	})
 	b.Run("CheckRelation_CacheMiss", func(b *testing.B) {
 		b.ResetTimer()
+		var wg sync.WaitGroup
+		wg.Add(b.N)
 		for i := 0; i < b.N; i++ {
 			go func() {
+				defer wg.Done()
 				cache.CheckRelation(ctx, &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"}) // false
 			}()
 		}
+		wg.Wait()
 	})
 	b.Run("DeleteRelations", func(b *testing.B) {
 		b.ResetTimer()
+		var wg sync.WaitGroup
+		wg.Add(b.N)
 		for i := 0; i < b.N; i++ {
 			go func() {
+				defer wg.Done()
 				j := i % 1_000_000
 				cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{{Resource: resources[j], Target: targets[j], Relation: "owner"}})
 			}()
 		}
+		wg.Wait()
 	})
 }
 
