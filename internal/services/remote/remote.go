@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/descope/authzcache/internal/config"
+	ae "github.com/descope/authzservice/pkg/authzservice/errors"
 	"github.com/descope/go-sdk/descope"
 	"github.com/descope/go-sdk/descope/client"
 	"github.com/descope/go-sdk/descope/logger"
@@ -13,14 +14,17 @@ import (
 var baseURL = os.Getenv(descope.EnvironmentVariableBaseURL)
 
 func NewDescopeClientWithProjectID(projectID string) (sdk.Management, error) {
+	if projectID == "" {
+		return nil, ae.UnknownProject.New("projectID is empty")
+	}
 	descopeClient, err := client.NewWithConfig(&client.Config{
-		ProjectID:           string(projectID),
+		ProjectID:           projectID,
 		SessionJWTViaCookie: true,
 		DescopeBaseURL:      baseURL,
 		LogLevel:            getLogLevel(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, err // notest
 	}
 	return descopeClient.Management, nil
 }

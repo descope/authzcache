@@ -8,8 +8,8 @@ import (
 )
 
 func TestNewDescopeClientWithProjectID(t *testing.T) {
-	// remove default project ID environment variable
-	t.Setenv(descope.EnvironmentVariableProjectID, "")
+	// make sure projectID env variable is set (it should be ignored)
+	t.Setenv(descope.EnvironmentVariableProjectID, "some_project_id")
 	// Test with a valid project ID
 	projectID := "testProjectID"
 	client, err := NewDescopeClientWithProjectID(projectID)
