@@ -345,18 +345,40 @@ func BenchmarkCheckRelation(b *testing.B) {
 		approxTotalSize := sizeOfMap + 1_000_000*(sizeOfKey+sizeOfValue)
 		b.ReportMetric(float64(approxTotalSize)/(1024*1024), "approx_direct_cache_MB")
 	})
+	b.Run("AddRelations", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			go func() {
+				cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"}})
+			}()
+		}
+	})
 	b.Run("CheckRelation_CacheHit", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			// set j to an int between 0 and 999,999
-			j := i % 1_000_000
-			cache.CheckRelation(ctx, &descope.FGARelation{Resource: resources[j], Target: targets[j], Relation: "owner"}) // true
+			go func() {
+				j := i % 1_000_000
+				cache.CheckRelation(ctx, &descope.FGARelation{Resource: resources[j], Target: targets[j], Relation: "owner"}) // true
+			}()
+
 		}
 	})
 	b.Run("CheckRelation_CacheMiss", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			cache.CheckRelation(ctx, &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"}) // false
+			go func() {
+				cache.CheckRelation(ctx, &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"}) // false
+			}()
+		}
+	})
+	b.Run("DeleteRelations", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			go func() {
+				j := i % 1_000_000
+				cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{{Resource: resources[j], Target: targets[j], Relation: "owner"}})
+			}()
 		}
 	})
 }
