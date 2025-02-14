@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"sync"
 
 	"github.com/descope/authzcache/internal/services/caches"
 	cctx "github.com/descope/common/pkg/common/context"
@@ -19,15 +20,13 @@ type AuthzCache interface {
 type RemoteClientCreator func(projectID string) (sdk.Management, error)
 type ProjectAuthzCacheCreator func(ctx context.Context, remoteChangesChecker caches.RemoteChangesChecker) (caches.ProjectAuthzCache, error)
 
-type projectIDKey string
-
 type project struct {
 	cache   caches.ProjectAuthzCache // projectID -> caches
 	mgmtSDK sdk.Management
 }
 
 type authzCache struct {
-	projects            map[projectIDKey]project
+	projects            sync.Map //[projectIDKey]project
 	projectCacheCreator ProjectAuthzCacheCreator
 	remoteClientCreator RemoteClientCreator
 }
@@ -36,7 +35,7 @@ var _ AuthzCache = &authzCache{} // validate interface implementation
 
 func New(ctx context.Context, projectCacheCreator ProjectAuthzCacheCreator, remoteClientCreator RemoteClientCreator) (AuthzCache, error) {
 	cctx.Logger(ctx).Info().Msg("Starting new authz cache")
-	ac := &authzCache{projectCacheCreator: projectCacheCreator, projects: make(map[projectIDKey]project), remoteClientCreator: remoteClientCreator}
+	ac := &authzCache{projectCacheCreator: projectCacheCreator, remoteClientCreator: remoteClientCreator}
 	return ac, nil
 }
 
@@ -141,25 +140,25 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 }
 
 func (a *authzCache) getOrCreateProjectCache(ctx context.Context) (caches.ProjectAuthzCache, sdk.Management, error) {
-	projectID := projectIDKey(cctx.ProjectID(ctx))
-	if project, ok := a.projects[projectID]; ok {
-		return project.cache, project.mgmtSDK, nil
+	projectID := cctx.ProjectID(ctx)
+	if p, ok := a.projects.Load(projectID); ok {
+		return p.(project).cache, p.(project).mgmtSDK, nil
 	}
 	cctx.Logger(ctx).Info().Msg("Creating new project cache")
 	// create project mgmt sdk
-	mgmtSdk, err := a.remoteClientCreator(string(projectID))
+	projectMgmtSDK, err := a.remoteClientCreator(projectID)
 	if err != nil {
 		return nil, nil, err // notest
 	}
 	// create project cache
-	projectCache, err := a.projectCacheCreator(ctx, mgmtSdk.Authz())
+	projectCache, err := a.projectCacheCreator(ctx, projectMgmtSDK.Authz())
 	if err != nil {
 		return nil, nil, err // notest
 	}
 	// start remote changes polling
 	projectCache.StartRemoteChangesPolling(ctx)
 	// save cache and sdk
-	a.projects[projectID] = project{cache: projectCache, mgmtSDK: mgmtSdk}
+	a.projects.Store(projectID, project{cache: projectCache, mgmtSDK: projectMgmtSDK})
 	// return cache and sdk
-	return projectCache, mgmtSdk, nil
+	return projectCache, projectMgmtSDK, nil
 }

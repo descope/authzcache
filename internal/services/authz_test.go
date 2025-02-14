@@ -26,7 +26,6 @@ func TestNewAuthzCache(t *testing.T) {
 	ac, err := New(context.TODO(), mockCacheCreator, mockRemoteClientCreator)
 	require.NoError(t, err)
 	require.NotNil(t, ac)
-	require.NotNil(t, ac.(*authzCache).projects)
 	require.NotNil(t, ac.(*authzCache).projectCacheCreator)
 	require.NotNil(t, ac.(*authzCache).remoteClientCreator)
 }
