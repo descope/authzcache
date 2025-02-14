@@ -5,6 +5,7 @@ import (
 
 	grpcauthzcv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
 	"github.com/descope/common/pkg/common/config"
+	cctx "github.com/descope/common/pkg/common/context"
 	"github.com/descope/common/pkg/common/grpc/grpcclient"
 )
 
@@ -20,8 +21,7 @@ func NewClient(ctx context.Context, grpcClientConfig *grpcclient.Config) (*Authz
 		grpcClientConfig.ServicePort = config.GetAuthzCacheGRPCPort()
 	}
 
-	// TODO: Add health check?
-	//grpcClientConfig.HealthID = cctx.HealthAuthzCacheGRPC
+	grpcClientConfig.HealthID = cctx.HealthAuthzCacheGRPC
 	grpcClient, err := grpcclient.NewClient(ctx, grpcClientConfig)
 	if err != nil {
 		return nil, err
