@@ -5,7 +5,7 @@ go 1.23
 toolchain go1.23.4
 
 require (
-	github.com/descope/common v0.0.9-0.20250213111933-c32e2f25f24f
+	github.com/descope/common v0.0.9-0.20250214120718-565140d13a1f
 	github.com/descope/go-sdk v1.6.10-0.20250213151745-026980d25525
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250127200540-611164390420
 	github.com/descope/protoc-gen-validate v1.6.4-0.20250205164547-4aa1cd839d29
