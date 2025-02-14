@@ -176,7 +176,7 @@ func TestHandleRemotePollingTick_NoCachedRelations(t *testing.T) {
 		return nil, nil
 	}
 	// call the tick handler directly (for testing purposes)
-	cache.handleRemotePollingTick(ctx)
+	cache.updateCacheWithRemotePolling(ctx)
 	// verify that the schema cache was invalidated
 	assert.Nil(t, cache.schemaCache)
 }
@@ -193,7 +193,7 @@ func TestHandleRemotePollingTick_RemoteChangesError(t *testing.T) {
 	// populate the cache with some relations
 	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
 	// call the tick handler directly (for testing purposes)
-	cache.handleRemotePollingTick(ctx)
+	cache.updateCacheWithRemotePolling(ctx)
 	// sanity: verify that the remote was called
 	require.True(t, remoteCalled)
 	// verify that the cache was not invalidated
@@ -218,7 +218,7 @@ func TestHandleRemotePollingTick_RemoteSchemaChange(t *testing.T) {
 		return &descope.AuthzModified{SchemaChanged: true}, nil
 	}
 	// call the tick handler directly (for testing purposes)
-	cache.handleRemotePollingTick(ctx)
+	cache.updateCacheWithRemotePolling(ctx)
 	// verify that the schema cache was invalidated
 	assert.Nil(t, cache.GetSchema())
 	// verify that all relations were invalidated
@@ -250,7 +250,7 @@ func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {
 		}, nil
 	}
 	// call the tick handler directly (for testing purposes)
-	cache.handleRemotePollingTick(ctx)
+	cache.updateCacheWithRemotePolling(ctx)
 	// Verify that the schema cache was not invalidated
 	assert.NotNil(t, cache.GetSchema())
 	// Verify that all indirect relations are now invalidated
@@ -286,7 +286,7 @@ func TestHandleRemotePollingTick_NoRemoteChanges(t *testing.T) {
 		return &descope.AuthzModified{}, nil
 	}
 	// call the tick handler directly (for testing purposes)
-	cache.handleRemotePollingTick(ctx)
+	cache.updateCacheWithRemotePolling(ctx)
 	// sanity: verify that the remote was called
 	require.True(t, remoteCalled)
 	// verify that the schema cache was not invalidated

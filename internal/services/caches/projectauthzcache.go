@@ -3,6 +3,7 @@ package caches
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/descope/authzcache/internal/config"
@@ -32,6 +33,7 @@ type projectAuthzCache struct {
 	directRelationCache   *lru.MonitoredLRUCache[resourceTarget, map[relation]bool] // resource:target -> map[relation]bool, e.g. p1:file1:user2 -> {owner->false, read->true}
 	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, bool]      // resource:target:relation -> bool, e.g. p1:file1:user2:owner -> false
 	remoteChanges         *remoteChangesTracking
+	mutex                 sync.RWMutex
 }
 
 type ProjectAuthzCache interface {
@@ -64,7 +66,7 @@ func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChange
 			remotePollingInterval: time.Millisecond * time.Duration(config.GetRemotePollingIntervalInMillis()),
 		},
 	}
-	pc.remoteChanges.tickHandler = pc.handleRemotePollingTick // set the tick handler (to be used in the polling goroutine)
+	pc.remoteChanges.tickHandler = pc.updateCacheWithRemotePolling // set the tick handler (to be used in the polling goroutine)
 	return pc, nil
 }
 
@@ -73,6 +75,8 @@ func (pc *projectAuthzCache) GetSchema() *descope.FGASchema {
 }
 
 func (pc *projectAuthzCache) CheckRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
+	pc.mutex.RLock()
+	defer pc.mutex.RUnlock()
 	if allowed, ok := pc.checkDirectRelation(ctx, r); ok {
 		return allowed, true, true
 	}
@@ -82,8 +86,9 @@ func (pc *projectAuthzCache) CheckRelation(ctx context.Context, r *descope.FGARe
 	return false, false, false
 }
 
-// TODO: think about concurrent updates, might need to add locks and stuff since go maps are not safe for concurrent reads/writes
 func (pc *projectAuthzCache) UpdateCacheWithSchema(ctx context.Context, schema *descope.FGASchema) {
+	pc.mutex.Lock()
+	defer pc.mutex.Unlock()
 	pc.schemaCache = schema
 	// on schema update, we need to purge all relations
 	pc.indirectRelationCache.Purge(ctx)
@@ -94,6 +99,8 @@ func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, 
 	if len(relations) == 0 {
 		return
 	}
+	pc.mutex.Lock()
+	defer pc.mutex.Unlock()
 	pc.indirectRelationCache.Purge(ctx) // added (direct) relations can change the result of indirect checks, so we must purge all indirect relations
 	for _, r := range relations {
 		pc.addDirectRelation(ctx, r, true)
@@ -104,6 +111,8 @@ func (pc *projectAuthzCache) UpdateCacheWithDeletedRelations(ctx context.Context
 	if len(relations) == 0 {
 		return
 	}
+	pc.mutex.Lock()
+	defer pc.mutex.Unlock()
 	pc.indirectRelationCache.Purge(ctx) // deleted (direct) relations can change the result of indirect checks, so we must purge all indirect relations
 	for _, r := range relations {
 		pc.removeDirectRelation(ctx, r)
@@ -114,6 +123,8 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 	if len(sdkChecks) == 0 {
 		return
 	}
+	pc.mutex.Lock()
+	defer pc.mutex.Unlock()
 	for _, c := range sdkChecks {
 		if c.Info.Direct {
 			pc.addDirectRelation(ctx, c.Relation, c.Allowed)
@@ -138,7 +149,9 @@ func (pc *projectAuthzCache) StartRemoteChangesPolling(ctx context.Context) {
 	})
 }
 
-func (pc *projectAuthzCache) handleRemotePollingTick(ctx context.Context) {
+func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
+	pc.mutex.Lock()
+	defer pc.mutex.Unlock()
 	// in case of no cached relations, we skip the server call but invalidate the schema cache to make sure we don't miss schema changes
 	if noRelations := pc.directRelationCache.Len(ctx) == 0 && pc.indirectRelationCache.Len(ctx) == 0; noRelations {
 		pc.remoteChanges.lastPollTime = time.Now()
