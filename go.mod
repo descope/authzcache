@@ -5,13 +5,13 @@ go 1.23
 toolchain go1.23.4
 
 require (
-	github.com/descope/common v0.0.9-0.20250129113710-ba07fc6837d9
-	github.com/descope/go-sdk v1.6.10-0.20250130113819-1976646f19c7
+	github.com/descope/common v0.0.9-0.20250213111933-c32e2f25f24f
+	github.com/descope/go-sdk v1.6.10-0.20250213151745-026980d25525
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250127200540-611164390420
-	github.com/descope/protoc-gen-validate v1.6.4-0.20250128110522-4087f4457ac6
+	github.com/descope/protoc-gen-validate v1.6.4-0.20250205164547-4aa1cd839d29
 	github.com/stretchr/testify v1.10.0
 	google.golang.org/grpc v1.70.0
-	google.golang.org/protobuf v1.36.4
+	google.golang.org/protobuf v1.36.5
 )
 
 require (
@@ -46,13 +46,13 @@ require (
 	github.com/DataDog/opentelemetry-mapping-go/pkg/otlp/attributes v0.21.0 // indirect
 	github.com/DataDog/sketches-go v1.4.6 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/aws/aws-sdk-go v1.55.5 // indirect
+	github.com/aws/aws-sdk-go v1.55.6 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
-	github.com/descope/authzservice v0.0.0-20250128235450-381878b8ce18
+	github.com/descope/authzservice v0.0.0-20250213221432-7ef6417deda7
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eapache/queue/v2 v2.0.0-20230407133247-75960ed334e4 // indirect
@@ -91,7 +91,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/nyaruka/phonenumbers v1.4.4 // indirect
+	github.com/nyaruka/phonenumbers v1.5.0 // indirect
 	github.com/outcaste-io/ristretto v0.2.3 // indirect
 	github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -130,7 +130,7 @@ require (
 	golang.org/x/crypto v0.32.0 // indirect
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
