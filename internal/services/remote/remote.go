@@ -27,7 +27,7 @@ func NewDescopeClientWithProjectID(projectID string) (sdk.Management, error) {
 
 func getLogLevel() logger.LogLevel {
 	if config.GetSDKDebugLog() {
-		return logger.LogDebugLevel
+		return logger.LogDebugLevel // notest
 	}
 	return logger.LogInfoLevel
 }
