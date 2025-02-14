@@ -7,7 +7,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/descope/authzcache/internal/config"
 	"github.com/descope/go-sdk/descope"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -305,11 +304,11 @@ func TestRemotePolling(t *testing.T) {
 	// use context with cancel to avoid goroutine leak
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
-	// set the polling interval to 10ms
-	t.Setenv(config.ConfigKeyRemotePollingIntervalInMillis, "10")
 	cache, _ := setup(t)
+	// force the polling interval to be 10ms
+	cache.remoteChanges.remotePollingInterval = 10 * time.Millisecond
 	// mock tick handler func
-	var mutex sync.Mutex
+	var mutex sync.RWMutex
 	var tickHandlerCalled bool
 	cache.remoteChanges.tickHandler = func(_ context.Context) {
 		mutex.Lock() // must lock to avoid race condition between the test and the goroutine started in StartRemoteChangesPolling
@@ -320,8 +319,8 @@ func TestRemotePolling(t *testing.T) {
 	cache.StartRemoteChangesPolling(ctx)
 	time.Sleep(15 * time.Millisecond)
 	// verify that the remote was called
-	mutex.Lock() // must lock to avoid race condition between the test and the goroutine started in StartRemoteChangesPolling
-	defer mutex.Unlock()
+	mutex.RLock() // must lock to avoid race condition between the test and the goroutine started in StartRemoteChangesPolling
+	defer mutex.RUnlock()
 	assert.True(t, tickHandlerCalled)
 }
 
