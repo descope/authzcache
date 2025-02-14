@@ -95,3 +95,44 @@ func TestGetIndirectRelationCacheSizePerProject(t *testing.T) {
 		})
 	}
 }
+
+func TestGetSDKDebugLog(t *testing.T) {
+	tests := []struct {
+		name     string
+		debug    string
+		expected bool
+	}{
+		{
+			name:     "Config value set to true",
+			debug:    "true",
+			expected: true,
+		},
+		{
+			name:     "Config value set to TRUE",
+			debug:    "TRUE",
+			expected: true,
+		},
+		{
+			name:     "Config value set to false",
+			debug:    "false",
+			expected: false,
+		},
+		{
+			name:     "Config value set to FALSE",
+			debug:    "FALSE",
+			expected: false,
+		},
+		{
+			name:     "Config value not set",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(ConfigKeySDKDebugLog, tt.debug)
+			actual := GetSDKDebugLog()
+			require.Equal(t, tt.expected, actual)
+		})
+	}
+}

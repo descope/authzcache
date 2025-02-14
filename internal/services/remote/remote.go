@@ -3,6 +3,7 @@ package remote
 import (
 	"os"
 
+	"github.com/descope/authzcache/internal/config"
 	"github.com/descope/go-sdk/descope"
 	"github.com/descope/go-sdk/descope/client"
 	"github.com/descope/go-sdk/descope/logger"
@@ -16,10 +17,17 @@ func NewDescopeClientWithProjectID(projectID string) (sdk.Management, error) {
 		ProjectID:           string(projectID),
 		SessionJWTViaCookie: true,
 		DescopeBaseURL:      baseURL,
-		LogLevel:            logger.LogDebugLevel, // TODO: extract to env var
+		LogLevel:            getLogLevel(),
 	})
 	if err != nil {
 		return nil, err
 	}
 	return descopeClient.Management, nil
+}
+
+func getLogLevel() logger.LogLevel {
+	if config.GetSDKDebugLog() {
+		return logger.LogDebugLevel
+	}
+	return logger.LogInfoLevel
 }
