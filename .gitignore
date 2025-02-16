@@ -34,7 +34,7 @@ local_test.go
 .test/
 
 # Go build outputs
-# outputs/
+outputs/
 
 # Go workspace file
 go.work
