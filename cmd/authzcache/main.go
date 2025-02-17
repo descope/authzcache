@@ -6,6 +6,7 @@ import (
 
 	"github.com/descope/authzcache/internal/config"
 	"github.com/descope/authzcache/internal/controllers"
+	"github.com/descope/authzcache/internal/middlewares"
 	"github.com/descope/authzcache/internal/services"
 	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/authzcache/internal/services/remote"
@@ -13,7 +14,6 @@ import (
 	cconfig "github.com/descope/common/pkg/common/config"
 	cctx "github.com/descope/common/pkg/common/context"
 	"github.com/descope/common/pkg/common/grpc/server"
-	"github.com/descope/common/pkg/common/http/middlewares"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
 )
@@ -48,7 +48,7 @@ func serve() {
 		},
 		server.ServerOptions{
 			ServiceMiddlwares: []func(context.Context) func(h http.Handler) http.Handler{
-				middlewares.ProjectIDHandler,
+				middlewares.ProjectIDParser,
 			},
 		})
 
