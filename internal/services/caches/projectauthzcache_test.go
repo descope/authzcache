@@ -239,14 +239,12 @@ func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {
 	// sanity check: the cache is now populated
 	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
 	require.Greater(t, cache.indirectRelationCache.Len(ctx), 0)
-	// get one of the cached (direct) relations resource and target
+	// get one of the cached (direct) relations resource
 	resourceChanged := cachedRelations[0].r.Resource
-	targetChanged := cachedRelations[0].r.Target
-	// Simulate a relation change in the remote
+	// Simulate a relation change in the remote between a resource and a targetset. This should return a resource without a target
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		return &descope.AuthzModified{
 			Resources: []string{resourceChanged},
-			Targets:   []string{targetChanged},
 		}, nil
 	}
 	// call the tick handler directly (for testing purposes)
@@ -258,7 +256,7 @@ func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {
 	// verify that all relations not changed remotely are still in the cache
 	var atLeastOneStillInCache bool
 	for _, cr := range cachedRelations {
-		expectedToRemainInCache := cr.direct && cr.r.Resource != resourceChanged && cr.r.Target != targetChanged
+		expectedToRemainInCache := cr.direct && cr.r.Resource != resourceChanged
 		atLeastOneStillInCache = atLeastOneStillInCache || expectedToRemainInCache
 		allowed, _, ok := cache.CheckRelation(ctx, cr.r)
 		assert.Equal(t, expectedToRemainInCache, ok)
@@ -266,7 +264,7 @@ func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {
 		expectedAllowed := expectedToRemainInCache && cr.allowed
 		assert.Equal(t, expectedAllowed, allowed)
 	}
-	// we know that there is one direct relation that should still be in the cache since it has different resource and target
+	// we know that there is one direct relation that should still be in the cache since it has a different resource
 	assert.True(t, atLeastOneStillInCache)
 }
 
