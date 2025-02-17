@@ -2,6 +2,7 @@ package caches
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -241,10 +242,11 @@ func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {
 	require.Greater(t, cache.indirectRelationCache.Len(ctx), 0)
 	// get one of the cached (direct) relations resource
 	resourceChanged := cachedRelations[0].r.Resource
-	// Simulate a relation change in the remote between a resource and a targetset. This should return a resource without a target
+	targetChanged := "user2"
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		return &descope.AuthzModified{
-			Resources: []string{resourceChanged},
+			Resources: []string{resourceChanged, "not_in_cache"},
+			Targets:   []string{targetChanged, "not_in_cache"},
 		}, nil
 	}
 	// call the tick handler directly (for testing purposes)
@@ -256,7 +258,7 @@ func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {
 	// verify that all relations not changed remotely are still in the cache
 	var atLeastOneStillInCache bool
 	for _, cr := range cachedRelations {
-		expectedToRemainInCache := cr.direct && cr.r.Resource != resourceChanged
+		expectedToRemainInCache := cr.direct && cr.r.Resource != resourceChanged && cr.r.Target != targetChanged
 		atLeastOneStillInCache = atLeastOneStillInCache || expectedToRemainInCache
 		allowed, _, ok := cache.CheckRelation(ctx, cr.r)
 		assert.Equal(t, expectedToRemainInCache, ok)
@@ -322,28 +324,54 @@ func TestRemotePolling(t *testing.T) {
 	assert.True(t, tickHandlerCalled)
 }
 
+func TestDirectIndices(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	// add 2 direct relations
+	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"}, true)
+	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"}, true)
+	// assert all indices created and added
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t1:owner")))
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t2:owner")))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t1"], resourceTargetRelation("r1:t1:owner")))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"], resourceTargetRelation("r1:t2:owner")))
+	// assert nothing extra was added
+	assert.Equal(t, 1, len(cache.directResourcesIndex))
+	assert.Equal(t, 2, len(cache.directResourcesIndex["r1"]))
+	assert.Equal(t, 2, len(cache.directTargetsIndex))
+	assert.Equal(t, 1, len(cache.directTargetsIndex["t1"]))
+	assert.Equal(t, 1, len(cache.directTargetsIndex["t2"]))
+	// remove 1st relation
+	cache.removeDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})
+	// assert that the removed relation is not in the indices, but the other one is
+	assert.False(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t1:owner")))
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t2:owner")))
+	assert.False(t, slices.Contains(cache.directTargetsIndex["t1"], resourceTargetRelation("r1:t1:owner")))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"], resourceTargetRelation("r1:t2:owner")))
+	// remove 2nd relation
+	cache.removeDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})
+	// assert that both indexes are now empty
+	assert.Equal(t, 0, len(cache.directResourcesIndex["r1"]))
+	assert.Equal(t, 0, len(cache.directTargetsIndex["t1"]))
+	assert.Equal(t, 0, len(cache.directTargetsIndex["t2"]))
+}
+
 // benchmark cache checks with 1,000,000 direct relations
 func BenchmarkCheckRelation(b *testing.B) {
 	// prepare the cache with 1,000,000 direct relations
 	ctx := context.TODO()
-	remoteChecker := &mockRemoteChangesChecker{}
-	cache, _ := NewProjectAuthzCache(ctx, remoteChecker)
-	resources := make([]string, 1_000_000)
-	targets := make([]string, 1_000_000)
-	// insert 1,000,000 direct relation keys with 1 relation each into the cache
-	for i := 0; i < 1_000_000; i++ {
-		resources[i] = uuid.NewString()
-		targets[i] = uuid.NewString()
-		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: true, Relation: &descope.FGARelation{Resource: resources[i], Target: targets[i], Relation: "owner"}, Info: &descope.FGACheckInfo{Direct: true}}})
-	}
 	b.Run("ApproximateCacheSize", func(b *testing.B) {
-		sizeOfMap := unsafe.Sizeof(cache.(*projectAuthzCache).directRelationCache)
-		sizeOfKey := unsafe.Sizeof(uuid.NewString()) * 2 // ~  resource:target
-		sizeOfValue := unsafe.Sizeof(map[string]bool{}) + unsafe.Sizeof("owner") + unsafe.Sizeof(true)
-		approxTotalSize := sizeOfMap + 1_000_000*(sizeOfKey+sizeOfValue)
+		b.ResetTimer()
+		cache, _, _ := populateLargeDirectCache(ctx)
+		sizeOfMap := unsafe.Sizeof(cache.directRelationCache)
+		sizeOfKey := unsafe.Sizeof(uuid.NewString()) * 3 // ~  resource:target:relation
+		sizeOfValue := unsafe.Sizeof(true)
+		sizeOfIndexes := unsafe.Sizeof(map[string][]resourceTargetRelation{}) + sizeOfKey*2_000_000
+		approxTotalSize := sizeOfMap + 1_000_000*(sizeOfKey+sizeOfValue) + sizeOfIndexes
 		b.ReportMetric(float64(approxTotalSize)/(1024*1024), "approx_direct_cache_MB")
 	})
 	b.Run("AddRelations", func(b *testing.B) {
+		cache, _, _ := populateLargeDirectCache(ctx)
 		b.ResetTimer()
 		var wg sync.WaitGroup
 		wg.Add(b.N)
@@ -356,6 +384,7 @@ func BenchmarkCheckRelation(b *testing.B) {
 		wg.Wait()
 	})
 	b.Run("CheckRelation_CacheHit", func(b *testing.B) {
+		cache, resources, targets := populateLargeDirectCache(ctx)
 		b.ResetTimer()
 		var wg sync.WaitGroup
 		wg.Add(b.N)
@@ -370,6 +399,7 @@ func BenchmarkCheckRelation(b *testing.B) {
 		wg.Wait()
 	})
 	b.Run("CheckRelation_CacheMiss", func(b *testing.B) {
+		cache, _, _ := populateLargeDirectCache(ctx)
 		b.ResetTimer()
 		var wg sync.WaitGroup
 		wg.Add(b.N)
@@ -382,6 +412,7 @@ func BenchmarkCheckRelation(b *testing.B) {
 		wg.Wait()
 	})
 	b.Run("DeleteRelations", func(b *testing.B) {
+		cache, resources, targets := populateLargeDirectCache(ctx)
 		b.ResetTimer()
 		var wg sync.WaitGroup
 		wg.Add(b.N)
@@ -394,6 +425,43 @@ func BenchmarkCheckRelation(b *testing.B) {
 		}
 		wg.Wait()
 	})
+	b.Run("DeleteRelationsByResourceOrTarget_Hits", func(b *testing.B) {
+		cache, resources, targets := populateLargeDirectCache(ctx)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			j := i % 1_000_000
+			if i%2 == 0 {
+				cache.removeDirectRelationByResource(ctx, resources[j])
+			} else {
+				cache.removeDirectRelationByTarget(ctx, targets[j])
+			}
+		}
+	})
+	b.Run("DeleteRelationsByResourceOrTarget_Misses", func(b *testing.B) {
+		cache, _, _ := populateLargeDirectCache(ctx)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			if i%2 == 0 {
+				cache.removeDirectRelationByResource(ctx, uuid.NewString())
+			} else {
+				cache.removeDirectRelationByTarget(ctx, uuid.NewString())
+			}
+		}
+	})
+}
+
+func populateLargeDirectCache(ctx context.Context) (*projectAuthzCache, []string, []string) {
+	remoteChecker := &mockRemoteChangesChecker{}
+	cache, _ := NewProjectAuthzCache(ctx, remoteChecker)
+	resources := make([]string, 1_000_000)
+	targets := make([]string, 1_000_000)
+	// insert 1,000,000 direct relation keys with 1 relation each into the cache
+	for i := 0; i < 1_000_000; i++ {
+		resources[i] = uuid.NewString()
+		targets[i] = uuid.NewString()
+		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: true, Relation: &descope.FGARelation{Resource: resources[i], Target: targets[i], Relation: "owner"}, Info: &descope.FGACheckInfo{Direct: true}}})
+	}
+	return cache.(*projectAuthzCache), resources, targets
 }
 
 func setup(t *testing.T) (*projectAuthzCache, *mockRemoteChangesChecker) {
@@ -426,7 +494,7 @@ func updateBothCachesWithChecks(ctx context.Context, t *testing.T, cache *projec
 	}
 	cache.UpdateCacheWithChecks(ctx, checks)
 	// validate cache distribution
-	require.Equal(t, 3, cache.directRelationCache.Len(ctx)) // 4 entries, but 2 relations are saved under the same key (resourceOneID:user1) in the direct cache
+	require.Equal(t, 4, cache.directRelationCache.Len(ctx))
 	require.Equal(t, 2, cache.indirectRelationCache.Len(ctx))
 	return []*cachedRelation{
 		{allowed: true, direct: true, r: directTrueRelation},
