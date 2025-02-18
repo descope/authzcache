@@ -118,6 +118,14 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/authzv1.CheckResponseTuple'
+        authzv1.CheckResponseInfo:
+            type: object
+            properties:
+                direct:
+                    type: boolean
+                    description: |-
+                        A relation is considered "direct" if, based solely on the schema, its "allowed" state can only be
+                         changed by creating or deleting relations involving its resource, its target, or both (including itself)
         authzv1.CheckResponseTuple:
             type: object
             properties:
@@ -125,6 +133,8 @@ components:
                     type: boolean
                 tuple:
                     $ref: '#/components/schemas/authzv1.Tuple'
+                info:
+                    $ref: '#/components/schemas/authzv1.CheckResponseInfo'
         authzv1.CreateTuplesRequest:
             type: object
             properties:
