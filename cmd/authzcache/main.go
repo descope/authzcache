@@ -50,6 +50,7 @@ func serve() {
 			ServiceMiddlwares: []func(context.Context) func(h http.Handler) http.Handler{
 				middlewares.ProjectIDParser,
 			},
+			SkipInitCommonProjectCache: true,
 		})
 
 	if err != nil {
