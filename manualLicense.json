@@ -1,0 +1,9 @@
+{
+  "github.com/descope/common": "ignore",
+  "github.com/descope/connectorservice": "ignore",
+  "github.com/descope/sessionservice": "ignore",
+  "github.com/descope/projectservice": "ignore",
+  "github.com/descope/userservice": "ignore",
+  "github.com/descope/authzservice": "ignore",
+  "github.com/rogpeppe/go-internal": "BSD-3"
+}

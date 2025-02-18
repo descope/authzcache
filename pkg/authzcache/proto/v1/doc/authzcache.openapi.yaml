@@ -1,0 +1,171 @@
+# Generated with protoc-gen-openapi
+# https://github.com/google/gnostic/tree/master/cmd/protoc-gen-openapi
+
+openapi: 3.0.3
+info:
+    title: AuthzCache API
+    version: 0.0.1
+paths:
+    /v1/mgmt/fga/check:
+        post:
+            tags:
+                - AuthzCache
+            summary: Check if the given relations are allowed
+            description: Check if the given relations are allowed.
+            operationId: Check
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/authzv1.CheckRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/authzv1.CheckResponse'
+            security:
+                - AuthProjectIdMgmtKey: []
+            x-publishYaml: fga
+            x-order: 3
+    /v1/mgmt/fga/relations:
+        post:
+            tags:
+                - AuthzCache
+            summary: Create the given relations
+            description: Create the given relations.
+            operationId: CreateFGARelations
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/authzv1.CreateTuplesRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/authzv1.CreateTuplesResponse'
+            security:
+                - AuthProjectIdMgmtKey: []
+            x-publishYaml: fga
+            x-order: 2
+    /v1/mgmt/fga/relations/delete:
+        post:
+            tags:
+                - AuthzCache
+            summary: Delete the given relations
+            description: Delete the given relations.
+            operationId: DeleteFGARelations
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/authzv1.DeleteTuplesRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/authzv1.DeleteTuplesResponse'
+            security:
+                - AuthProjectIdMgmtKey: []
+            x-publishYaml: fga
+            x-order: 3
+    /v1/mgmt/fga/schema:
+        post:
+            tags:
+                - AuthzCache
+            summary: Create the given FGA Schema
+            description: Create the given FGA Schema.
+            operationId: CreateFGASchema
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/authzv1.SaveDSLSchemaRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/authzv1.SaveDSLSchemaResponse'
+            security:
+                - AuthProjectIdMgmtKey: []
+            x-publishYaml: fga
+            x-order: 1
+components:
+    schemas:
+        authzv1.CheckRequest:
+            type: object
+            properties:
+                tuples:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/authzv1.Tuple'
+        authzv1.CheckResponse:
+            type: object
+            properties:
+                tuples:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/authzv1.CheckResponseTuple'
+        authzv1.CheckResponseTuple:
+            type: object
+            properties:
+                allowed:
+                    type: boolean
+                tuple:
+                    $ref: '#/components/schemas/authzv1.Tuple'
+        authzv1.CreateTuplesRequest:
+            type: object
+            properties:
+                tuples:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/authzv1.Tuple'
+        authzv1.CreateTuplesResponse:
+            type: object
+            properties: {}
+        authzv1.DeleteTuplesRequest:
+            type: object
+            properties:
+                tuples:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/authzv1.Tuple'
+        authzv1.DeleteTuplesResponse:
+            type: object
+            properties: {}
+        authzv1.SaveDSLSchemaRequest:
+            type: object
+            properties:
+                dsl:
+                    type: string
+            description: New API
+        authzv1.SaveDSLSchemaResponse:
+            type: object
+            properties: {}
+        authzv1.Tuple:
+            type: object
+            properties:
+                resource:
+                    type: string
+                resourceType:
+                    type: string
+                relation:
+                    type: string
+                target:
+                    type: string
+                targetType:
+                    type: string
+tags:
+    - name: AuthzCache

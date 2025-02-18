@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+if [ -d vendor ]; then
+	source vendor/github.com/descope/common/scripts/lint/lint.sh
+else
+	source $GOPATH/src/github.com/descope/common/scripts/lint/lint.sh
+fi
+
+run_default_linter --build-folder "cmd" --do-not-check-main $1
