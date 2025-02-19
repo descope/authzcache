@@ -8,7 +8,9 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/descope/authzcache/internal/config"
 	"github.com/descope/go-sdk/descope"
+	lru "github.com/descope/golang-lru"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -141,6 +143,9 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 		assert.False(t, allowed)
 		assert.False(t, direct)
 	}
+	// verify that indices are now empty
+	assert.Equal(t, 0, len(cache.directResourcesIndex))
+	assert.Equal(t, 0, len(cache.directTargetsIndex))
 }
 
 func TestEmptyActions(t *testing.T) {
@@ -229,6 +234,9 @@ func TestHandleRemotePollingTick_RemoteSchemaChange(t *testing.T) {
 		assert.False(t, allowed)
 		assert.False(t, direct)
 	}
+	// verify indices are now empty
+	assert.Equal(t, 0, len(cache.directResourcesIndex))
+	assert.Equal(t, 0, len(cache.directTargetsIndex))
 }
 
 func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {
@@ -265,7 +273,19 @@ func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {
 		// if the relation is still in the cache, it should have the same allowed value
 		expectedAllowed := expectedToRemainInCache && cr.allowed
 		assert.Equal(t, expectedAllowed, allowed)
+		// validate no index was wrongly removed
+		if expectedToRemainInCache {
+			resource := resource(cr.r.Resource)
+			target := target(cr.r.Target)
+			assert.True(t, slices.Contains(cache.directResourcesIndex[resource], key(cr.r)))
+			assert.True(t, slices.Contains(cache.directTargetsIndex[target], key(cr.r)))
+		}
 	}
+	// verify the the changed target and relation were removed from the indices
+	_, rOK := cache.directResourcesIndex[resource(resourceChanged)]
+	assert.False(t, rOK, "resource: %s should have been removed from the cache and the index", resourceChanged)
+	_, tOK := cache.directTargetsIndex[target(targetChanged)]
+	assert.False(t, tOK, "target: %s should have been removed from the cache and the index", targetChanged)
 	// we know that there is one direct relation that should still be in the cache since it has a different resource
 	assert.True(t, atLeastOneStillInCache)
 }
@@ -324,6 +344,28 @@ func TestRemotePolling(t *testing.T) {
 	assert.True(t, tickHandlerCalled)
 }
 
+func TestUnderstandEvictionCallback(t *testing.T) {
+	t.Skip("Toy method for understanding cache eviction, not a real test")
+	cbCallCount := 0
+	cb := func(_, _ int) {
+		cbCallCount++
+	}
+	cache, err := lru.NewWithEvict[int, int](2, cb)
+	require.NoError(t, err)
+	cache.Add(1, 1)
+	cache.Add(2, 2)
+	cache.Remove(1)
+	cache.Remove(1) //again while key not in cache
+	cache.Remove(2)
+	cache.Add(1, 1)
+	cache.Add(2, 2)
+	require.Equal(t, 0, cbCallCount, "evict callback should not have been called since no eviction happened")
+	cache.Add(3, 3) // this addition should call the evict CB since the cache is full
+	require.Equal(t, 1, cbCallCount)
+	cache.Purge()
+	require.Equal(t, 3, cbCallCount) // purge DOES call the evict CB, even though eviction was done externally
+}
+
 func TestDirectIndices(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)
@@ -345,8 +387,8 @@ func TestDirectIndices(t *testing.T) {
 	cache.removeDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})
 	// assert that the removed relation is not in the indices, but the other one is
 	assert.False(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t1:owner")))
-	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t2:owner")))
 	assert.False(t, slices.Contains(cache.directTargetsIndex["t1"], resourceTargetRelation("r1:t1:owner")))
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t2:owner")))
 	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"], resourceTargetRelation("r1:t2:owner")))
 	// remove 2nd relation
 	cache.removeDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})
@@ -354,6 +396,40 @@ func TestDirectIndices(t *testing.T) {
 	assert.Equal(t, 0, len(cache.directResourcesIndex["r1"]))
 	assert.Equal(t, 0, len(cache.directTargetsIndex["t1"]))
 	assert.Equal(t, 0, len(cache.directTargetsIndex["t2"]))
+	// test removal of elements which are not in the cache (don't panic)
+	cache.removeDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})
+	cache.removeDirectRelation(ctx, &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: uuid.NewString()})
+}
+
+func TestRemoveIndexOnEviction(t *testing.T) {
+	ctx := context.TODO()
+	// set cache size to 2 so that 3rd addition triggers an eviction
+	t.Setenv(config.ConfigKeyDirectRelationCacheSizePerProject, "2")
+	cache, _ := setup(t)
+	// add 2 direct relations
+	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"}, true)
+	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"}, true)
+	// assert all indices created and added
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t1:owner")))
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t2:owner")))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t1"], resourceTargetRelation("r1:t1:owner")))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"], resourceTargetRelation("r1:t2:owner")))
+	// add 3rd relation (this should trigger an eviction)
+	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"}, true)
+	// assert that the 1st relation was evicted from the cache and the indices
+	_, _, ok := cache.CheckRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})
+	assert.False(t, ok)
+	assert.False(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t1:owner")))
+	assert.False(t, slices.Contains(cache.directTargetsIndex["t1"], resourceTargetRelation("r1:t1:owner")))
+	// assert that the other 2 relations are still in the cache and the indices
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t2:owner")))
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t3:owner")))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"], resourceTargetRelation("r1:t2:owner")))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t3"], resourceTargetRelation("r1:t3:owner")))
+	_, _, ok = cache.CheckRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})
+	assert.True(t, ok)
+	_, _, ok = cache.CheckRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"})
+	assert.True(t, ok)
 }
 
 // benchmark cache checks with 1,000,000 direct relations
@@ -370,7 +446,7 @@ func BenchmarkCheckRelation(b *testing.B) {
 		approxTotalSize := sizeOfMap + 1_000_000*(sizeOfKey+sizeOfValue) + sizeOfIndexes
 		b.ReportMetric(float64(approxTotalSize)/(1024*1024), "approx_direct_cache_MB")
 	})
-	b.Run("AddRelations", func(b *testing.B) {
+	b.Run("AddRelations_AboveCacheSize", func(b *testing.B) {
 		cache, _, _ := populateLargeDirectCache(ctx)
 		b.ResetTimer()
 		var wg sync.WaitGroup
@@ -431,9 +507,9 @@ func BenchmarkCheckRelation(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			j := i % 1_000_000
 			if i%2 == 0 {
-				cache.removeDirectRelationByResource(ctx, resources[j])
+				cache.removeDirectRelationByResource(ctx, resource(resources[j]))
 			} else {
-				cache.removeDirectRelationByTarget(ctx, targets[j])
+				cache.removeDirectRelationByTarget(ctx, target(targets[j]))
 			}
 		}
 	})
@@ -442,9 +518,9 @@ func BenchmarkCheckRelation(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			if i%2 == 0 {
-				cache.removeDirectRelationByResource(ctx, uuid.NewString())
+				cache.removeDirectRelationByResource(ctx, resource(uuid.NewString()))
 			} else {
-				cache.removeDirectRelationByTarget(ctx, uuid.NewString())
+				cache.removeDirectRelationByTarget(ctx, target(uuid.NewString()))
 			}
 		}
 	})

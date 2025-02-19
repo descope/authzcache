@@ -7,6 +7,7 @@ toolchain go1.23.5
 require (
 	github.com/descope/common v0.0.9-0.20250214120718-565140d13a1f
 	github.com/descope/go-sdk v1.6.10-0.20250213151745-026980d25525
+	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250127200540-611164390420
 	github.com/descope/protoc-gen-validate v1.6.4-0.20250205164547-4aa1cd839d29
 	github.com/stretchr/testify v1.10.0
@@ -19,7 +20,6 @@ require (
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
-	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nikunjy/rules v1.5.0 // indirect
