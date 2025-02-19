@@ -32,8 +32,8 @@ type target string
 type projectAuthzCache struct {
 	schemaCache           *descope.FGASchema                                   // schema
 	directRelationCache   *lru.MonitoredLRUCache[resourceTargetRelation, bool] // resource:target:relation -> bool, e.g. file1:user2:owner -> false
-	directResourcesIndex  map[resource][]resourceTargetRelation
-	directTargetsIndex    map[target][]resourceTargetRelation
+	directResourcesIndex  map[resource]map[target][]resourceTargetRelation
+	directTargetsIndex    map[target]map[resource][]resourceTargetRelation
 	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, bool] // resource:target:relation -> bool, e.g. file1:user2:owner -> false
 	remoteChanges         *remoteChangesTracking
 	mutex                 sync.RWMutex
@@ -52,14 +52,14 @@ type ProjectAuthzCache interface {
 var _ ProjectAuthzCache = &projectAuthzCache{} // ensure projectAuthzCache implements ProjectAuthzCache
 
 func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChangesChecker) (ProjectAuthzCache, error) {
-	directResourcesIndex := make(map[resource][]resourceTargetRelation)
-	directTargetsIndex := make(map[target][]resourceTargetRelation)
-	removeIndexOnCacheEviction := func(k resourceTargetRelation, _ bool) {
+	directResourcesIndex := make(map[resource]map[target][]resourceTargetRelation)
+	directTargetsIndex := make(map[target]map[resource][]resourceTargetRelation)
+	removeIndexOnCacheEviction := func(key resourceTargetRelation, _ bool) {
 		// on eviction, we need to remove the keys from the indexes as well
-		splitKey := strings.Split(string(k), ":")
+		splitKey := strings.Split(string(key), ":")
 		resource, target := resource(splitKey[0]), target(splitKey[1])
-		removeKeyFromResourceIndex(directResourcesIndex, resource, k)
-		removeKeyFromTargetIndex(directTargetsIndex, target, k)
+		removeKeyFromResourceIndex(directResourcesIndex, resource, target, key)
+		removeKeyFromTargetIndex(directTargetsIndex, resource, target, key)
 	}
 	directRelationCache, err := lru.NewWithEvict[resourceTargetRelation, bool](config.GetDirectRelationCacheSizePerProject(), "authz-direct-relations-"+cctx.ProjectID(ctx), removeIndexOnCacheEviction)
 	if err != nil {
@@ -220,8 +220,26 @@ func (pc *projectAuthzCache) fetchRemoteChanges(ctx context.Context) (*descope.A
 func (pc *projectAuthzCache) addDirectRelation(ctx context.Context, r *descope.FGARelation, isAllowed bool) {
 	key := key(r)
 	pc.directRelationCache.Add(ctx, key, isAllowed)
-	pc.directResourcesIndex[resource(r.Resource)] = append(pc.directResourcesIndex[resource(r.Resource)], key)
-	pc.directTargetsIndex[target(r.Target)] = append(pc.directTargetsIndex[target(r.Target)], key)
+	resource := resource(r.Resource)
+	target := target(r.Target)
+	pc.addKeyToDirectResourceIndex(key, resource, target)
+	pc.addKeyToDirectTargetIndex(key, resource, target)
+}
+
+func (pc *projectAuthzCache) addKeyToDirectResourceIndex(k resourceTargetRelation, r resource, t target) {
+	if targetsToKeys, ok := pc.directResourcesIndex[r]; ok {
+		targetsToKeys[t] = append(targetsToKeys[t], k)
+	} else {
+		pc.directResourcesIndex[r] = map[target][]resourceTargetRelation{t: append([]resourceTargetRelation{}, k)}
+	}
+}
+
+func (pc *projectAuthzCache) addKeyToDirectTargetIndex(k resourceTargetRelation, r resource, t target) {
+	if resourcesToKeys, ok := pc.directTargetsIndex[t]; ok {
+		resourcesToKeys[r] = append(resourcesToKeys[r], k)
+	} else {
+		pc.directTargetsIndex[t] = map[resource][]resourceTargetRelation{r: append([]resourceTargetRelation{}, k)}
+	}
 }
 
 func (pc *projectAuthzCache) addIndirectRelation(ctx context.Context, r *descope.FGARelation, isAllowed bool) {
@@ -232,54 +250,66 @@ func (pc *projectAuthzCache) addIndirectRelation(ctx context.Context, r *descope
 func (pc *projectAuthzCache) removeDirectRelation(ctx context.Context, r *descope.FGARelation) {
 	key := key(r)
 	pc.directRelationCache.Remove(ctx, key)
-	removeKeyFromResourceIndex(pc.directResourcesIndex, resource(r.Resource), key)
-	removeKeyFromTargetIndex(pc.directTargetsIndex, target(r.Target), key)
+	resource := resource(r.Resource)
+	target := target(r.Target)
+	removeKeyFromResourceIndex(pc.directResourcesIndex, resource, target, key)
+	removeKeyFromTargetIndex(pc.directTargetsIndex, resource, target, key)
 }
 
 func (pc *projectAuthzCache) removeDirectRelationByResource(ctx context.Context, r resource) {
-	//deep copy the keys to avoid delete while iterating if eviction callback is triggered by Remove (behavior depends on the underlying LRU implementation)
-	keys := make([]resourceTargetRelation, len(pc.directResourcesIndex[r]))
-	copy(keys, pc.directResourcesIndex[r])
-	for _, k := range keys {
-		pc.directRelationCache.Remove(ctx, k)
+	targetsToKeys := pc.directResourcesIndex[r]
+	for _, keys := range targetsToKeys {
+		for _, k := range keys {
+			pc.directRelationCache.Remove(ctx, k)
+		}
 	}
 	delete(pc.directResourcesIndex, r)
 }
 
 func (pc *projectAuthzCache) removeDirectRelationByTarget(ctx context.Context, t target) {
-	//deep copy the keys to avoid delete while iterating if eviction callback is triggered by Remove (behavior depends on the underlying LRU implementation)
-	keys := make([]resourceTargetRelation, len(pc.directTargetsIndex[t]))
-	copy(keys, pc.directTargetsIndex[t])
-	for _, k := range keys {
-		pc.directRelationCache.Remove(ctx, k)
+	resourcesToKeys := pc.directTargetsIndex[t]
+	for _, keys := range resourcesToKeys {
+		for _, k := range keys {
+			pc.directRelationCache.Remove(ctx, k)
+		}
 	}
 	delete(pc.directTargetsIndex, t)
 }
 
-func removeKeyFromTargetIndex(index map[target][]resourceTargetRelation, t target, keyToRemove resourceTargetRelation) {
-	if keys, ok := index[t]; ok {
-		for i, key := range keys {
-			if key == keyToRemove {
-				index[t] = append(keys[:i], keys[i+1:]...)
-				if len(index[t]) == 0 {
-					delete(index, t)
-				}
+func removeKeyFromResourceIndex(index map[resource]map[target][]resourceTargetRelation, r resource, t target, keyToRemove resourceTargetRelation) {
+	if targetsToKeys, ok := index[r]; ok {
+		keys := targetsToKeys[t]
+		for i, k := range keys {
+			if k == keyToRemove {
+				keys = append(keys[:i], keys[i+1:]...)
+				targetsToKeys[t] = keys
 				break
 			}
+		}
+		if len(keys) == 0 {
+			delete(targetsToKeys, t)
+		}
+		if len(targetsToKeys) == 0 {
+			delete(index, r)
 		}
 	}
 }
 
-func removeKeyFromResourceIndex(index map[resource][]resourceTargetRelation, r resource, keyToRemove resourceTargetRelation) {
-	if keys, ok := index[r]; ok {
-		for i, key := range keys {
-			if key == keyToRemove {
-				index[r] = append(keys[:i], keys[i+1:]...)
-				if len(index[r]) == 0 {
-					delete(index, r)
-				}
+func removeKeyFromTargetIndex(index map[target]map[resource][]resourceTargetRelation, r resource, t target, keyToRemove resourceTargetRelation) {
+	if resourcesToKeys, ok := index[t]; ok {
+		keys := resourcesToKeys[r]
+		for i, k := range keys {
+			if k == keyToRemove {
+				keys = append(keys[:i], keys[i+1:]...)
+				resourcesToKeys[r] = keys
 				break
 			}
+		}
+		if len(keys) == 0 {
+			delete(resourcesToKeys, r)
+		}
+		if len(resourcesToKeys) == 0 {
+			delete(index, t)
 		}
 	}
 }

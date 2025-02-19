@@ -144,8 +144,8 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 		assert.False(t, direct)
 	}
 	// verify that indices are now empty
-	assert.Equal(t, 0, len(cache.directResourcesIndex))
-	assert.Equal(t, 0, len(cache.directTargetsIndex))
+	assert.Equal(t, 0, len(cache.directResourcesIndex), "%v", cache.directResourcesIndex)
+	assert.Equal(t, 0, len(cache.directTargetsIndex), "%v", cache.directTargetsIndex)
 }
 
 func TestEmptyActions(t *testing.T) {
@@ -269,7 +269,7 @@ func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {
 		expectedToRemainInCache := cr.direct && cr.r.Resource != resourceChanged && cr.r.Target != targetChanged
 		atLeastOneStillInCache = atLeastOneStillInCache || expectedToRemainInCache
 		allowed, _, ok := cache.CheckRelation(ctx, cr.r)
-		assert.Equal(t, expectedToRemainInCache, ok)
+		assert.Equal(t, expectedToRemainInCache, ok, "relation: %v cache state is wrong", cr.r)
 		// if the relation is still in the cache, it should have the same allowed value
 		expectedAllowed := expectedToRemainInCache && cr.allowed
 		assert.Equal(t, expectedAllowed, allowed)
@@ -277,8 +277,8 @@ func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {
 		if expectedToRemainInCache {
 			resource := resource(cr.r.Resource)
 			target := target(cr.r.Target)
-			assert.True(t, slices.Contains(cache.directResourcesIndex[resource], key(cr.r)))
-			assert.True(t, slices.Contains(cache.directTargetsIndex[target], key(cr.r)))
+			assert.True(t, slices.Contains(cache.directResourcesIndex[resource][target], key(cr.r)))
+			assert.True(t, slices.Contains(cache.directTargetsIndex[target][resource], key(cr.r)))
 		}
 	}
 	// verify the the changed target and relation were removed from the indices
@@ -363,7 +363,7 @@ func TestUnderstandEvictionCallback(t *testing.T) {
 	cache.Add(3, 3) // this addition should call the evict CB since the cache is full
 	require.Equal(t, 1, cbCallCount)
 	cache.Purge()
-	require.Equal(t, 3, cbCallCount) // purge DOES call the evict CB, even though eviction was done externally
+	require.Equal(t, 3, cbCallCount) // purge also calls the evict CB
 }
 
 func TestDirectIndices(t *testing.T) {
@@ -373,10 +373,10 @@ func TestDirectIndices(t *testing.T) {
 	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"}, true)
 	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"}, true)
 	// assert all indices created and added
-	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t1:owner")))
-	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t2:owner")))
-	assert.True(t, slices.Contains(cache.directTargetsIndex["t1"], resourceTargetRelation("r1:t1:owner")))
-	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"], resourceTargetRelation("r1:t2:owner")))
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t1"], key(&descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})))
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t2"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t1"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
 	// assert nothing extra was added
 	assert.Equal(t, 1, len(cache.directResourcesIndex))
 	assert.Equal(t, 2, len(cache.directResourcesIndex["r1"]))
@@ -386,10 +386,12 @@ func TestDirectIndices(t *testing.T) {
 	// remove 1st relation
 	cache.removeDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})
 	// assert that the removed relation is not in the indices, but the other one is
-	assert.False(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t1:owner")))
-	assert.False(t, slices.Contains(cache.directTargetsIndex["t1"], resourceTargetRelation("r1:t1:owner")))
-	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t2:owner")))
-	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"], resourceTargetRelation("r1:t2:owner")))
+	_, ok := cache.directResourcesIndex["r1"]["t1"]
+	assert.False(t, ok)
+	_, ok = cache.directTargetsIndex["t1"]["r1"]
+	assert.False(t, ok)
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t2"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
 	// remove 2nd relation
 	cache.removeDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})
 	// assert that both indexes are now empty
@@ -410,22 +412,24 @@ func TestRemoveIndexOnEviction(t *testing.T) {
 	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"}, true)
 	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"}, true)
 	// assert all indices created and added
-	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t1:owner")))
-	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t2:owner")))
-	assert.True(t, slices.Contains(cache.directTargetsIndex["t1"], resourceTargetRelation("r1:t1:owner")))
-	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"], resourceTargetRelation("r1:t2:owner")))
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t1"], key(&descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})))
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t2"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t1"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
 	// add 3rd relation (this should trigger an eviction)
 	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"}, true)
 	// assert that the 1st relation was evicted from the cache and the indices
 	_, _, ok := cache.CheckRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})
 	assert.False(t, ok)
-	assert.False(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t1:owner")))
-	assert.False(t, slices.Contains(cache.directTargetsIndex["t1"], resourceTargetRelation("r1:t1:owner")))
+	_, ok = cache.directResourcesIndex["r1"]["t1"]
+	assert.False(t, ok)
+	_, ok = cache.directTargetsIndex["t1"]["r1"]
+	assert.False(t, ok)
 	// assert that the other 2 relations are still in the cache and the indices
-	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t2:owner")))
-	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"], resourceTargetRelation("r1:t3:owner")))
-	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"], resourceTargetRelation("r1:t2:owner")))
-	assert.True(t, slices.Contains(cache.directTargetsIndex["t3"], resourceTargetRelation("r1:t3:owner")))
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t2"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
+	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t3"], key(&descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"})))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["t3"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"})))
 	_, _, ok = cache.CheckRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})
 	assert.True(t, ok)
 	_, _, ok = cache.CheckRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"})
