@@ -3,6 +3,7 @@ package caches
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,12 +26,14 @@ type remoteChangesTracking struct {
 
 // cache key type aliases
 type resourceTargetRelation string
+type resource string
+type target string
 
 type projectAuthzCache struct {
 	schemaCache           *descope.FGASchema                                   // schema
 	directRelationCache   *lru.MonitoredLRUCache[resourceTargetRelation, bool] // resource:target:relation -> bool, e.g. file1:user2:owner -> false
-	directResourcesIndex  map[string][]resourceTargetRelation
-	directTargetsIndex    map[string][]resourceTargetRelation
+	directResourcesIndex  map[resource]map[target][]resourceTargetRelation
+	directTargetsIndex    map[target]map[resource][]resourceTargetRelation
 	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, bool] // resource:target:relation -> bool, e.g. file1:user2:owner -> false
 	remoteChanges         *remoteChangesTracking
 	mutex                 sync.RWMutex
@@ -49,18 +52,13 @@ type ProjectAuthzCache interface {
 var _ ProjectAuthzCache = &projectAuthzCache{} // ensure projectAuthzCache implements ProjectAuthzCache
 
 func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChangesChecker) (ProjectAuthzCache, error) {
-	directRelationCache, err := lru.New[resourceTargetRelation, bool](config.GetDirectRelationCacheSizePerProject(), "authz-direct-relations-"+cctx.ProjectID(ctx))
-	if err != nil {
-		return nil, err // notest
-	}
 	indirectRelationCache, err := lru.New[resourceTargetRelation, bool](config.GetIndirectRelationCacheSizePerProject(), "authz-indirect-relations-"+cctx.ProjectID(ctx))
 	if err != nil {
 		return nil, err // notest
 	}
 	pc := &projectAuthzCache{
-		directRelationCache:   directRelationCache,
-		directResourcesIndex:  make(map[string][]resourceTargetRelation),
-		directTargetsIndex:    make(map[string][]resourceTargetRelation),
+		directResourcesIndex:  make(map[resource]map[target][]resourceTargetRelation),
+		directTargetsIndex:    make(map[target]map[resource][]resourceTargetRelation),
 		indirectRelationCache: indirectRelationCache,
 		remoteChanges: &remoteChangesTracking{
 			lastPollTime:          time.Now(),
@@ -68,6 +66,11 @@ func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChange
 			remotePollingInterval: time.Millisecond * time.Duration(config.GetRemotePollingIntervalInMillis()),
 		},
 	}
+	directRelationCache, err := lru.NewWithEvict[resourceTargetRelation, bool](config.GetDirectRelationCacheSizePerProject(), "authz-direct-relations-"+cctx.ProjectID(ctx), pc.removeIndexOnCacheEviction)
+	if err != nil {
+		return nil, err // notest
+	}
+	pc.directRelationCache = directRelationCache
 	pc.remoteChanges.tickHandler = pc.updateCacheWithRemotePolling // set the tick handler (to be used in the polling goroutine)
 	return pc, nil
 }
@@ -93,8 +96,10 @@ func (pc *projectAuthzCache) UpdateCacheWithSchema(ctx context.Context, schema *
 	defer pc.mutex.Unlock()
 	pc.schemaCache = schema
 	// on schema update, we need to purge all relations
-	pc.indirectRelationCache.Purge(ctx)
+	pc.directResourcesIndex = make(map[resource]map[target][]resourceTargetRelation)
+	pc.directTargetsIndex = make(map[target]map[resource][]resourceTargetRelation)
 	pc.directRelationCache.Purge(ctx)
+	pc.indirectRelationCache.Purge(ctx)
 }
 
 func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, relations []*descope.FGARelation) {
@@ -172,6 +177,8 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	if remoteChanges.SchemaChanged {
 		cctx.Logger(ctx).Info().Msg("Remote changes show schema changed, purging all caches")
 		pc.schemaCache = nil
+		pc.directResourcesIndex = make(map[resource]map[target][]resourceTargetRelation)
+		pc.directTargetsIndex = make(map[target]map[resource][]resourceTargetRelation)
 		pc.directRelationCache.Purge(ctx)
 		pc.indirectRelationCache.Purge(ctx)
 		return
@@ -184,27 +191,11 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	cctx.Logger(ctx).Debug().Msg(fmt.Sprintf("Remote changes found, Resources: %v, Targets: %v, updating caches", remoteChanges.Resources, remoteChanges.Targets))
 	pc.indirectRelationCache.Purge(ctx)
 	for _, r := range remoteChanges.Resources {
-		pc.removeDirectRelationByResource(ctx, r)
+		pc.removeDirectRelationByResource(ctx, resource(r))
 	}
 	for _, t := range remoteChanges.Targets {
-		pc.removeDirectRelationByTarget(ctx, t)
+		pc.removeDirectRelationByTarget(ctx, target(t))
 	}
-}
-
-func (pc *projectAuthzCache) removeDirectRelationByResource(ctx context.Context, r string) {
-	keys := pc.directResourcesIndex[r]
-	for _, k := range keys {
-		pc.directRelationCache.Remove(ctx, k)
-	}
-	delete(pc.directResourcesIndex, r)
-}
-
-func (pc *projectAuthzCache) removeDirectRelationByTarget(ctx context.Context, t string) {
-	keys := pc.directTargetsIndex[t]
-	for _, k := range keys {
-		pc.directRelationCache.Remove(ctx, k)
-	}
-	delete(pc.directTargetsIndex, t)
 }
 
 func (pc *projectAuthzCache) fetchRemoteChanges(ctx context.Context) (*descope.AuthzModified, error) {
@@ -224,8 +215,26 @@ func (pc *projectAuthzCache) fetchRemoteChanges(ctx context.Context) (*descope.A
 func (pc *projectAuthzCache) addDirectRelation(ctx context.Context, r *descope.FGARelation, isAllowed bool) {
 	key := key(r)
 	pc.directRelationCache.Add(ctx, key, isAllowed)
-	pc.directResourcesIndex[r.Resource] = append(pc.directResourcesIndex[r.Resource], key)
-	pc.directTargetsIndex[r.Target] = append(pc.directTargetsIndex[r.Target], key)
+	resource := resource(r.Resource)
+	target := target(r.Target)
+	pc.addKeyToDirectResourceIndex(key, resource, target)
+	pc.addKeyToDirectTargetIndex(key, resource, target)
+}
+
+func (pc *projectAuthzCache) addKeyToDirectResourceIndex(k resourceTargetRelation, r resource, t target) {
+	if targetsToKeys, ok := pc.directResourcesIndex[r]; ok {
+		targetsToKeys[t] = append(targetsToKeys[t], k)
+	} else {
+		pc.directResourcesIndex[r] = map[target][]resourceTargetRelation{t: append([]resourceTargetRelation{}, k)}
+	}
+}
+
+func (pc *projectAuthzCache) addKeyToDirectTargetIndex(k resourceTargetRelation, r resource, t target) {
+	if resourcesToKeys, ok := pc.directTargetsIndex[t]; ok {
+		resourcesToKeys[r] = append(resourcesToKeys[r], k)
+	} else {
+		pc.directTargetsIndex[t] = map[resource][]resourceTargetRelation{r: append([]resourceTargetRelation{}, k)}
+	}
 }
 
 func (pc *projectAuthzCache) addIndirectRelation(ctx context.Context, r *descope.FGARelation, isAllowed bool) {
@@ -236,17 +245,68 @@ func (pc *projectAuthzCache) addIndirectRelation(ctx context.Context, r *descope
 func (pc *projectAuthzCache) removeDirectRelation(ctx context.Context, r *descope.FGARelation) {
 	key := key(r)
 	pc.directRelationCache.Remove(ctx, key)
-	// iterate over the keys saved in the indexes and remove the key from the indexes slices
-	for i, k := range pc.directResourcesIndex[r.Resource] {
-		if k == key {
-			pc.directResourcesIndex[r.Resource] = append(pc.directResourcesIndex[r.Resource][:i], pc.directResourcesIndex[r.Resource][i+1:]...)
-			break
+	resource := resource(r.Resource)
+	target := target(r.Target)
+	pc.removeKeyFromResourceIndex(resource, target, key)
+	pc.removeKeyFromTargetIndex(resource, target, key)
+}
+
+func (pc *projectAuthzCache) removeDirectRelationByResource(ctx context.Context, r resource) {
+	targetsToKeys := pc.directResourcesIndex[r]
+	for _, keys := range targetsToKeys {
+		for _, k := range keys {
+			pc.directRelationCache.Remove(ctx, k)
 		}
 	}
-	for i, k := range pc.directTargetsIndex[r.Target] {
-		if k == key {
-			pc.directTargetsIndex[r.Target] = append(pc.directTargetsIndex[r.Target][:i], pc.directTargetsIndex[r.Target][i+1:]...)
-			break
+	delete(pc.directResourcesIndex, r)
+}
+
+func (pc *projectAuthzCache) removeDirectRelationByTarget(ctx context.Context, t target) {
+	resourcesToKeys := pc.directTargetsIndex[t]
+	for _, keys := range resourcesToKeys {
+		for _, k := range keys {
+			pc.directRelationCache.Remove(ctx, k)
+		}
+	}
+	delete(pc.directTargetsIndex, t)
+}
+
+func (pc *projectAuthzCache) removeKeyFromResourceIndex(r resource, t target, keyToRemove resourceTargetRelation) {
+	index := pc.directResourcesIndex
+	if targetsToKeys, ok := index[r]; ok {
+		keys := targetsToKeys[t]
+		for i, k := range keys {
+			if k == keyToRemove {
+				keys = append(keys[:i], keys[i+1:]...)
+				targetsToKeys[t] = keys
+				break
+			}
+		}
+		if len(keys) == 0 {
+			delete(targetsToKeys, t)
+		}
+		if len(targetsToKeys) == 0 {
+			delete(index, r)
+		}
+	}
+}
+
+func (pc *projectAuthzCache) removeKeyFromTargetIndex(r resource, t target, keyToRemove resourceTargetRelation) {
+	index := pc.directTargetsIndex
+	if resourcesToKeys, ok := index[t]; ok {
+		keys := resourcesToKeys[r]
+		for i, k := range keys {
+			if k == keyToRemove {
+				keys = append(keys[:i], keys[i+1:]...)
+				resourcesToKeys[r] = keys
+				break
+			}
+		}
+		if len(keys) == 0 {
+			delete(resourcesToKeys, r)
+		}
+		if len(resourcesToKeys) == 0 {
+			delete(index, t)
 		}
 	}
 }
@@ -269,4 +329,12 @@ func (pc *projectAuthzCache) checkIndirectRelation(ctx context.Context, r *desco
 
 func key(r *descope.FGARelation) resourceTargetRelation {
 	return resourceTargetRelation(r.Resource + ":" + r.Target + ":" + r.Relation)
+}
+
+func (pc *projectAuthzCache) removeIndexOnCacheEviction(key resourceTargetRelation, _ bool) {
+	// on eviction, we need to remove the keys from the indexes as well
+	splitKey := strings.Split(string(key), ":")
+	resource, target := resource(splitKey[0]), target(splitKey[1])
+	pc.removeKeyFromResourceIndex(resource, target, key)
+	pc.removeKeyFromTargetIndex(resource, target, key)
 }
