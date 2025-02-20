@@ -345,7 +345,6 @@ func TestRemotePolling(t *testing.T) {
 }
 
 func TestUnderstandEvictionCallback(t *testing.T) {
-	t.Skip("Toy method for understanding cache eviction, not a real test")
 	cbCallCount := 0
 	cb := func(_, _ int) {
 		cbCallCount++
