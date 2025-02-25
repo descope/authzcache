@@ -2,7 +2,7 @@ module github.com/descope/authzcache
 
 go 1.23
 
-toolchain go1.23.5
+toolchain go1.23.6
 
 require (
 	github.com/descope/common v0.0.9-0.20250214120718-565140d13a1f
