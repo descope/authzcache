@@ -104,6 +104,27 @@ paths:
             x-order: 1
 components:
     schemas:
+        authzv1.CheckPath:
+            type: object
+            properties:
+                steps:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/authzv1.CheckPathStep'
+        authzv1.CheckPathStep:
+            type: object
+            properties:
+                stepType:
+                    type: integer
+                    format: enum
+                tuple:
+                    $ref: '#/components/schemas/authzv1.Tuple'
+                permission:
+                    type: string
+                subPaths:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/authzv1.CheckPath'
         authzv1.CheckRequest:
             type: object
             properties:
@@ -111,6 +132,8 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/authzv1.Tuple'
+                computePaths:
+                    type: boolean
         authzv1.CheckResponse:
             type: object
             properties:
@@ -126,6 +149,10 @@ components:
                     description: |-
                         A relation is considered "direct" if, based solely on the schema, its "allowed" state can only be
                          changed by creating or deleting relations involving its resource, its target, or both (including itself)
+                path:
+                    allOf:
+                        - $ref: '#/components/schemas/authzv1.CheckPath'
+                    description: if the check succeeded, includes the full path of intermediate relations between the target and the resource
         authzv1.CheckResponseTuple:
             type: object
             properties:
