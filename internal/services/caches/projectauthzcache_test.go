@@ -196,19 +196,34 @@ func TestHandleRemotePollingTick_RemoteChangesError(t *testing.T) {
 		remoteCalled = true
 		return nil, assert.AnError
 	}
+	// populate the schema cache
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
 	// populate the cache with some relations
 	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
+	// sanity: the cache is now populated
+	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
+	require.Greater(t, cache.indirectRelationCache.Len(ctx), 0)
+	require.NotNil(t, cache.GetSchema())
+	//record the current time
+	timeBeforePolling := time.Now()
+	// sanity: last poll time is in the past
+	require.Less(t, cache.remoteChanges.lastPollTime, timeBeforePolling)
 	// call the tick handler directly (for testing purposes)
 	cache.updateCacheWithRemotePolling(ctx)
 	// sanity: verify that the remote was called
 	require.True(t, remoteCalled)
-	// verify that the cache was not invalidated
+	// verify that all relations were invalidated
 	for _, cr := range cachedRelations {
-		allowed, direct, ok := cache.CheckRelation(ctx, cr.r)
-		assert.True(t, ok)
-		assert.Equal(t, cr.allowed, allowed)
-		assert.Equal(t, cr.direct, direct)
+		_, _, ok := cache.CheckRelation(ctx, cr.r)
+		assert.False(t, ok)
 	}
+	// verify indices are now empty
+	assert.Equal(t, 0, len(cache.directResourcesIndex))
+	assert.Equal(t, 0, len(cache.directTargetsIndex))
+	// verify that the schema cache was invalidated
+	assert.Nil(t, cache.GetSchema())
+	// verify that the last polling time was updated
+	assert.Greater(t, cache.remoteChanges.lastPollTime, timeBeforePolling)
 }
 
 func TestHandleRemotePollingTick_RemoteSchemaChange(t *testing.T) {
@@ -223,6 +238,10 @@ func TestHandleRemotePollingTick_RemoteSchemaChange(t *testing.T) {
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		return &descope.AuthzModified{SchemaChanged: true}, nil
 	}
+	//record the current time
+	timeBeforePolling := time.Now()
+	// sanity: last poll time is in the past
+	require.Less(t, cache.remoteChanges.lastPollTime, timeBeforePolling)
 	// call the tick handler directly (for testing purposes)
 	cache.updateCacheWithRemotePolling(ctx)
 	// verify that the schema cache was invalidated
@@ -237,6 +256,8 @@ func TestHandleRemotePollingTick_RemoteSchemaChange(t *testing.T) {
 	// verify indices are now empty
 	assert.Equal(t, 0, len(cache.directResourcesIndex))
 	assert.Equal(t, 0, len(cache.directTargetsIndex))
+	// verify that the last polling time was updated
+	assert.Greater(t, cache.remoteChanges.lastPollTime, timeBeforePolling)
 }
 
 func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {

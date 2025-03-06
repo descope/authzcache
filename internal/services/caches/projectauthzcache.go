@@ -96,10 +96,7 @@ func (pc *projectAuthzCache) UpdateCacheWithSchema(ctx context.Context, schema *
 	defer pc.mutex.Unlock()
 	pc.schemaCache = schema
 	// on schema update, we need to purge all relations
-	pc.directResourcesIndex = make(map[resource]map[target][]resourceTargetRelation)
-	pc.directTargetsIndex = make(map[target]map[resource][]resourceTargetRelation)
-	pc.directRelationCache.Purge(ctx)
-	pc.indirectRelationCache.Purge(ctx)
+	pc.purgeRelationCaches(ctx)
 }
 
 func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, relations []*descope.FGARelation) {
@@ -169,18 +166,16 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	// get the changes since the last poll time
 	cctx.Logger(ctx).Debug().Msg("Checking for remote changes...")
 	remoteChanges, err := pc.fetchRemoteChanges(ctx)
+	// if there was an error, we need to purge all caches
 	if err != nil {
-		cctx.Logger(ctx).Error().Err(err).Msg("Failed to get new remote changes")
+		cctx.Logger(ctx).Error().Err(err).Msg("Failed to get new remote changes, purging all caches")
+		pc.purgeAllCaches(ctx)
 		return
 	}
 	// if the schema changed, we need to purge all caches
 	if remoteChanges.SchemaChanged {
 		cctx.Logger(ctx).Info().Msg("Remote changes show schema changed, purging all caches")
-		pc.schemaCache = nil
-		pc.directResourcesIndex = make(map[resource]map[target][]resourceTargetRelation)
-		pc.directTargetsIndex = make(map[target]map[resource][]resourceTargetRelation)
-		pc.directRelationCache.Purge(ctx)
-		pc.indirectRelationCache.Purge(ctx)
+		pc.purgeAllCaches(ctx)
 		return
 	}
 	// update the local cache only if there are missing remote changes
@@ -337,4 +332,18 @@ func (pc *projectAuthzCache) removeIndexOnCacheEviction(key resourceTargetRelati
 	resource, target := resource(splitKey[0]), target(splitKey[1])
 	pc.removeKeyFromResourceIndex(resource, target, key)
 	pc.removeKeyFromTargetIndex(resource, target, key)
+}
+
+func (pc *projectAuthzCache) purgeAllCaches(ctx context.Context) {
+	pc.schemaCache = nil
+	pc.purgeRelationCaches(ctx)
+	// since all caches were purged, we can update the last poll time to the current time
+	pc.remoteChanges.lastPollTime = time.Now()
+}
+
+func (pc *projectAuthzCache) purgeRelationCaches(ctx context.Context) {
+	pc.directResourcesIndex = make(map[resource]map[target][]resourceTargetRelation)
+	pc.directTargetsIndex = make(map[target]map[resource][]resourceTargetRelation)
+	pc.directRelationCache.Purge(ctx)
+	pc.indirectRelationCache.Purge(ctx)
 }
