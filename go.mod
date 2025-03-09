@@ -3,8 +3,8 @@ module github.com/descope/authzcache
 go 1.24.0
 
 require (
-	github.com/descope/common v0.0.9-0.20250308101803-3d296062579f
-	github.com/descope/go-sdk v1.6.10
+	github.com/descope/common v0.0.9-0.20250309120951-5a372de4b439
+	github.com/descope/go-sdk v1.6.11-0.20250309165057-73c915cfdc37
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250303191711-a5d7b5c4c9cd
 	github.com/descope/protoc-gen-validate v1.6.4-0.20250303172117-9b72a0b49b1f
@@ -52,7 +52,7 @@ require (
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
-	github.com/descope/authzservice v0.0.0-20250309072835-f0a36a4656ff
+	github.com/descope/authzservice v0.0.0-20250309185403-8bb800e8b2da
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eapache/queue/v2 v2.0.0-20230407133247-75960ed334e4 // indirect
@@ -132,7 +132,7 @@ require (
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
-	golang.org/x/time v0.9.0 // indirect
+	golang.org/x/time v0.10.0 // indirect
 	golang.org/x/tools v0.30.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250227231956-55c901821b1e
