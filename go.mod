@@ -3,7 +3,7 @@ module github.com/descope/authzcache
 go 1.24.0
 
 require (
-	github.com/descope/common v0.0.9-0.20250311204553-e0399de54ee5
+	github.com/descope/common v0.0.9-0.20250312191608-096ae94f1f47
 	github.com/descope/go-sdk v1.6.11-0.20250309165057-73c915cfdc37
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250303191711-a5d7b5c4c9cd
@@ -19,6 +19,7 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nikunjy/rules v1.5.0 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
@@ -52,7 +53,7 @@ require (
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
-	github.com/descope/authzservice v0.0.0-20250312130910-c71475a106de
+	github.com/descope/authzservice v0.0.0-20250312214910-953b8b87ab5f
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eapache/queue/v2 v2.0.0-20230407133247-75960ed334e4 // indirect
