@@ -752,8 +752,8 @@ github.com/descope/authzservice v0.0.0-20250316223428-6420891bd470 h1:+VoygvajD3
 github.com/descope/authzservice v0.0.0-20250316223428-6420891bd470/go.mod h1:3aXsf0PKlqwI3fFn39ZYOkOpIcnSqxCy7wXcLc8th80=
 github.com/descope/common v0.0.9-0.20250314160826-d86bf1b8e5d7 h1:uua1VkPHgWm9us4y6z+crJ8SGllZsVpOTts64NyE4Wg=
 github.com/descope/common v0.0.9-0.20250314160826-d86bf1b8e5d7/go.mod h1:odxb7milP+5AUrLRg+ejMjjP5vgiDjL3V8rs0Dd1Sh8=
-github.com/descope/go-sdk v1.6.11-0.20250316220328-74bdbc6abae6 h1:V6G53/NMXM/oMAqjM05/B2Ng+q0cESoP4vq7ajlbKXQ=
-github.com/descope/go-sdk v1.6.11-0.20250316220328-74bdbc6abae6/go.mod h1:dZ7/W/qJqamEyLnX7J78OSNrvpMv5AGbBne1P3Wjk5s=
+github.com/descope/go-sdk v1.6.11-0.20250317054624-d5ec647d4930 h1:PAaGEo3T01SheOMFpYZiMuvAGYq6lgAueZnuJfsSTdU=
+github.com/descope/go-sdk v1.6.11-0.20250317054624-d5ec647d4930/go.mod h1:d1gTaz6iMN4+vtCZoBVRlwU9asZYInb/mcpGg3mX758=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14/go.mod h1:NXzSaAKXU0dil+cxwRcnqgNPdZR0U571aLLqJaRibBw=
 github.com/descope/protoc-gen-mocker v1.0.1-0.20250303191711-a5d7b5c4c9cd h1:LkcpwCbudAAU1R7S6/5G6cJNG/UtUeOl2HXSbC7ntkI=
