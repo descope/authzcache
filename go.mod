@@ -9,7 +9,7 @@ require (
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250303191711-a5d7b5c4c9cd
 	github.com/descope/protoc-gen-validate v1.6.4
 	github.com/stretchr/testify v1.10.0
-	google.golang.org/grpc v1.70.0
+	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.5
 )
 
@@ -26,7 +26,6 @@ require (
 	github.com/rs/zerolog v1.33.0 // indirect
 	github.com/thomaspoignant/go-feature-flag v1.40.0 // indirect
 	go.opentelemetry.io/collector/component/componenttest v0.120.0 // indirect
-	go.opentelemetry.io/otel/sdk/metric v1.34.0 // indirect
 	golang.org/x/exp v0.0.0-20250228200357-dead58393ab7 // indirect
 )
 
