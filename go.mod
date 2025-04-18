@@ -9,7 +9,7 @@ require (
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250303191711-a5d7b5c4c9cd
 	github.com/descope/protoc-gen-validate v1.6.4
 	github.com/stretchr/testify v1.10.0
-	google.golang.org/grpc v1.71.0
+	google.golang.org/grpc v1.71.1
 	google.golang.org/protobuf v1.36.6
 )
 
