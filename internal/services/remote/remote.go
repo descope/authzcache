@@ -2,6 +2,7 @@ package remote
 
 import (
 	"os"
+	"strings"
 
 	"github.com/descope/authzcache/internal/config"
 	ae "github.com/descope/authzservice/pkg/authzservice/errors"
@@ -12,6 +13,7 @@ import (
 )
 
 var baseURL = os.Getenv(descope.EnvironmentVariableBaseURL)
+var managementKey = strings.Trim(os.Getenv(descope.EnvironmentVariableManagementKey), "\"")
 
 func NewDescopeClientWithProjectID(projectID string) (sdk.Management, error) {
 	if projectID == "" {
@@ -22,6 +24,7 @@ func NewDescopeClientWithProjectID(projectID string) (sdk.Management, error) {
 		SessionJWTViaCookie: true,
 		DescopeBaseURL:      baseURL,
 		LogLevel:            getLogLevel(),
+		ManagementKey:       managementKey,
 	})
 	if err != nil {
 		return nil, err // notest
