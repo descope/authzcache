@@ -6,6 +6,7 @@ import (
 
 	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/go-sdk/descope"
+	"github.com/descope/go-sdk/descope/logger"
 	"github.com/descope/go-sdk/descope/sdk"
 	mocksmgmt "github.com/descope/go-sdk/descope/tests/mocks/mgmt"
 	"github.com/stretchr/testify/require"
@@ -20,7 +21,7 @@ func TestNewAuthzCache(t *testing.T) {
 	mockCacheCreator := func(_ context.Context, _ caches.RemoteChangesChecker) (caches.ProjectAuthzCache, error) {
 		return nil, nil
 	}
-	mockRemoteClientCreator := func(_ string) (sdk.Management, error) {
+	mockRemoteClientCreator := func(_ string, _ logger.LoggerInterface) (sdk.Management, error) {
 		return nil, nil
 	}
 	ac, err := New(context.TODO(), mockCacheCreator, mockRemoteClientCreator)
@@ -35,7 +36,7 @@ func injectAuthzMocks(t *testing.T) (AuthzCache, *mocksmgmt.MockManagement, *moc
 		MockFGA:   &mocksmgmt.MockFGA{},
 		MockAuthz: &mocksmgmt.MockAuthz{},
 	}
-	mockRemoteClientCreator := func(_ string) (sdk.Management, error) {
+	mockRemoteClientCreator := func(_ string, _ logger.LoggerInterface) (sdk.Management, error) {
 		return mockSDK, nil
 	}
 	mockCache := &mockCache{}
@@ -57,10 +58,9 @@ func TestCreateFGASchema(t *testing.T) {
 	cacheUpdateCallCount := 0
 	sdkUpdateCallCount := 0
 	dsl := "schema definition"
-	mockSDK.MockFGA.SaveSchemaAssert = func(schema *descope.FGASchema) error {
+	mockSDK.MockFGA.SaveSchemaAssert = func(schema *descope.FGASchema) {
 		require.Equal(t, dsl, schema.Schema)
 		sdkUpdateCallCount++
-		return nil
 	}
 	mockCache.UpdateCacheWithSchemaFunc = func(_ context.Context, schema *descope.FGASchema) {
 		require.Equal(t, dsl, schema.Schema)
@@ -81,10 +81,9 @@ func TestCreateFGARelations(t *testing.T) {
 	cacheUpdateCallCount := 0
 	sdkUpdateCallCount := 0
 	relations := []*descope.FGARelation{{Resource: "mario", Target: "luigi", Relation: "littleBro"}, {Resource: "luigi", Target: "mario", Relation: "bigBro"}}
-	mockSDK.MockFGA.CreateRelationsAssert = func(rels []*descope.FGARelation) error {
+	mockSDK.MockFGA.CreateRelationsAssert = func(rels []*descope.FGARelation) {
 		require.Equal(t, relations, rels)
 		sdkUpdateCallCount++
-		return nil
 	}
 	mockCache.UpdateCacheWithAddedRelationsFunc = func(_ context.Context, relations []*descope.FGARelation) {
 		require.Equal(t, relations, relations)
@@ -102,9 +101,8 @@ func TestCreateFGARelations(t *testing.T) {
 func TestCreateFGAEmptyRelations(t *testing.T) {
 	// setup mocks
 	ac, mockSDK, mockCache := injectAuthzMocks(t)
-	mockSDK.MockFGA.CreateRelationsAssert = func(_ []*descope.FGARelation) error {
+	mockSDK.MockFGA.CreateRelationsAssert = func(_ []*descope.FGARelation) {
 		require.Fail(t, "should not be called")
-		return nil
 	}
 	mockCache.UpdateCacheWithAddedRelationsFunc = func(_ context.Context, _ []*descope.FGARelation) {
 		require.Fail(t, "should not be called")
@@ -123,10 +121,9 @@ func TestDeleteFGARelations(t *testing.T) {
 	cacheUpdateCallCount := 0
 	sdkUpdateCallCount := 0
 	relations := []*descope.FGARelation{{Resource: "mario", Target: "luigi", Relation: "littleBro"}, {Resource: "luigi", Target: "mario", Relation: "bigBro"}}
-	mockSDK.MockFGA.DeleteRelationsAssert = func(rels []*descope.FGARelation) error {
+	mockSDK.MockFGA.DeleteRelationsAssert = func(rels []*descope.FGARelation) {
 		require.Equal(t, relations, rels)
 		sdkUpdateCallCount++
-		return nil
 	}
 	mockCache.UpdateCacheWithDeletedRelationsFunc = func(_ context.Context, relations []*descope.FGARelation) {
 		require.Equal(t, relations, relations)
@@ -144,9 +141,8 @@ func TestDeleteFGARelations(t *testing.T) {
 func TestDeleteFGAEmptyRelations(t *testing.T) {
 	// setup mocks
 	ac, mockSDK, mockCache := injectAuthzMocks(t)
-	mockSDK.MockFGA.DeleteRelationsAssert = func(_ []*descope.FGARelation) error {
+	mockSDK.MockFGA.DeleteRelationsAssert = func(_ []*descope.FGARelation) {
 		require.Fail(t, "should not be called")
-		return nil
 	}
 	mockCache.UpdateCacheWithDeletedRelationsFunc = func(_ context.Context, _ []*descope.FGARelation) {
 		require.Fail(t, "should not be called")
