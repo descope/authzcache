@@ -15,7 +15,7 @@ import (
 var baseURL = os.Getenv(descope.EnvironmentVariableBaseURL)
 var managementKey = strings.Trim(os.Getenv(descope.EnvironmentVariableManagementKey), "\"")
 
-func NewDescopeClientWithProjectID(projectID string) (sdk.Management, error) {
+func NewDescopeClientWithProjectID(projectID string, loggerInstance logger.LoggerInterface) (sdk.Management, error) {
 	if projectID == "" {
 		return nil, ae.UnknownProject.New("projectID is empty")
 	}
@@ -24,6 +24,7 @@ func NewDescopeClientWithProjectID(projectID string) (sdk.Management, error) {
 		SessionJWTViaCookie: true,
 		DescopeBaseURL:      baseURL,
 		LogLevel:            getLogLevel(),
+		Logger:              loggerInstance,
 		ManagementKey:       managementKey,
 	})
 	if err != nil {

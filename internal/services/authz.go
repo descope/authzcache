@@ -7,6 +7,7 @@ import (
 	"github.com/descope/authzcache/internal/services/caches"
 	cctx "github.com/descope/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
+	"github.com/descope/go-sdk/descope/logger"
 	"github.com/descope/go-sdk/descope/sdk"
 )
 
@@ -17,7 +18,7 @@ type AuthzCache interface {
 	Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error)
 }
 
-type RemoteClientCreator func(projectID string) (sdk.Management, error)
+type RemoteClientCreator func(projectID string, logger logger.LoggerInterface) (sdk.Management, error)
 type ProjectAuthzCacheCreator func(ctx context.Context, remoteChangesChecker caches.RemoteChangesChecker) (caches.ProjectAuthzCache, error)
 
 type project struct {
@@ -146,7 +147,7 @@ func (a *authzCache) getOrCreateProjectCache(ctx context.Context) (caches.Projec
 	}
 	cctx.Logger(ctx).Info().Msg("Creating new project cache")
 	// create project mgmt sdk
-	projectMgmtSDK, err := a.remoteClientCreator(projectID)
+	projectMgmtSDK, err := a.remoteClientCreator(projectID, cctx.Logger(ctx))
 	if err != nil {
 		return nil, nil, err // notest
 	}
