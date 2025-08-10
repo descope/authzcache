@@ -5,7 +5,7 @@ go 1.24.3
 toolchain go1.24.5
 
 require (
-	github.com/descope/common v0.0.9-0.20250804122442-4f0ca5be4b82
+	github.com/descope/common v0.0.9-0.20250807220923-5060fab910b0
 	github.com/descope/go-sdk v1.6.14
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250528231433-f1797c28592e
