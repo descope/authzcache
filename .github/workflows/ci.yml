@@ -65,10 +65,15 @@ jobs:
 
       - name: Debug token access
         run: |
-          echo "Testing token access to descope/common..."
+          echo "Testing token access and listing available repositories..."
+          echo "=== Checking descope/common ==="
           curl -H "Authorization: token ${{ steps.generate_token.outputs.token }}" \
                -H "Accept: application/vnd.github.v3+json" \
                https://api.github.com/repos/descope/common
+          echo -e "\n=== Listing installation repositories ==="
+          curl -H "Authorization: token ${{ steps.generate_token.outputs.token }}" \
+               -H "Accept: application/vnd.github.v3+json" \
+               https://api.github.com/installation/repositories | jq '.repositories[] | .full_name'
         continue-on-error: true
 
       - name: Checkout common scripts as vendor
