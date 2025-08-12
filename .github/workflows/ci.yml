@@ -14,8 +14,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Generate GitHub App Token
+        id: github_app_token
+        uses: actions/create-github-app-token@5d869da34e18e7287c1daad50e0b8ea0f506ce69 # v1.11.0
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PEM }}
       - name: Build
         uses: descope/common/.github/actions/build@main
+        env:
+          GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
         with:
           go_version: ${{ env.GO_VERSION }}
           scripts_folder: ${{ env.SCRIPTS_DIR }}
@@ -28,8 +36,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Generate GitHub App Token
+        id: github_app_token
+        uses: actions/create-github-app-token@5d869da34e18e7287c1daad50e0b8ea0f506ce69 # v1.11.0
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PEM }}
       - name: Lint and more checks
         uses: descope/common/.github/actions/lint@main
+        env:
+          GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
         with:
           go_version: ${{ env.GO_VERSION }}
           scripts_folder: ${{ env.SCRIPTS_DIR }}
@@ -42,10 +58,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Generate GitHub App Token
+        id: github_app_token
+        uses: actions/create-github-app-token@5d869da34e18e7287c1daad50e0b8ea0f506ce69 # v1.11.0
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PEM }}
       - name: Run Tests
         uses: descope/common/.github/actions/tests@main
         env:
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
+          GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
         with:
           go_version: ${{ env.GO_VERSION }}
           scripts_folder: ${{ env.SCRIPTS_DIR }}
@@ -59,8 +82,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Generate GitHub App Token
+        id: github_app_token
+        uses: actions/create-github-app-token@5d869da34e18e7287c1daad50e0b8ea0f506ce69 # v1.11.0
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PEM }}
       - name: Run Security checks
         uses: descope/common/.github/actions/security@main
+        env:
+          GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
         with:
           go_version: ${{ env.GO_VERSION }}
           scripts_folder: ${{ env.SCRIPTS_DIR }}
@@ -82,10 +113,10 @@ jobs:
 
       - name: Generate GitHub App Token
         id: github_app_token
-        uses: tibdex/github-app-token@v1
+        uses: actions/create-github-app-token@5d869da34e18e7287c1daad50e0b8ea0f506ce69 # v1.11.0
         with:
-          app_id: ${{ secrets.APP_ID }}
-          private_key: ${{ secrets.APP_PEM }}
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PEM }}
       - name: Pack and Upload
         uses: descope/common/.github/actions/pack@main
         env:
