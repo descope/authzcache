@@ -28,10 +28,14 @@ jobs:
         run: |
           echo "Checking common-repo structure:"
           ls -la common-repo/ || echo "common-repo directory not found"
+          echo "Checking .github:"
+          ls -la common-repo/.github/ || echo ".github directory not found"
           echo "Checking for actions:"
           ls -la common-repo/.github/actions/ || echo "actions directory not found"
           echo "Checking for build action:"
           ls -la common-repo/.github/actions/build/ || echo "build action not found"
+          echo "Checking for action.yml:"
+          ls -la common-repo/.github/actions/build/action.yml || echo "action.yml not found"
 
       - name: Build
         uses: ./common-repo/.github/actions/build
