@@ -61,6 +61,13 @@ jobs:
         run: |
           git config --global url."https://x-access-token:${{ secrets.AUTHZCACHE_TO_COMMON }}@github.com/descope".insteadOf "https://github.com/descope"
 
+      - name: Download and vendor dependencies
+        run: |
+          go mod download
+          go mod vendor
+        env:
+          TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
+
       - name: Lint using vendor approach
         run: |
           chmod +x vendor/github.com/descope/common/build/ci/build_lint.sh
@@ -94,6 +101,13 @@ jobs:
       - name: Configure Git for private repos
         run: |
           git config --global url."https://x-access-token:${{ secrets.AUTHZCACHE_TO_COMMON }}@github.com/descope".insteadOf "https://github.com/descope"
+
+      - name: Download and vendor dependencies
+        run: |
+          go mod download
+          go mod vendor
+        env:
+          TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
 
       - name: Run Tests using vendor approach
         run: |
@@ -129,6 +143,13 @@ jobs:
       - name: Configure Git for private repos
         run: |
           git config --global url."https://x-access-token:${{ secrets.AUTHZCACHE_TO_COMMON }}@github.com/descope".insteadOf "https://github.com/descope"
+
+      - name: Download and vendor dependencies
+        run: |
+          go mod download
+          go mod vendor
+        env:
+          TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
 
       - name: Run Security checks using vendor approach
         run: |
