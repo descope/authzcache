@@ -17,31 +17,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Checkout common scripts
+      - name: Checkout common scripts as vendor
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: descope/common
           token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          path: common-repo
+          path: vendor/github.com/descope/common
 
-      - name: Debug - List common repo structure
+      - name: Build using vendor approach
         run: |
-          echo "Checking common-repo structure:"
-          ls -la common-repo/ || echo "common-repo directory not found"
-          echo "Checking .github:"
-          ls -la common-repo/.github/ || echo ".github directory not found"
-          echo "Checking for actions:"
-          ls -la common-repo/.github/actions/ || echo "actions directory not found"
-          echo "Checking for build action:"
-          ls -la common-repo/.github/actions/build/ || echo "build action not found"
-          echo "Checking for action.yml:"
-          ls -la common-repo/.github/actions/build/action.yml || echo "action.yml not found"
-
-      - name: Build
-        uses: ./common-repo/.github/actions/build
-        with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ./common-repo/scripts
+          # Use the traditional vendor approach that works
+          make build
+        env:
+          GO_VERSION: ${{ env.GO_VERSION }}
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
 
