@@ -8,39 +8,21 @@ env:
   GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
 
 jobs:
-  setup:
-    name: Setup Common Repository
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout common scripts
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          repository: descope/common
-          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          path: common-repo
-
-      - name: Upload common repo
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
-        with:
-          name: common-repo
-          path: common-repo/
-          retention-days: 1
-
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: setup
     env:
       GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Download common repo
-        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
+      - name: Checkout common scripts
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          name: common-repo
-          path: common-repo/
+          repository: descope/common
+          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
+          path: common-repo
 
       - name: Build
         uses: ./common-repo/.github/actions/build
@@ -53,18 +35,18 @@ jobs:
   lint:
     name: Lint and more checks
     runs-on: ubuntu-latest
-    needs: setup
     env:
       GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Download common repo
-        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
+      - name: Checkout common scripts
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          name: common-repo
-          path: common-repo/
+          repository: descope/common
+          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
+          path: common-repo
 
       - name: Lint and more checks
         uses: ./common-repo/.github/actions/lint
@@ -77,18 +59,18 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    needs: setup
     env:
       GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Download common repo
-        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
+      - name: Checkout common scripts
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          name: common-repo
-          path: common-repo/
+          repository: descope/common
+          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
+          path: common-repo
 
       - name: Run Tests
         uses: ./common-repo/.github/actions/tests
@@ -104,18 +86,18 @@ jobs:
   security:
     name: Run Security checks
     runs-on: ubuntu-latest
-    needs: setup
     env:
       GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Download common repo
-        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
+      - name: Checkout common scripts
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          name: common-repo
-          path: common-repo/
+          repository: descope/common
+          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
+          path: common-repo
 
       - name: Run Security checks
         uses: ./common-repo/.github/actions/security
@@ -128,7 +110,7 @@ jobs:
   pack:
     name: Pack and Upload
     runs-on: ubuntu-latest
-    needs: [setup, build]
+    needs: build
     permissions:
       packages: write
       contents: read
@@ -140,11 +122,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Download common repo
-        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
+      - name: Checkout common scripts
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          name: common-repo
-          path: common-repo/
+          repository: descope/common
+          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
+          path: common-repo
 
       - name: Pack and Upload
         uses: ./common-repo/.github/actions/pack
