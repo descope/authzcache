@@ -8,48 +8,66 @@ env:
   GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
 
 jobs:
+  setup:
+    name: Setup Common Repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout common scripts
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: descope/common
+          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
+          path: common-repo
+
+      - name: Upload common repo
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: common-repo
+          path: common-repo/
+          retention-days: 1
+
   build:
     name: Build
     runs-on: ubuntu-latest
+    needs: setup
     env:
       GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Checkout common scripts
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Download common repo
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
-          repository: descope/common
-          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          path: .github/actions-common
+          name: common-repo
+          path: common-repo/
 
       - name: Build
-        uses: ./.github/actions-common/.github/actions/build
+        uses: ./common-repo/.github/actions/build
         with:
           go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ./vendor/github.com/descope/common
+          scripts_folder: ./common-repo/scripts
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
 
   lint:
     name: Lint and more checks
     runs-on: ubuntu-latest
+    needs: setup
     env:
       GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Checkout common scripts
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Download common repo
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
-          repository: descope/common
-          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          path: .github/actions-common
+          name: common-repo
+          path: common-repo/
 
       - name: Lint and more checks
-        uses: ./.github/actions-common/.github/actions/lint
+        uses: ./common-repo/.github/actions/lint
         with:
           go_version: ${{ env.GO_VERSION }}
           scripts_folder: ./vendor/github.com/descope/common
@@ -59,21 +77,21 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    needs: setup
     env:
       GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Checkout common scripts
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Download common repo
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
-          repository: descope/common
-          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          path: .github/actions-common
+          name: common-repo
+          path: common-repo/
 
       - name: Run Tests
-        uses: ./.github/actions-common/.github/actions/tests
+        uses: ./common-repo/.github/actions/tests
         env:
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
         with:
@@ -86,21 +104,21 @@ jobs:
   security:
     name: Run Security checks
     runs-on: ubuntu-latest
+    needs: setup
     env:
       GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Checkout common scripts
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Download common repo
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
-          repository: descope/common
-          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          path: .github/actions-common
+          name: common-repo
+          path: common-repo/
 
       - name: Run Security checks
-        uses: ./.github/actions-common/.github/actions/security
+        uses: ./common-repo/.github/actions/security
         with:
           go_version: ${{ env.GO_VERSION }}
           scripts_folder: ./vendor/github.com/descope/common
@@ -110,7 +128,7 @@ jobs:
   pack:
     name: Pack and Upload
     runs-on: ubuntu-latest
-    needs: build
+    needs: [setup, build]
     permissions:
       packages: write
       contents: read
@@ -122,16 +140,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-
-      - name: Checkout common scripts
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Download common repo
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
-          repository: descope/common
-          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          path: .github/actions-common
+          name: common-repo
+          path: common-repo/
 
       - name: Pack and Upload
-        uses: ./.github/actions-common/.github/actions/pack
+        uses: ./common-repo/.github/actions/pack
         with:
           go_version: ${{ env.GO_VERSION }}
           action_token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
