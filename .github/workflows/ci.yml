@@ -15,6 +15,7 @@ jobs:
       contents: read
     outputs:
       token: ${{ steps.generate_token.outputs.token }}
+      test: "hello-world"
     steps:
       - name: Generate token
         id: generate_token
@@ -22,6 +23,10 @@ jobs:
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PEM }}
+
+      - name: Test step output
+        id: test_step
+        run: echo "test-output=working" >> $GITHUB_OUTPUT
 
 
 
@@ -38,12 +43,12 @@ jobs:
     steps:
       - name: Verify token access
         run: |
-          echo "Direct needs access: '${{ needs.generate-token.outputs.token }}'"
-          echo "Environment variable: '${GITHUB_TOKEN}'"
-          echo "Token received: ${#GITHUB_TOKEN} characters"
-          echo "Direct token available: ${{ needs.generate-token.outputs.token != '' }}"
-          echo "Token status: $([ -n "${GITHUB_TOKEN}" ] && echo "✅ Available" || echo "❌ Missing")"
+          echo "🔍 DEBUGGING JOB OUTPUTS:"
+          echo "Test output: '${{ needs.generate-token.outputs.test }}'"
+          echo "Token output: '${{ needs.generate-token.outputs.token }}'"
+          echo "Environment GITHUB_TOKEN: '${GITHUB_TOKEN}'"
           echo "Full needs context: ${{ toJson(needs.generate-token.outputs) }}"
+          echo "Full needs: ${{ toJson(needs) }}"
 
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
