@@ -44,6 +44,15 @@ jobs:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PEM }}
 
+      - name: Debug token generation
+        run: |
+          echo "Generate token step outcome: ${{ steps.generate_token.outcome }}"
+          echo "Generate token step conclusion: ${{ steps.generate_token.conclusion }}"
+          echo "Token output: '${{ steps.generate_token.outputs.token }}'"
+          echo "Installation ID: '${{ steps.generate_token.outputs.installation-id }}'"
+          echo "App slug: '${{ steps.generate_token.outputs.app-slug }}'"
+          echo "All outputs: ${{ toJson(steps.generate_token.outputs) }}"
+
       - name: Test step output
         id: test_step
         run: echo "test-output=working" >> $GITHUB_OUTPUT
