@@ -57,6 +57,18 @@ jobs:
         id: test_step
         run: echo "test-output=working" >> $GITHUB_OUTPUT
 
+      - name: Verify job will output token
+        run: |
+          echo "Final verification before job completes:"
+          echo "Token from generate_token step: '${{ steps.generate_token.outputs.token }}'"
+          echo "This will be job output: '${{ steps.generate_token.outputs.token }}'"
+          if [ -z "${{ steps.generate_token.outputs.token }}" ]; then
+            echo "❌ No token to output from job!"
+            exit 1
+          else
+            echo "✅ Token ready for job output"
+          fi
+
 
 
 
