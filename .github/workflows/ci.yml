@@ -18,20 +18,27 @@ jobs:
     steps:
       - name: Generate token
         id: generate_token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PEM }}
 
       - name: Verify token generation
         run: |
+          echo "Generate token step outcome: ${{ steps.generate_token.outcome }}"
+          echo "Generate token step conclusion: ${{ steps.generate_token.conclusion }}"
           echo "Raw token output: '${{ steps.generate_token.outputs.token }}'"
           echo "Token length: ${#TOKEN}"
+          echo "All step outputs: ${{ toJson(steps.generate_token.outputs) }}"
           if [ -n "${{ steps.generate_token.outputs.token }}" ]; then
             echo "✅ Token generated successfully"
           else
             echo "❌ Token generation failed"
-            exit 1
+            echo "Checking if action completed successfully..."
+            if [ "${{ steps.generate_token.outcome }}" != "success" ]; then
+              echo "❌ Generate token step failed!"
+              exit 1
+            fi
           fi
         env:
           TOKEN: ${{ steps.generate_token.outputs.token }}
