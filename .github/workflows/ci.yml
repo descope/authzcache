@@ -32,15 +32,35 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Build
-        uses: descope/common/.github/actions/build@main
-        env:
-          GITHUB_TOKEN: ${{ needs.generate-token.outputs.token }}
+
+      - name: Checkout common scripts as vendor
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ${{ env.SCRIPTS_DIR }}
-          APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
-          APP_ID: ${{ secrets.RELEASE_APP_ID }}
+          repository: descope/common
+          token: ${{ needs.generate-token.outputs.token }}
+          path: vendor/github.com/descope/common
+
+      - name: Set up Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          check-latest: true
+
+      - name: Configure Git for private repos
+        run: |
+          git config --global url."https://x-access-token:${{ needs.generate-token.outputs.token }}@github.com/descope".insteadOf "https://github.com/descope"
+
+      - name: Download and vendor dependencies
+        run: |
+          go mod download
+          go mod vendor
+
+      - name: Build using vendor approach
+        run: |
+          make build
+        env:
+          CI_READ_COMMON: ${{ needs.generate-token.outputs.token }}
 
   lint:
     name: Lint and more checks
@@ -51,15 +71,34 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Lint and more checks
-        uses: descope/common/.github/actions/lint@main
-        env:
-          GITHUB_TOKEN: ${{ needs.generate-token.outputs.token }}
+
+      - name: Checkout common scripts as vendor
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ${{ env.SCRIPTS_DIR }}
-          APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
-          APP_ID: ${{ secrets.RELEASE_APP_ID }}
+          repository: descope/common
+          token: ${{ needs.generate-token.outputs.token }}
+          path: vendor/github.com/descope/common
+
+      - name: Set up Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          check-latest: true
+
+      - name: Configure Git for private repos
+        run: |
+          git config --global url."https://x-access-token:${{ needs.generate-token.outputs.token }}@github.com/descope".insteadOf "https://github.com/descope"
+
+      - name: Download and vendor dependencies
+        run: |
+          go mod download
+          go mod vendor
+
+      - name: Lint using vendor approach
+        run: |
+          chmod +x vendor/github.com/descope/common/build/ci/build_lint.sh
+          vendor/github.com/descope/common/build/ci/build_lint.sh
 
   test:
     name: Run Tests
@@ -70,17 +109,36 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Run Tests
-        uses: descope/common/.github/actions/tests@main
+
+      - name: Checkout common scripts as vendor
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: descope/common
+          token: ${{ needs.generate-token.outputs.token }}
+          path: vendor/github.com/descope/common
+
+      - name: Set up Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          check-latest: true
+
+      - name: Configure Git for private repos
+        run: |
+          git config --global url."https://x-access-token:${{ needs.generate-token.outputs.token }}@github.com/descope".insteadOf "https://github.com/descope"
+
+      - name: Download and vendor dependencies
+        run: |
+          go mod download
+          go mod vendor
+
+      - name: Run Tests using vendor approach
+        run: |
+          chmod +x vendor/github.com/descope/common/build/ci/build_test.sh
+          vendor/github.com/descope/common/build/ci/build_test.sh
         env:
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
-          GITHUB_TOKEN: ${{ needs.generate-token.outputs.token }}
-        with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ${{ env.SCRIPTS_DIR }}
-          APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
-          APP_ID: ${{ secrets.RELEASE_APP_ID }}
-          min_coverage: 100
 
   security:
     name: Run Security checks
@@ -91,15 +149,34 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Run Security checks
-        uses: descope/common/.github/actions/security@main
-        env:
-          GITHUB_TOKEN: ${{ needs.generate-token.outputs.token }}
+
+      - name: Checkout common scripts as vendor
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ${{ env.SCRIPTS_DIR }}
-          APP_PEM: ${{ secrets.APP_PEM }}
-          APP_ID: ${{ secrets.APP_ID }}
+          repository: descope/common
+          token: ${{ needs.generate-token.outputs.token }}
+          path: vendor/github.com/descope/common
+
+      - name: Set up Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          check-latest: true
+
+      - name: Configure Git for private repos
+        run: |
+          git config --global url."https://x-access-token:${{ needs.generate-token.outputs.token }}@github.com/descope".insteadOf "https://github.com/descope"
+
+      - name: Download and vendor dependencies
+        run: |
+          go mod download
+          go mod vendor
+
+      - name: Run Security checks using vendor approach
+        run: |
+          chmod +x vendor/github.com/descope/common/build/ci/build_security.sh
+          vendor/github.com/descope/common/build/ci/build_security.sh
 
   pack:
     name: Pack and Upload
@@ -113,12 +190,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Pack and Upload
-        uses: descope/common/.github/actions/pack@main
-        env:
-          GITHUB_TOKEN: ${{ needs.generate-token.outputs.token }}
+
+      - name: Checkout common scripts as vendor
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          go_version: ${{ env.GO_VERSION }}
-          action_token: ${{ needs.generate-token.outputs.token }}
-          APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
-          APP_ID: ${{ secrets.RELEASE_APP_ID }}
+          repository: descope/common
+          token: ${{ needs.generate-token.outputs.token }}
+          path: vendor/github.com/descope/common
+
+      - name: Pack and Upload using vendor approach
+        run: |
+          make build
+        env:
+          CI_READ_COMMON: ${{ needs.generate-token.outputs.token }}
