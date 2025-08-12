@@ -79,10 +79,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Generate GitHub App Token
+        id: github_app_token
+        uses: tibdex/github-app-token@v1
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PEM }}
       - name: Pack and Upload
         uses: descope/common/.github/actions/pack@main
+        env:
+          GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
         with:
           go_version: ${{ env.GO_VERSION }}
-          action_token: ${{ secrets.GITHUB_TOKEN }}
+          action_token: ${{ steps.github_app_token.outputs.token }}
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
