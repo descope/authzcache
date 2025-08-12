@@ -5,11 +5,14 @@ on: push
 env:
   GO_VERSION: ${{ vars.GO_VERSION }}
   DATABASE_PASSWORD: passwordless
+  GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
 
 jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -26,6 +29,8 @@ jobs:
   lint:
     name: Lint and more checks
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -41,6 +46,8 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -59,6 +66,8 @@ jobs:
   security:
     name: Run Security checks
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -80,6 +89,8 @@ jobs:
       contents: read
       id-token: write
       attestations: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
