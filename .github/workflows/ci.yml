@@ -23,6 +23,14 @@ jobs:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PEM }}
 
+      - name: Debug job output mapping
+        run: |
+          echo "Step output token: '${{ steps.generate_token.outputs.token }}'"
+          echo "Job will output: '${{ steps.generate_token.outputs.token }}'"
+          echo "Token length: ${#TOKEN}"
+        env:
+          TOKEN: ${{ steps.generate_token.outputs.token }}
+
 
 
   build:
