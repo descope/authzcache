@@ -17,12 +17,32 @@ jobs:
       token: ${{ steps.generate_token.outputs.token }}
       test: "hello-world"
     steps:
+      - name: Debug secrets before token generation
+        run: |
+          echo "APP_ID length: ${#APP_ID}"
+          echo "APP_PEM length: ${#APP_PEM}"
+          if [[ -z "$APP_ID" ]]; then
+            echo "❌ APP_ID is empty or not set"
+            exit 1
+          else
+            echo "✅ APP_ID is set"
+          fi
+          if [[ -z "$APP_PEM" ]]; then
+            echo "❌ APP_PEM is empty or not set"
+            exit 1
+          else
+            echo "✅ APP_PEM is set"
+          fi
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_PEM: ${{ secrets.APP_PEM }}
+
       - name: Generate token
         id: generate_token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@5d869da34e18e7287c1daad50e0b8ea0f506ce69 # v1.11.0
         with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PEM }}
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PEM }}
 
       - name: Test step output
         id: test_step
