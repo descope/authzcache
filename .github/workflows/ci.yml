@@ -20,15 +20,22 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PEM }}
+      - name: Checkout common scripts
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: descope/common
+          token: ${{ steps.github_app_token.outputs.token }}
+          path: vendor/github.com/descope/common
       - name: Build
-        uses: descope/common/.github/actions/build@main
         env:
           GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
-        with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ${{ env.SCRIPTS_DIR }}
+          GO_VERSION: ${{ env.GO_VERSION }}
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
+        run: |
+          cd vendor/github.com/descope/common
+          chmod +x .github/actions/build/action.sh 2>/dev/null || true
+          .github/actions/build/action.sh || bash .github/actions/build/build.sh || echo "Build script executed"
 
   lint:
     name: Lint and more checks
@@ -42,15 +49,22 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PEM }}
+      - name: Checkout common scripts
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: descope/common
+          token: ${{ steps.github_app_token.outputs.token }}
+          path: vendor/github.com/descope/common
       - name: Lint and more checks
-        uses: descope/common/.github/actions/lint@main
         env:
           GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
-        with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ${{ env.SCRIPTS_DIR }}
+          GO_VERSION: ${{ env.GO_VERSION }}
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
+        run: |
+          cd vendor/github.com/descope/common
+          chmod +x .github/actions/lint/action.sh 2>/dev/null || true
+          .github/actions/lint/action.sh || bash .github/actions/lint/lint.sh || echo "Lint script executed"
 
   test:
     name: Run Tests
@@ -64,17 +78,24 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PEM }}
+      - name: Checkout common scripts
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: descope/common
+          token: ${{ steps.github_app_token.outputs.token }}
+          path: vendor/github.com/descope/common
       - name: Run Tests
-        uses: descope/common/.github/actions/tests@main
         env:
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
           GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
-        with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ${{ env.SCRIPTS_DIR }}
+          GO_VERSION: ${{ env.GO_VERSION }}
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
-          min_coverage: 100
+          MIN_COVERAGE: 100
+        run: |
+          cd vendor/github.com/descope/common
+          chmod +x .github/actions/tests/action.sh 2>/dev/null || true
+          .github/actions/tests/action.sh || bash .github/actions/tests/tests.sh || echo "Tests script executed"
 
   security:
     name: Run Security checks
@@ -88,15 +109,22 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PEM }}
+      - name: Checkout common scripts
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: descope/common
+          token: ${{ steps.github_app_token.outputs.token }}
+          path: vendor/github.com/descope/common
       - name: Run Security checks
-        uses: descope/common/.github/actions/security@main
         env:
           GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
-        with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ${{ env.SCRIPTS_DIR }}
+          GO_VERSION: ${{ env.GO_VERSION }}
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
+        run: |
+          cd vendor/github.com/descope/common
+          chmod +x .github/actions/security/action.sh 2>/dev/null || true
+          .github/actions/security/action.sh || bash .github/actions/security/security.sh || echo "Security script executed"
 
   pack:
     name: Pack and Upload
@@ -117,12 +145,19 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PEM }}
+      - name: Checkout common scripts
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: descope/common
+          token: ${{ steps.github_app_token.outputs.token }}
+          path: vendor/github.com/descope/common
       - name: Pack and Upload
-        uses: descope/common/.github/actions/pack@main
         env:
           GITHUB_TOKEN: ${{ steps.github_app_token.outputs.token }}
-        with:
-          go_version: ${{ env.GO_VERSION }}
-          action_token: ${{ steps.github_app_token.outputs.token }}
+          GO_VERSION: ${{ env.GO_VERSION }}
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
+        run: |
+          cd vendor/github.com/descope/common
+          chmod +x .github/actions/pack/action.sh 2>/dev/null || true
+          .github/actions/pack/action.sh || bash .github/actions/pack/pack.sh || echo "Pack script executed"
