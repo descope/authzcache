@@ -25,23 +25,12 @@ jobs:
           path: .github/actions-common
 
       - name: Build
-        run: |
-          cd .github/actions-common/.github/actions/build
-          chmod +x action.sh 2>/dev/null || chmod +x *.sh 2>/dev/null || true
-          if [ -f "action.sh" ]; then
-            ./action.sh
-          elif [ -f "build.sh" ]; then
-            ./build.sh
-          else
-            echo "No build script found, checking action.yml"
-            if [ -f "action.yml" ] || [ -f "action.yaml" ]; then
-              echo "Found action definition but no script - this may be a composite action"
-            fi
-          fi
-        env:
-          INPUT_GO_VERSION: ${{ env.GO_VERSION }}
-          INPUT_APP_PEM: ${{ secrets.APP_PEM }}
-          INPUT_APP_ID: ${{ secrets.APP_ID }}
+        uses: ./.github/actions-common/.github/actions/build
+        with:
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: ./vendor/github.com/descope/common
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
 
   lint:
     name: Lint and more checks
@@ -60,23 +49,12 @@ jobs:
           path: .github/actions-common
 
       - name: Lint and more checks
-        run: |
-          cd .github/actions-common/.github/actions/lint
-          chmod +x action.sh 2>/dev/null || chmod +x *.sh 2>/dev/null || true
-          if [ -f "action.sh" ]; then
-            ./action.sh
-          elif [ -f "lint.sh" ]; then
-            ./lint.sh
-          else
-            echo "No lint script found, checking action.yml"
-            if [ -f "action.yml" ] || [ -f "action.yaml" ]; then
-              echo "Found action definition but no script - this may be a composite action"
-            fi
-          fi
-        env:
-          INPUT_GO_VERSION: ${{ env.GO_VERSION }}
-          INPUT_APP_PEM: ${{ secrets.APP_PEM }}
-          INPUT_APP_ID: ${{ secrets.APP_ID }}
+        uses: ./.github/actions-common/.github/actions/lint
+        with:
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: ./vendor/github.com/descope/common
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
 
   test:
     name: Run Tests
@@ -95,25 +73,15 @@ jobs:
           path: .github/actions-common
 
       - name: Run Tests
-        run: |
-          cd .github/actions-common/.github/actions/tests
-          chmod +x action.sh 2>/dev/null || chmod +x *.sh 2>/dev/null || true
-          if [ -f "action.sh" ]; then
-            ./action.sh
-          elif [ -f "tests.sh" ]; then
-            ./tests.sh
-          else
-            echo "No test script found, checking action.yml"
-            if [ -f "action.yml" ] || [ -f "action.yaml" ]; then
-              echo "Found action definition but no script - this may be a composite action"
-            fi
-          fi
+        uses: ./.github/actions-common/.github/actions/tests
         env:
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
-          INPUT_GO_VERSION: ${{ env.GO_VERSION }}
-          INPUT_APP_PEM: ${{ secrets.APP_PEM }}
-          INPUT_APP_ID: ${{ secrets.APP_ID }}
-          INPUT_MIN_COVERAGE: 100
+        with:
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: ./vendor/github.com/descope/common
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
+          min_coverage: 100
 
   security:
     name: Run Security checks
@@ -132,23 +100,12 @@ jobs:
           path: .github/actions-common
 
       - name: Run Security checks
-        run: |
-          cd .github/actions-common/.github/actions/security
-          chmod +x action.sh 2>/dev/null || chmod +x *.sh 2>/dev/null || true
-          if [ -f "action.sh" ]; then
-            ./action.sh
-          elif [ -f "security.sh" ]; then
-            ./security.sh
-          else
-            echo "No security script found, checking action.yml"
-            if [ -f "action.yml" ] || [ -f "action.yaml" ]; then
-              echo "Found action definition but no script - this may be a composite action"
-            fi
-          fi
-        env:
-          INPUT_GO_VERSION: ${{ env.GO_VERSION }}
-          INPUT_APP_PEM: ${{ secrets.APP_PEM }}
-          INPUT_APP_ID: ${{ secrets.APP_ID }}
+        uses: ./.github/actions-common/.github/actions/security
+        with:
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: ./vendor/github.com/descope/common
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
 
   pack:
     name: Pack and Upload
@@ -166,8 +123,15 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
 
+      - name: Checkout common scripts
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: descope/common
+          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
+          path: .github/actions-common
+
       - name: Pack and Upload
-        uses: descope/common/.github/actions/pack@main
+        uses: ./.github/actions-common/.github/actions/pack
         with:
           go_version: ${{ env.GO_VERSION }}
           action_token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
