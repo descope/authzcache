@@ -23,25 +23,7 @@ jobs:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PEM }}
 
-      - name: Verify token generation
-        run: |
-          echo "Generate token step outcome: ${{ steps.generate_token.outcome }}"
-          echo "Generate token step conclusion: ${{ steps.generate_token.conclusion }}"
-          echo "Raw token output: '${{ steps.generate_token.outputs.token }}'"
-          echo "Token length: ${#TOKEN}"
-          echo "All step outputs: ${{ toJson(steps.generate_token.outputs) }}"
-          if [ -n "${{ steps.generate_token.outputs.token }}" ]; then
-            echo "✅ Token generated successfully"
-          else
-            echo "❌ Token generation failed"
-            echo "Checking if action completed successfully..."
-            if [ "${{ steps.generate_token.outcome }}" != "success" ]; then
-              echo "❌ Generate token step failed!"
-              exit 1
-            fi
-          fi
-        env:
-          TOKEN: ${{ steps.generate_token.outputs.token }}
+
 
   build:
     name: Build
@@ -52,13 +34,10 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ needs.generate-token.outputs.token }}
     steps:
-      - name: Debug token availability
+      - name: Verify token access
         run: |
-          echo "Token available: ${{ needs.generate-token.outputs.token != '' }}"
-          echo "Raw token from needs: '${{ needs.generate-token.outputs.token }}'"
-          echo "GITHUB_TOKEN env var: '${GITHUB_TOKEN}'"
-          echo "Token length: ${#GITHUB_TOKEN}"
-          echo "Needs context: ${{ toJson(needs) }}"
+          echo "Token received: ${#GITHUB_TOKEN} characters"
+          echo "Token status: $([ -n "${GITHUB_TOKEN}" ] && echo "✅ Available" || echo "❌ Missing")"
 
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
