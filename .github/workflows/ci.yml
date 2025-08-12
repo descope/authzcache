@@ -18,8 +18,8 @@ jobs:
         id: generate_token
         uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a # v2.1.0
         with:
-          app_id: ${{ secrets.APP_ID }}
-          private_key: ${{ secrets.APP_PEM }}
+          app_id: ${{ secrets.RELEASE_APP_ID }}
+          private_key: ${{ secrets.RELEASE_APP_PEM }}
 
   build:
     name: Build
@@ -35,8 +35,8 @@ jobs:
         with:
           go_version: ${{ env.GO_VERSION }}
           scripts_folder: ${{ env.SCRIPTS_DIR }}
-          APP_PEM: ${{ secrets.APP_PEM }}
-          APP_ID: ${{ secrets.APP_ID }}
+          APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+          APP_ID: ${{ secrets.RELEASE_APP_ID }}
 
   lint:
     name: Lint and more checks
@@ -52,8 +52,8 @@ jobs:
         with:
           go_version: ${{ env.GO_VERSION }}
           scripts_folder: ${{ env.SCRIPTS_DIR }}
-          APP_PEM: ${{ secrets.APP_PEM }}
-          APP_ID: ${{ secrets.APP_ID }}
+          APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+          APP_ID: ${{ secrets.RELEASE_APP_ID }}
 
   test:
     name: Run Tests
@@ -70,8 +70,8 @@ jobs:
         with:
           go_version: ${{ env.GO_VERSION }}
           scripts_folder: ${{ env.SCRIPTS_DIR }}
-          APP_PEM: ${{ secrets.APP_PEM }}
-          APP_ID: ${{ secrets.APP_ID }}
+          APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+          APP_ID: ${{ secrets.RELEASE_APP_ID }}
           min_coverage: 100
 
   security:
@@ -110,5 +110,5 @@ jobs:
         with:
           go_version: ${{ env.GO_VERSION }}
           action_token: ${{ needs.generate-token.outputs.token }}
-          APP_PEM: ${{ secrets.APP_PEM }}
-          APP_ID: ${{ secrets.APP_ID }}
+          APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+          APP_ID: ${{ secrets.RELEASE_APP_ID }}
