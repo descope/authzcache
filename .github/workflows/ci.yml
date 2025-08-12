@@ -4,7 +4,6 @@ on: push
 
 env:
   GO_VERSION: ${{ vars.GO_VERSION }}
-  SCRIPTS_DIR: ./vendor/github.com/descope/common
   DATABASE_PASSWORD: passwordless
 
 jobs:
@@ -16,22 +15,13 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
 
-      - name: Checkout common scripts
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          repository: descope/common
-          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          path: vendor/github.com/descope/common
       - name: Build
-        env:
-          GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          GO_VERSION: ${{ env.GO_VERSION }}
+        uses: descope/common/.github/actions/build@main
+        with:
+          go_version: ${{ env.GO_VERSION }}
+
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
-        run: |
-          cd vendor/github.com/descope/common
-          chmod +x .github/actions/build/action.sh 2>/dev/null || true
-          .github/actions/build/action.sh || bash .github/actions/build/build.sh || echo "Build script executed"
 
   lint:
     name: Lint and more checks
@@ -40,22 +30,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Checkout common scripts
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          repository: descope/common
-          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          path: vendor/github.com/descope/common
       - name: Lint and more checks
-        env:
-          GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          GO_VERSION: ${{ env.GO_VERSION }}
+        uses: descope/common/.github/actions/lint@main
+        with:
+          go_version: ${{ env.GO_VERSION }}
+
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
-        run: |
-          cd vendor/github.com/descope/common
-          chmod +x .github/actions/lint/action.sh 2>/dev/null || true
-          .github/actions/lint/action.sh || bash .github/actions/lint/lint.sh || echo "Lint script executed"
 
   test:
     name: Run Tests
@@ -64,24 +45,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Checkout common scripts
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          repository: descope/common
-          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          path: vendor/github.com/descope/common
       - name: Run Tests
+        uses: descope/common/.github/actions/tests@main
         env:
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
-          GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          GO_VERSION: ${{ env.GO_VERSION }}
+        with:
+          go_version: ${{ env.GO_VERSION }}
+
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
-          MIN_COVERAGE: 100
-        run: |
-          cd vendor/github.com/descope/common
-          chmod +x .github/actions/tests/action.sh 2>/dev/null || true
-          .github/actions/tests/action.sh || bash .github/actions/tests/tests.sh || echo "Tests script executed"
+          min_coverage: 100
 
   security:
     name: Run Security checks
@@ -90,22 +63,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Checkout common scripts
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          repository: descope/common
-          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          path: vendor/github.com/descope/common
       - name: Run Security checks
-        env:
-          GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          GO_VERSION: ${{ env.GO_VERSION }}
+        uses: descope/common/.github/actions/security@main
+        with:
+          go_version: ${{ env.GO_VERSION }}
+
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
-        run: |
-          cd vendor/github.com/descope/common
-          chmod +x .github/actions/security/action.sh 2>/dev/null || true
-          .github/actions/security/action.sh || bash .github/actions/security/security.sh || echo "Security script executed"
 
   pack:
     name: Pack and Upload
@@ -121,19 +85,10 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
 
-      - name: Checkout common scripts
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          repository: descope/common
-          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          path: vendor/github.com/descope/common
       - name: Pack and Upload
-        env:
-          GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
-          GO_VERSION: ${{ env.GO_VERSION }}
+        uses: descope/common/.github/actions/pack@main
+        with:
+          go_version: ${{ env.GO_VERSION }}
+          action_token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
-        run: |
-          cd vendor/github.com/descope/common
-          chmod +x .github/actions/pack/action.sh 2>/dev/null || true
-          .github/actions/pack/action.sh || bash .github/actions/pack/pack.sh || echo "Pack script executed"
