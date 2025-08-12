@@ -63,6 +63,14 @@ jobs:
         with:
           token: ${{ steps.generate_token.outputs.token }}
 
+      - name: Debug token access
+        run: |
+          echo "Testing token access to descope/common..."
+          curl -H "Authorization: token ${{ steps.generate_token.outputs.token }}" \
+               -H "Accept: application/vnd.github.v3+json" \
+               https://api.github.com/repos/descope/common
+        continue-on-error: true
+
       - name: Checkout common scripts as vendor
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
