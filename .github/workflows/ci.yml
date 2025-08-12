@@ -2,180 +2,113 @@ name: CI
 
 on: push
 
-permissions:
-  contents: read
-
 env:
   GO_VERSION: ${{ vars.GO_VERSION }}
+  SCRIPTS_DIR: ./vendor/github.com/descope/common
   DATABASE_PASSWORD: passwordless
-  GITHUB_TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
 
 jobs:
-  setup:
-    name: Setup Environment
+  generate-token:
+    name: Generate GitHub App Token
     runs-on: ubuntu-latest
+    outputs:
+      token: ${{ steps.generate_token.outputs.token }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Checkout common scripts as vendor
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Generate token
+        id: generate_token
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a # v2.1.0
         with:
-          repository: descope/common
-          token:  ${{ env.GITHUB_TOKEN }}
-          path: vendor/github.com/descope/common
-
-      - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          check-latest: true
-
-      - name: Configure Git for private repos
-        run: |
-          git config --global url."https://x-access-token:${{ secrets.AUTHZCACHE_TO_COMMON }}@github.com/descope".insteadOf "https://github.com/descope"
-
-      - name: Download and vendor dependencies
-        run: |
-          go mod download
-          go mod vendor
-        env:
-          TOKEN:  ${{ env.GITHUB_TOKEN }}
-
-      - name: Cache workspace
-        uses: actions/cache@v4
-        with:
-          path: |
-            .
-            ~/go/pkg/mod
-          key: workspace-${{ runner.os }}-${{ github.sha }}
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PEM }}
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: setup
+    needs: generate-token
     steps:
-      - name: Restore workspace cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            .
-            ~/go/pkg/mod
-          key: workspace-${{ runner.os }}-${{ github.sha }}
-
-      - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          check-latest: true
-
-      - name: Build using vendor approach
-        run: |
-          make build
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Build
+        uses: descope/common/.github/actions/build@main
         env:
-          GO_VERSION: ${{ env.GO_VERSION }}
-          CI_READ_COMMON: ${{ env.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ needs.generate-token.outputs.token }}
+        with:
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: ${{ env.SCRIPTS_DIR }}
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
 
   lint:
     name: Lint and more checks
     runs-on: ubuntu-latest
-    needs: setup
+    needs: generate-token
     steps:
-      - name: Restore workspace cache
-        uses: actions/cache@v4
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Lint and more checks
+        uses: descope/common/.github/actions/lint@main
+        env:
+          GITHUB_TOKEN: ${{ needs.generate-token.outputs.token }}
         with:
-          path: |
-            .
-            ~/go/pkg/mod
-          key: workspace-${{ runner.os }}-${{ github.sha }}
-
-      - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          check-latest: true
-
-      - name: Lint using vendor approach
-        run: |
-          chmod +x vendor/github.com/descope/common/build/ci/build_lint.sh
-          vendor/github.com/descope/common/build/ci/build_lint.sh
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: ${{ env.SCRIPTS_DIR }}
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
 
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    needs: setup
+    needs: generate-token
     steps:
-      - name: Restore workspace cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            .
-            ~/go/pkg/mod
-          key: workspace-${{ runner.os }}-${{ github.sha }}
-
-      - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          check-latest: true
-
-      - name: Run Tests using vendor approach
-        run: |
-          chmod +x vendor/github.com/descope/common/build/ci/build_test.sh
-          vendor/github.com/descope/common/build/ci/build_test.sh
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Run Tests
+        uses: descope/common/.github/actions/tests@main
         env:
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
+          GITHUB_TOKEN: ${{ needs.generate-token.outputs.token }}
+        with:
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: ${{ env.SCRIPTS_DIR }}
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
+          min_coverage: 100
 
   security:
     name: Run Security checks
     runs-on: ubuntu-latest
-    needs: setup
+    needs: generate-token
     steps:
-      - name: Restore workspace cache
-        uses: actions/cache@v4
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Run Security checks
+        uses: descope/common/.github/actions/security@main
+        env:
+          GITHUB_TOKEN: ${{ needs.generate-token.outputs.token }}
         with:
-          path: |
-            .
-            ~/go/pkg/mod
-          key: workspace-${{ runner.os }}-${{ github.sha }}
-
-      - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          check-latest: true
-
-      - name: Run Security checks using vendor approach
-        run: |
-          chmod +x vendor/github.com/descope/common/build/ci/build_security.sh
-          vendor/github.com/descope/common/build/ci/build_security.sh
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: ${{ env.SCRIPTS_DIR }}
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
 
   pack:
     name: Pack and Upload
     runs-on: ubuntu-latest
-    needs: [setup, build]
+    needs: [generate-token, build]
     permissions:
       packages: write
       contents: read
       id-token: write
       attestations: write
     steps:
-      - name: Restore workspace cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            .
-            ~/go/pkg/mod
-          key: workspace-${{ runner.os }}-${{ github.sha }}
-
-      - name: Pack and Upload using vendor approach
-        run: |
-          make build
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Pack and Upload
+        uses: descope/common/.github/actions/pack@main
         env:
-          GO_VERSION: ${{ env.GO_VERSION }}
-          CI_READ_COMMON: ${{ env.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ needs.generate-token.outputs.token }}
+        with:
+          go_version: ${{ env.GO_VERSION }}
+          action_token: ${{ needs.generate-token.outputs.token }}
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
