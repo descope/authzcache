@@ -24,6 +24,15 @@ jobs:
           token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
           path: common-repo
 
+      - name: Debug - List common repo structure
+        run: |
+          echo "Checking common-repo structure:"
+          ls -la common-repo/ || echo "common-repo directory not found"
+          echo "Checking for actions:"
+          ls -la common-repo/.github/actions/ || echo "actions directory not found"
+          echo "Checking for build action:"
+          ls -la common-repo/.github/actions/build/ || echo "build action not found"
+
       - name: Build
         uses: ./common-repo/.github/actions/build
         with:
