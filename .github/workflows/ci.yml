@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: descope/common
-          token: ${{ secrets.AUTHZCACHE_TO_COMMON }}
+          token:  ${{ env.GITHUB_TOKEN }}
           path: vendor/github.com/descope/common
 
       - name: Set up Go
@@ -41,7 +41,7 @@ jobs:
           go mod download
           go mod vendor
         env:
-          TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
+          TOKEN:  ${{ env.GITHUB_TOKEN }}
 
       - name: Cache workspace
         uses: actions/cache@v4
@@ -78,7 +78,7 @@ jobs:
           GO_VERSION: ${{ env.GO_VERSION }}
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
-          CI_READ_COMMON: ${{ secrets.AUTHZCACHE_TO_COMMON }}
+          CI_READ_COMMON: ${{ env.GITHUB_TOKEN }}
 
   lint:
     name: Lint and more checks
@@ -104,8 +104,6 @@ jobs:
         run: |
           chmod +x vendor/github.com/descope/common/build/ci/build_lint.sh
           vendor/github.com/descope/common/build/ci/build_lint.sh
-        env:
-          TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
 
   test:
     name: Run Tests
@@ -133,7 +131,6 @@ jobs:
           vendor/github.com/descope/common/build/ci/build_test.sh
         env:
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
-          TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
 
   security:
     name: Run Security checks
@@ -159,8 +156,6 @@ jobs:
         run: |
           chmod +x vendor/github.com/descope/common/build/ci/build_security.sh
           vendor/github.com/descope/common/build/ci/build_security.sh
-        env:
-          TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
 
   pack:
     name: Pack and Upload
@@ -187,4 +182,4 @@ jobs:
           GO_VERSION: ${{ env.GO_VERSION }}
           APP_PEM: ${{ secrets.APP_PEM }}
           APP_ID: ${{ secrets.APP_ID }}
-          CI_READ_COMMON: ${{ secrets.AUTHZCACHE_TO_COMMON }}
+          CI_READ_COMMON: ${{ env.GITHUB_TOKEN }}
