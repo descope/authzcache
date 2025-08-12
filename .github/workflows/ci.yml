@@ -180,6 +180,4 @@ jobs:
           make build
         env:
           GO_VERSION: ${{ env.GO_VERSION }}
-          APP_PEM: ${{ secrets.APP_PEM }}
-          APP_ID: ${{ secrets.APP_ID }}
           CI_READ_COMMON: ${{ env.GITHUB_TOKEN }}
