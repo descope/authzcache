@@ -2,6 +2,9 @@ name: CI
 
 on: push
 
+permissions:
+  contents: read
+
 env:
   GO_VERSION: ${{ vars.GO_VERSION }}
   DATABASE_PASSWORD: passwordless
@@ -41,7 +44,7 @@ jobs:
           TOKEN: ${{ secrets.AUTHZCACHE_TO_COMMON }}
 
       - name: Cache workspace
-        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.2.0
+        uses: actions/cache@v4
         with:
           path: |
             .
@@ -54,7 +57,7 @@ jobs:
     needs: setup
     steps:
       - name: Restore workspace cache
-        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.2.0
+        uses: actions/cache@v4
         with:
           path: |
             .
@@ -83,7 +86,7 @@ jobs:
     needs: setup
     steps:
       - name: Restore workspace cache
-        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.2.0
+        uses: actions/cache@v4
         with:
           path: |
             .
@@ -110,7 +113,7 @@ jobs:
     needs: setup
     steps:
       - name: Restore workspace cache
-        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.2.0
+        uses: actions/cache@v4
         with:
           path: |
             .
@@ -138,7 +141,7 @@ jobs:
     needs: setup
     steps:
       - name: Restore workspace cache
-        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.2.0
+        uses: actions/cache@v4
         with:
           path: |
             .
@@ -170,7 +173,7 @@ jobs:
       attestations: write
     steps:
       - name: Restore workspace cache
-        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.2.0
+        uses: actions/cache@v4
         with:
           path: |
             .
