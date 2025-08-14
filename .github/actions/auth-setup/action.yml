@@ -15,6 +15,7 @@ runs:
       with:
         app-id: ${{ env.RELEASE_APP_ID }}
         private-key: ${{ env.RELEASE_APP_PEM }}
+        owner: descope
 
     - name: Configure Git for private repos
       run: |
