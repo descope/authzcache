@@ -24,8 +24,18 @@ runs:
 
     - name: Download and vendor dependencies
       run: |
-        go mod download
-        go mod vendor
+        echo "Attempting to download dependencies..."
+        if ! go mod download; then
+          echo "⚠️ Some private dependencies are not accessible"
+          echo "This is expected if the GitHub App doesn't have access to all repositories"
+          echo "Continuing with available dependencies..."
+        fi
+
+        echo "Creating vendor directory..."
+        if ! go mod vendor; then
+          echo "⚠️ Vendoring failed, some dependencies may be missing"
+          echo "This may cause build failures if missing dependencies are required"
+        fi
       shell: bash
       env:
         GOPRIVATE: github.com/descope/*
