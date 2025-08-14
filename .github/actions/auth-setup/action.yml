@@ -20,3 +20,18 @@ runs:
       run: |
         git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/descope".insteadOf "https://github.com/descope"
       shell: bash
+
+    - name: Debug repository access
+      run: |
+        echo "Testing access to descope repositories..."
+        echo "Available repositories for this GitHub App:"
+        curl -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/installation/repositories | jq '.repositories[] | .full_name' || echo "Failed to list repositories"
+
+        echo "Testing specific repository access:"
+        curl -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/repos/descope/authzservice || echo "Failed to access authzservice"
+      shell: bash
+      continue-on-error: true
