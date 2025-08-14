@@ -1,57 +1,246 @@
 name: Pack and Upload
-description: "Build and push Docker image to GHCR"
+description: "Pack and Upload"
 
 inputs:
-  app-id:
-    description: "GitHub App ID"
+  go_version:
+    description: "Go version to use"
+    required: false
+  ecr_aws_account:
+    description: "AWS account for ECR images"
+    required: false
+    default: "601853031418"
+  APP_PEM:
+    description: "Github App Key"
     required: true
-  private-key:
-    description: "GitHub App private key"
+  APP_ID:
+    description: "Github App ID"
     required: true
+  build_args:
+    description: "Extra build args"
+    required: false
+  repo_name:
+    description: "Docker repository name (defaults to .env file)"
+    required: false
+  build_dir:
+    description: "Go file target to build (defaults to .env file)"
+    required: false
+  port:
+    description: "Port (defaults to .env file)"
+    required: false
+  common_repo_path:
+    description: "Relative path to common repo (defaults to vendor/github.com/descope/common)"
+  dockerfile:
+    description: "Relative path to Dockerfile (defaults to vendor/github.com/descope/common/build/docker/service/Dockerfile)"
+  action_token:
+    default: ${{ github.token }}
+    description: Github actions token
+  platforms:
+    description: Which platforms to build
+    required: false
+    default: linux/amd64,linux/arm64
+  fail_on_vulnerabilities:
+    description: Fail the build if vulnerabilities are found
+    required: false
+    default: "true"
+  context:
+    description: "Context to build the image in"
+    required: false
+    default: "."
+  dockerhub_username:
+    description: "DockerHub username for publishing"
+    required: false
+  dockerhub_token:
+    description: "DockerHub token for publishing"
+    required: false
+  enable_dockerhub:
+    description: "Enable DockerHub publishing"
+    required: false
+    default: "false"
 
 runs:
   using: "composite"
   steps:
-    - name: Generate GitHub App Token
-      id: app-token
-      uses: actions/create-github-app-token@5d869da34e18e7287c1daad50e0b8ea0f506ce69 # v1.11.0
-      with:
-        app-id: ${{ inputs.app-id }}
-        private-key: ${{ inputs.private-key }}
-
     - name: Setup
-      uses: ./.github/actions/setup
+      id: setup
+      if: ${{ inputs.go_version }}
+      uses: descope/common/.github/actions/setup@main
       with:
-        github-token: ${{ steps.app-token.outputs.token }}
+        go_version: ${{ inputs.go_version }}
+        APP_PEM: ${{ inputs.APP_PEM }}
+        APP_ID: ${{ inputs.APP_ID }}
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@4fd812986e6c8c2a69e18311145f9371337f27d4 # v3.4.0
+    - name: Setup build args
+      id: setup_build_args
+      env:
+        COMMON_REPO_PATH: ${{ inputs.common_repo_path && inputs.common_repo_path || 'vendor/github.com/descope/common' }}
+        DOCKERFILE_PATH: ${{ inputs.dockerfile && inputs.dockerfile || 'vendor/github.com/descope/common/build/docker/service/Dockerfile' }}
+      shell: bash
+      run: |
+        source configs/dev/deploy.env || true
+        source configs/dev/config.env || true
+        echo build_dir=${{ inputs.build_dir && inputs.build_dir || '${BUILD_DIR}' }} >> ${GITHUB_OUTPUT}
+        echo port=${{ inputs.port && inputs.port || '${PORT}' }} >> ${GITHUB_OUTPUT}
+        echo repo_name=${{ inputs.repo_name && inputs.repo_name || '${REPO_NAME}' }} >> ${GITHUB_OUTPUT}
+        echo common_repo_path=${COMMON_REPO_PATH} >> ${GITHUB_OUTPUT}
+        echo dockerfile=${DOCKERFILE_PATH} >> ${GITHUB_OUTPUT}
 
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3.1.0
+    - name: Login to GHCR
+      uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
-        password: ${{ steps.app-token.outputs.token }}
+        password: ${{ inputs.action_token}}
 
-    - name: Extract metadata
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+      with:
+        aws-region: us-east-1
+        role-to-assume: arn:aws:iam::${{ inputs.ecr_aws_account }}:role/GitHubActionsECR
+        role-session-name: ${{steps.setup_build_args.outputs.repo_name}}-${{ github.run_number }}@${{ github.run_attempt }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+
+    - name: Login to Docker Hub
+      if: ${{ inputs.enable_dockerhub == 'true' && inputs.dockerhub_username && inputs.dockerhub_token }}
+      uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+      with:
+        registry: docker.io
+        username: ${{ inputs.dockerhub_username }}
+        password: ${{ inputs.dockerhub_token }}
+
+    - name: Create ECR repository and set permissions if needed
+      shell: bash
+      env:
+        REPO_NAME: "descope/${{steps.setup_build_args.outputs.repo_name}}"
+      run: |
+        # Create repository if it doesn't exist
+        if ! aws ecr describe-repositories --repository-names "$REPO_NAME" >/dev/null 2>&1; then
+          echo "Creating ECR repository: $REPO_NAME"
+          aws ecr create-repository --repository-name "$REPO_NAME" \
+            --image-scanning-configuration scanOnPush=true \
+            --encryption-configuration encryptionType=AES256
+        else
+          echo "ECR repository $REPO_NAME already exists."
+        fi
+
+        # Set repository policy if it doesn't exist
+        if ! aws ecr get-repository-policy --repository-name "$REPO_NAME" >/dev/null 2>&1; then
+          echo "Setting ECR repository policy for $REPO_NAME"
+          aws ecr set-repository-policy --repository-name "$REPO_NAME" --policy-text '{
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "cross-account-pull",
+                "Effect": "Allow",
+                "Principal": {
+                  "AWS": [
+                    "arn:aws:iam::808694526875:root",
+                    "arn:aws:iam::265102686009:root",
+                    "arn:aws:iam::882548883321:root"
+                  ]
+                },
+                "Action": [
+                  "ecr:BatchCheckLayerAvailability",
+                  "ecr:BatchGetImage",
+                  "ecr:DescribeImageScanFindings",
+                  "ecr:DescribeImages",
+                  "ecr:DescribeRepositories",
+                  "ecr:GetAuthorizationToken",
+                  "ecr:GetDownloadUrlForLayer",
+                  "ecr:GetRepositoryPolicy",
+                  "ecr:ListImages"
+                ]
+              }
+            ]
+          }'
+        else
+          echo "ECR repository policy already exists for $REPO_NAME"
+        fi
+    - name: Extract metadata for GHCR and ECR
       id: meta
-      uses: docker/metadata-action@8e5442c4ef9f78752691e2d8f8d19755c6f78e81 # v5.5.1
+      uses: descope/common/.github/actions/docker-metadata@main
       with:
-        images: ghcr.io/${{ github.repository }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
+        cache: "false"
+        images: |
+          ghcr.io/descope/${{steps.setup_build_args.outputs.repo_name}}
+          ${{ steps.login-ecr.outputs.registry }}/descope/${{steps.setup_build_args.outputs.repo_name}}
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@2cdde995de11925a030ce8070c3d77a52ffcf1c0 # v5.3.0
+    - name: Extract metadata for DockerHub
+      id: meta-dockerhub
+      if: ${{ inputs.enable_dockerhub == 'true' }}
+      uses: descope/common/.github/actions/docker-metadata@main
       with:
+        cache: "false"
+        images: docker.io/descope/${{steps.setup_build_args.outputs.repo_name}}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
+      with:
+        version: latest
+        cache-binary: false
+    - name: Combine tags for all registries
+      id: combine-tags
+      shell: bash
+      run: |
+        TAGS="${{ steps.meta.outputs.tags }}"
+        if [[ "${{ inputs.enable_dockerhub }}" == "true" ]]; then
+          DOCKERHUB_TAGS="${{ steps.meta-dockerhub.outputs.tags }}"
+          if [[ -n "$DOCKERHUB_TAGS" ]]; then
+            TAGS="$TAGS"$'\n'"$DOCKERHUB_TAGS"
+          fi
+        fi
+        echo "tags<<EOF" >> $GITHUB_OUTPUT
+        echo "$TAGS" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Build and push
+      uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+      id: push
+      with:
+        platforms: ${{ inputs.platforms }}
         context: .
-        platforms: linux/amd64,linux/arm64
         push: true
-        tags: ${{ steps.meta.outputs.tags }}
+        sbom: true
+        provenance: mode=max
+        file: ${{ steps.setup_build_args.outputs.dockerfile }}
+        tags: ${{ steps.combine-tags.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        annotations: ${{ steps.meta.outputs.annotations }}
+        cache: "false"
+        secrets: |
+          "github_token=${{steps.setup.outputs.token}}"
+        build-args: |
+          build_dir=${{steps.setup_build_args.outputs.build_dir}}
+          port=${{steps.setup_build_args.outputs.port}}
+          repo_name=${{steps.setup_build_args.outputs.repo_name}}
+          GIT_SHA=${{github.sha}}
+          ${{ inputs.build_args }}
+        outputs: "type=image,name=target"
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # 0.32.0
+      with:
+        image-ref: ghcr.io/descope/${{steps.setup_build_args.outputs.repo_name}}@${{steps.push.outputs.digest}}
+        cache: "false"
+        format: "table"
+        exit-code: ${{ inputs.fail_on_vulnerabilities == 'true' && '1' || '0' }}
+    - name: Attest
+      uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+      id: attest
+      with:
+        subject-name: ghcr.io/descope/${{steps.setup_build_args.outputs.repo_name}}
+        subject-digest: ${{ steps.push.outputs.digest }}
+        push-to-registry: true
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3.9.1
+
+    - name: Sign the image with Cosign (keyless)
+      shell: bash
+      run: |
+        cosign sign ghcr.io/descope/${{steps.setup_build_args.outputs.repo_name}}@${{steps.push.outputs.digest}}
+        cosign sign ${{ steps.login-ecr.outputs.registry }}/descope/${{steps.setup_build_args.outputs.repo_name}}@${{steps.push.outputs.digest}}
+        if [[ "${{ inputs.enable_dockerhub }}" == "true" ]]; then
+          cosign sign docker.io/descope/${{steps.setup_build_args.outputs.repo_name}}@${{steps.push.outputs.digest}}
+        fi

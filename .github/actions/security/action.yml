@@ -1,53 +1,50 @@
-name: Security
-description: "Run security checks including gitleaks"
+name: Run Security Checks
+description: "Run Security Checks"
 
 inputs:
-  github-token:
-    description: "GitHub token for private repo access"
+  go_version:
+    description: "Go version to use"
+    required: true
+  scripts_folder:
+    description: "Scripts folder"
     required: false
+    default: "."
+  APP_PEM:
+    description: "Github App Key"
+    required: true
+  APP_ID:
+    description: "Github App ID"
+    required: true
 
 runs:
   using: "composite"
   steps:
-    - name: Setup
-      uses: ./.github/actions/setup
+    - name: Setup Go
+      if: ${{ hashFiles('go.mod') != '' }}
+      uses: descope/common/.github/actions/setup@main
       with:
-        github-token: ${{ inputs.github-token }}
-
-    - name: Install gitleaks
+        go_version: ${{ inputs.go_version }}
+        APP_PEM: ${{ inputs.APP_PEM }}
+        APP_ID: ${{ inputs.APP_ID }}
+    - name: Setup NodeJS if package.json exists
+      if: ${{ hashFiles('package.json') != '' }}
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      with:
+        node-version-file: package.json
+    - if: ${{ hashFiles('package.json') != '' }}
+      name: Install NodeJS dependencies
+      shell: bash
       run: |
-        SECRETS_SUPPORTED_VERSION="8.18.3"
-        INSTALLED_SECRETS_VERSION="$(gitleaks version 2>/dev/null || echo 'not installed')"
-        if [[ $INSTALLED_SECRETS_VERSION != *"$SECRETS_SUPPORTED_VERSION"* ]]; then
-          echo "Installing gitleaks..."
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${SECRETS_SUPPORTED_VERSION}/gitleaks_${SECRETS_SUPPORTED_VERSION}_$(uname -s)_$(uname -m).tar.gz" | tar -xz -C "$(go env GOPATH)/bin" gitleaks
+        corepack enable
+        if [ -f "yarn.lock" ]; then
+          yarn install --immutable
+        elif [ -f "pnpm-lock.yaml" ]; then
+          pnpm install --frozen-lockfile
+        else
+          npm ci
         fi
+    - if: ${{ hashFiles('package.json') != '' }}
+      name: Run Node Security Checks
       shell: bash
-
-    - name: Create gitleaks config
       run: |
-        cat > gitleaks.toml << 'EOF'
-        title = "Gitleaks Config"
-
-        [extend]
-        useDefault = true
-
-        [[rules]]
-        description = "Generic API Key"
-        id = "generic-api-key"
-        regex = '''(?i)[a-z0-9]{32,}'''
-        keywords = ["api", "key", "token", "secret"]
-        EOF
-      shell: bash
-
-    - name: Run gitleaks
-      run: |
-        echo "Running gitleaks to detect secrets..."
-        echo "Checking git history..."
-        gitleaks detect -v --redact -c gitleaks.toml || true
-
-        echo "Checking local files..."
-        gitleaks detect --no-git -v --redact -c gitleaks.toml || true
-
-        echo "Security checks completed"
-      shell: bash
+        npm audit signatures

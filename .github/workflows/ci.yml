@@ -16,38 +16,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Auth Setup
-        id: auth
-        uses: ./.github/actions/auth-setup
-        env:
-          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
-
       - name: Build
         uses: ./.github/actions/build
-        with:
-          github-token: ${{ steps.auth.outputs.token }}
 
   lint:
     name: Lint
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      checks: write
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Auth Setup
-        id: auth
-        uses: ./.github/actions/auth-setup
-        env:
-          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
-
       - name: Lint
         uses: ./.github/actions/lint
         with:
-          github-token: ${{ steps.auth.outputs.token }}
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: "."
+          APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+          APP_ID: ${{ secrets.RELEASE_APP_ID }}
 
   test:
     name: Test
@@ -58,18 +47,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Auth Setup
-        id: auth
-        uses: ./.github/actions/auth-setup
-        env:
-          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
-
       - name: Test
         uses: ./.github/actions/test
         with:
-          database_password: ${{ env.DATABASE_PASSWORD }}
-          github-token: ${{ steps.auth.outputs.token }}
+          min_coverage: "80"
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: "."
+          APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+          APP_ID: ${{ secrets.RELEASE_APP_ID }}
 
   security:
     name: Security
@@ -80,17 +65,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Auth Setup
-        id: auth
-        uses: ./.github/actions/auth-setup
-        env:
-          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
-
       - name: Security
         uses: ./.github/actions/security
         with:
-          github-token: ${{ steps.auth.outputs.token }}
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: "."
+          APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+          APP_ID: ${{ secrets.RELEASE_APP_ID }}
 
   pack:
     name: Pack and Upload

@@ -1,58 +1,48 @@
-name: Lint
-description: "Run Go linting and security checks"
-
+name: Lint and more checks
+description: "Lint and more checks"
 inputs:
-  github-token:
-    description: "GitHub token for private repo access"
+  go_version:
+    description: "Go version to use"
+    required: true
+  scripts_folder:
+    description: "Scripts folder"
     required: false
+    default: "."
+  APP_PEM:
+    description: "Github App Key"
+    required: true
+  APP_ID:
+    description: "Github App ID"
+    required: true
 
 runs:
   using: "composite"
   steps:
     - name: Setup
-      uses: ./.github/actions/setup
+      id: setup
+      uses: descope/common/.github/actions/setup@main
       with:
-        github-token: ${{ inputs.github-token }}
-
-    - name: Install golangci-lint
-      run: |
-        # renovate: datasource=github-releases depName=golangci/golangci-lint
-        GOLANG_CI_SUPPORTED_VERSION="1.64.6"
-        INSTALLED_GOLANG_CLI_VERSION="$(golangci-lint --version 2>/dev/null || echo 'not installed')"
-        if [[ $INSTALLED_GOLANG_CLI_VERSION != *"$GOLANG_CI_SUPPORTED_VERSION"* ]]; then
-          echo "Installing golangci-lint..."
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v${GOLANG_CI_SUPPORTED_VERSION}
-        fi
-      shell: bash
-
-    - name: Run go mod tidy
-      run: |
-        echo "Running go mod tidy..."
-        go mod tidy
-        if [ -d "vendor" ]; then
-          echo "Running go mod vendor..."
-          go mod vendor
-        fi
-      shell: bash
+        go_version: ${{ inputs.go_version }}
+        APP_PEM: ${{ inputs.APP_PEM }}
+        APP_ID: ${{ inputs.APP_ID }}
 
     - name: Run golangci-lint
-      run: |
-        echo "Running golangci-lint..."
-        golangci-lint run --timeout=10m ./...
-      shell: bash
+      uses: reviewdog/action-golangci-lint@f9bba13753278f6a73b27a56a3ffb1bfda90ed71 # v2.8.0
+      env:
+        TAR_OPTIONS: --skip-old-files
+      with:
+        github_token: ${{ steps.setup.outputs.token }}
+        fail_level: any
+        fail_on_error: true
+        golangci_lint_flags: "--config=${{ inputs.scripts_folder }}/scripts/lint/.golangci.yml"
+        filter_mode: nofilter
+        reporter: github-check
+        golangci_lint_version: v1.64.8 # v2 has breaking changes, duh.
 
-    - name: Run go vet
+    - name: Run leaks and additional checks
+      env:
+        TOKEN: ${{ steps.setup.outputs.token }}
       run: |
-        echo "Running go vet..."
-        go vet ./...
-      shell: bash
-
-    - name: Check formatting
-      run: |
-        echo "Checking Go formatting..."
-        if [ "$(gofmt -l . | wc -l)" -gt 0 ]; then
-          echo "Files not formatted properly:"
-          gofmt -l .
-          exit 1
-        fi
+        chmod +x ${{ inputs.scripts_folder }}/build/ci/build_lint.sh
+        ${{ inputs.scripts_folder }}/build/ci/build_lint.sh
       shell: bash

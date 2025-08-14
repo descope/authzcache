@@ -1,42 +1,63 @@
-name: Test
-description: "Run Go tests with coverage"
-
+name: Run Tests
+description: "Run Tests"
 inputs:
-  database_password:
-    description: "Database password for tests"
+  min_coverage:
+    description: "Minimum coverage"
+    required: true
+  go_version:
+    description: "Go version to use"
+    required: true
+  scripts_folder:
+    description: "Scripts folder"
     required: false
-    default: "passwordless"
-  github-token:
-    description: "GitHub token for private repo access"
-    required: false
+    default: "."
+  APP_PEM:
+    description: "Github App Key"
+    required: true
+  APP_ID:
+    description: "Github App ID"
+    required: true
 
 runs:
   using: "composite"
   steps:
     - name: Setup
-      uses: ./.github/actions/setup
+      uses: descope/common/.github/actions/setup@main
+      id: setup
       with:
-        github-token: ${{ inputs.github-token }}
+        go_version: ${{ inputs.go_version }}
+        APP_PEM: ${{ inputs.APP_PEM }}
+        APP_ID: ${{ inputs.APP_ID }}
+    - name: Start services
+      shell: bash
+      run: |
+        if [ "$DATABASE_PASSWORD" == "" ]; then
+          echo "no need to start services"
+        else
+          make dev-env
+        fi
 
     - name: Run tests
       run: |
-        echo "Running Go tests with coverage..."
-        export DB_AUTO_MIGRATE=false
-        go test -timeout 30m -v -coverpkg=./... -race -coverprofile=raw_coverage.out -covermode=atomic ./...
-
-        if [ $? -ne 0 ]; then
-          echo "Tests failed!"
-          exit 1
-        fi
-
-        echo "Generating filtered coverage.out..."
-        cat raw_coverage.out | grep -v -e ".*\.pb.*\.go\:.*" | grep -v -e ".*\/main\.go\:.*" | grep -v -e ".*\/config\.go\:.*" | grep -v -e ".*\/.*mock.*\/.*\.go\:.*" | grep -v -e "\/test\/.*\.go\:.*" | grep -v -e "\/generated\/.*\.go\:.*" > coverage.out
-
-        echo "Generating coverage report..."
-        go tool cover -func coverage.out | grep total | awk '{print $3}'
-
-        echo "Generating HTML coverage report..."
-        go tool cover -html=coverage.out -o coverage.html
+        docker ps -a
+        chmod +x ${{ inputs.scripts_folder }}/build/ci/build_test.sh
+        ${{ inputs.scripts_folder }}/build/ci/build_test.sh
       shell: bash
-      env:
-        DATABASE_PASSWORD: ${{ inputs.database_password }}
+
+    - name: Upload coverage HTML
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage.html
+        path: |
+          coverage.html
+
+    - name: Convert coverage to lcov
+      uses: jandelgado/gcov2lcov-action@v1.1.1
+
+    - name: Enforce coverage
+      uses: devmasx/coverage-check-action@v1.2.0
+      with:
+        type: lcov
+        result_path: coverage.lcov
+        min_coverage: ${{ inputs.min_coverage }}
+        token: ${{ steps.setup.outputs.token }}
