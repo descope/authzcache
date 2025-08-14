@@ -22,25 +22,4 @@ runs:
         git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/descope".insteadOf "https://github.com/descope"
       shell: bash
 
-    - name: Check repository access
-      run: |
-        echo "ℹ️ GitHub App Installation Details:"
-        echo "Installation ID: ${{ steps.app-token.outputs.installation-id }}"
-        echo "App Slug: ${{ steps.app-token.outputs.app-slug }}"
 
-        echo "📋 Repositories accessible to this token:"
-        REPOS=$(curl -s -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
-                     -H "Accept: application/vnd.github.v3+json" \
-                     https://api.github.com/installation/repositories)
-        echo "$REPOS" | jq -r '.repositories[] | .full_name' || echo "Failed to list repositories"
-
-        echo "🔍 Total repositories: $(echo "$REPOS" | jq -r '.total_count // "unknown"')"
-
-        echo "🧪 Testing authzservice access specifically:"
-        curl -s -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
-             -H "Accept: application/vnd.github.v3+json" \
-             https://api.github.com/repos/descope/authzservice | jq -r '.full_name // .message'
-
-        echo "📝 If authzservice shows 'Not Found', check app installation scope and permissions"
-      shell: bash
-      continue-on-error: true

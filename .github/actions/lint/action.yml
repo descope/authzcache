@@ -38,7 +38,7 @@ runs:
     - name: Run golangci-lint
       run: |
         echo "Running golangci-lint..."
-        golangci-lint run ./...
+        golangci-lint run --timeout=10m ./...
       shell: bash
 
     - name: Run go vet
