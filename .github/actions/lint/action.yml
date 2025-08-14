@@ -1,11 +1,18 @@
 name: Lint
 description: "Run Go linting and security checks"
 
+inputs:
+  github-token:
+    description: "GitHub token for private repo access"
+    required: false
+
 runs:
   using: "composite"
   steps:
     - name: Setup
       uses: ./.github/actions/setup
+      with:
+        github-token: ${{ inputs.github-token }}
 
     - name: Install golangci-lint
       run: |

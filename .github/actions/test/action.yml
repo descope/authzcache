@@ -6,12 +6,17 @@ inputs:
     description: "Database password for tests"
     required: false
     default: "passwordless"
+  github-token:
+    description: "GitHub token for private repo access"
+    required: false
 
 runs:
   using: "composite"
   steps:
     - name: Setup
       uses: ./.github/actions/setup
+      with:
+        github-token: ${{ inputs.github-token }}
 
     - name: Run tests
       run: |

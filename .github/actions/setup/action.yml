@@ -1,6 +1,11 @@
 name: Setup Go Environment
 description: "Set up Go and dependencies for CI"
 
+inputs:
+  github-token:
+    description: "GitHub token for private repo access"
+    required: false
+
 runs:
   using: "composite"
   steps:
@@ -11,8 +16,16 @@ runs:
         cache: true
         check-latest: true
 
+    - name: Configure Git for private repos
+      if: inputs.github-token != ''
+      run: |
+        git config --global url."https://x-access-token:${{ inputs.github-token }}@github.com/descope".insteadOf "https://github.com/descope"
+      shell: bash
+
     - name: Download and vendor dependencies
       run: |
         go mod download
         go mod vendor
       shell: bash
+      env:
+        GOPRIVATE: github.com/descope/*
