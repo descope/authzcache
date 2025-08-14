@@ -22,7 +22,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup
-      uses: descope/common/.github/actions/setup@main
+      uses: ./.github/actions/setup
       id: setup
       with:
         go_version: ${{ inputs.go_version }}

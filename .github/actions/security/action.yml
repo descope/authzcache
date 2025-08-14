@@ -21,7 +21,7 @@ runs:
   steps:
     - name: Setup Go
       if: ${{ hashFiles('go.mod') != '' }}
-      uses: descope/common/.github/actions/setup@main
+      uses: ./.github/actions/setup
       with:
         go_version: ${{ inputs.go_version }}
         APP_PEM: ${{ inputs.APP_PEM }}
