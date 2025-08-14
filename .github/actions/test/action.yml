@@ -1,0 +1,37 @@
+name: Test
+description: "Run Go tests with coverage"
+
+inputs:
+  database_password:
+    description: "Database password for tests"
+    required: false
+    default: "passwordless"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup
+      uses: ./.github/actions/setup
+
+    - name: Run tests
+      run: |
+        echo "Running Go tests with coverage..."
+        export DB_AUTO_MIGRATE=false
+        go test -timeout 30m -v -coverpkg=./... -race -coverprofile=raw_coverage.out -covermode=atomic ./...
+
+        if [ $? -ne 0 ]; then
+          echo "Tests failed!"
+          exit 1
+        fi
+
+        echo "Generating filtered coverage.out..."
+        cat raw_coverage.out | grep -v -e ".*\.pb.*\.go\:.*" | grep -v -e ".*\/main\.go\:.*" | grep -v -e ".*\/config\.go\:.*" | grep -v -e ".*\/.*mock.*\/.*\.go\:.*" | grep -v -e "\/test\/.*\.go\:.*" | grep -v -e "\/generated\/.*\.go\:.*" > coverage.out
+
+        echo "Generating coverage report..."
+        go tool cover -func coverage.out | grep total | awk '{print $3}'
+
+        echo "Generating HTML coverage report..."
+        go tool cover -html=coverage.out -o coverage.html
+      shell: bash
+      env:
+        DATABASE_PASSWORD: ${{ inputs.database_password }}

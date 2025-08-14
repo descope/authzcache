@@ -1,0 +1,46 @@
+name: Security
+description: "Run security checks including gitleaks"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup
+      uses: ./.github/actions/setup
+
+    - name: Install gitleaks
+      run: |
+        SECRETS_SUPPORTED_VERSION="8.18.3"
+        INSTALLED_SECRETS_VERSION="$(gitleaks version 2>/dev/null || echo 'not installed')"
+        if [[ $INSTALLED_SECRETS_VERSION != *"$SECRETS_SUPPORTED_VERSION"* ]]; then
+          echo "Installing gitleaks..."
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${SECRETS_SUPPORTED_VERSION}/gitleaks_${SECRETS_SUPPORTED_VERSION}_$(uname -s)_$(uname -m).tar.gz" | tar -xz -C "$(go env GOPATH)/bin" gitleaks
+        fi
+      shell: bash
+
+    - name: Create gitleaks config
+      run: |
+        cat > gitleaks.toml << 'EOF'
+        title = "Gitleaks Config"
+
+        [extend]
+        useDefault = true
+
+        [[rules]]
+        description = "Generic API Key"
+        id = "generic-api-key"
+        regex = '''(?i)[a-z0-9]{32,}'''
+        keywords = ["api", "key", "token", "secret"]
+        EOF
+      shell: bash
+
+    - name: Run gitleaks
+      run: |
+        echo "Running gitleaks to detect secrets..."
+        echo "Checking git history..."
+        gitleaks detect -v --redact -c gitleaks.toml || true
+
+        echo "Checking local files..."
+        gitleaks detect --no-git -v --redact -c gitleaks.toml || true
+
+        echo "Security checks completed"
+      shell: bash

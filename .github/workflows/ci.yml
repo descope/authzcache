@@ -3,139 +3,75 @@ name: CI
 on: push
 
 env:
-  GO_VERSION: ${{ vars.GO_VERSION }}
-  SCRIPTS_DIR: ./vendor/github.com/descope/common
+  GO_VERSION: ${{ vars.GO_VERSION || '1.21' }}
   DATABASE_PASSWORD: passwordless
 
 jobs:
-  ci:
-    name: Build, Test, Security, and Pack
+  build:
+    name: Build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Build
+        uses: ./.github/actions/build
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Lint
+        uses: ./.github/actions/lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Test
+        uses: ./.github/actions/test
+        with:
+          database_password: ${{ env.DATABASE_PASSWORD }}
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Security
+        uses: ./.github/actions/security
+
+  pack:
+    name: Pack and Upload
+    runs-on: ubuntu-latest
+    needs: [build, lint, test, security]
     permissions:
       contents: read
       packages: write
       id-token: write
       attestations: write
-    outputs:
-      token: ${{ steps.generate_token.outputs.token }}
-      app_token: ${{ steps.generate_token.outputs.token }}
-      test: "hello-world"
-      installation_id: ${{ steps.generate_token.outputs.installation-id }}
     steps:
-      - name: Debug secrets before token generation
-        run: |
-          echo "RELEASE_APP_ID length: ${#RELEASE_APP_ID}"
-          echo "RELEASE_APP_PEM length: ${#RELEASE_APP_PEM}"
-          if [[ -z "$RELEASE_APP_ID" ]]; then
-            echo "❌ RELEASE_APP_ID is empty or not set"
-            exit 1
-          else
-            echo "✅ RELEASE_APP_ID is set"
-          fi
-          if [[ -z "$RELEASE_APP_PEM" ]]; then
-            echo "❌ RELEASE_APP_PEM is empty or not set"
-            exit 1
-          else
-            echo "✅ RELEASE_APP_PEM is set"
-          fi
-        env:
-          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Generate token
-        id: generate_token
-        uses: actions/create-github-app-token@5d869da34e18e7287c1daad50e0b8ea0f506ce69 # v1.11.0
+      - name: Pack and Upload
+        uses: ./.github/actions/pack
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PEM }}
-
-      - name: Debug token generation
-        run: |
-          echo "Generate token step outcome: ${{ steps.generate_token.outcome }}"
-          echo "Generate token step conclusion: ${{ steps.generate_token.conclusion }}"
-          echo "Token output: '${{ steps.generate_token.outputs.token }}'"
-          echo "Installation ID: '${{ steps.generate_token.outputs.installation-id }}'"
-          echo "App slug: '${{ steps.generate_token.outputs.app-slug }}'"
-          echo "All outputs: ${{ toJson(steps.generate_token.outputs) }}"
-
-      - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          token: ${{ steps.generate_token.outputs.token }}
-
-      - name: Debug token access
-        run: |
-          echo "Testing token access and listing available repositories..."
-          echo "=== Checking descope/common ==="
-          curl -H "Authorization: token ${{ steps.generate_token.outputs.token }}" \
-               -H "Accept: application/vnd.github.v3+json" \
-               https://api.github.com/repos/descope/common
-          echo -e "\n=== Listing installation repositories ==="
-          curl -H "Authorization: token ${{ steps.generate_token.outputs.token }}" \
-               -H "Accept: application/vnd.github.v3+json" \
-               https://api.github.com/installation/repositories | jq '.repositories[] | .full_name'
-        continue-on-error: true
-
-      - name: Checkout common scripts as vendor
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          repository: descope/common
-          token: ${{ steps.generate_token.outputs.token }}
-          path: vendor/github.com/descope/common
-
-      - name: Set up Go
-        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.2
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          check-latest: true
-
-      - name: Configure Git for private repos
-        run: |
-          git config --global url."https://x-access-token:${{ steps.generate_token.outputs.token }}@github.com/descope".insteadOf "https://github.com/descope"
-
-      - name: Download and vendor dependencies
-        run: |
-          go mod download
-          go mod vendor
-
-      - name: Build
-        run: make build
-        env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-
-      - name: Lint
-        run: |
-          chmod +x vendor/github.com/descope/common/build/ci/build_lint.sh
-          vendor/github.com/descope/common/build/ci/build_lint.sh
-        env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-
-      - name: Test
-        run: |
-          chmod +x vendor/github.com/descope/common/build/ci/build_test.sh
-          vendor/github.com/descope/common/build/ci/build_test.sh
-        env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-          DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
-
-      - name: Security
-        run: |
-          chmod +x vendor/github.com/descope/common/build/ci/build_security.sh
-          vendor/github.com/descope/common/build/ci/build_security.sh
-        env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-
-      - name: Pack and Upload to GHCR
-        run: make build
-        env:
-          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
-
-
-
-
-
-
-
-
-

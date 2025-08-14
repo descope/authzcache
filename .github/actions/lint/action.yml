@@ -1,0 +1,51 @@
+name: Lint
+description: "Run Go linting and security checks"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup
+      uses: ./.github/actions/setup
+
+    - name: Install golangci-lint
+      run: |
+        # renovate: datasource=github-releases depName=golangci/golangci-lint
+        GOLANG_CI_SUPPORTED_VERSION="1.64.6"
+        INSTALLED_GOLANG_CLI_VERSION="$(golangci-lint --version 2>/dev/null || echo 'not installed')"
+        if [[ $INSTALLED_GOLANG_CLI_VERSION != *"$GOLANG_CI_SUPPORTED_VERSION"* ]]; then
+          echo "Installing golangci-lint..."
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v${GOLANG_CI_SUPPORTED_VERSION}
+        fi
+      shell: bash
+
+    - name: Run go mod tidy
+      run: |
+        echo "Running go mod tidy..."
+        go mod tidy
+        if [ -d "vendor" ]; then
+          echo "Running go mod vendor..."
+          go mod vendor
+        fi
+      shell: bash
+
+    - name: Run golangci-lint
+      run: |
+        echo "Running golangci-lint..."
+        golangci-lint run ./...
+      shell: bash
+
+    - name: Run go vet
+      run: |
+        echo "Running go vet..."
+        go vet ./...
+      shell: bash
+
+    - name: Check formatting
+      run: |
+        echo "Checking Go formatting..."
+        if [ "$(gofmt -l . | wc -l)" -gt 0 ]; then
+          echo "Files not formatted properly:"
+          gofmt -l .
+          exit 1
+        fi
+      shell: bash

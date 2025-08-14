@@ -1,0 +1,14 @@
+name: Build
+description: "Build the Go application"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup
+      uses: ./.github/actions/setup
+
+    - name: Build
+      run: |
+        echo "Building Go application..."
+        go build ./...
+      shell: bash
