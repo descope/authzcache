@@ -471,7 +471,7 @@ func BenchmarkCheckRelation(b *testing.B) {
 		b.ReportMetric(float64(approxTotalSize)/(1024*1024), "approx_direct_cache_MB")
 	})
 	b.Run("AddRelations_AboveCacheSize", func(b *testing.B) {
-		_, _, _ = populateLargeDirectCache(ctx)
+		cache, _, _ := populateLargeDirectCache(ctx)
 		b.ResetTimer()
 		var wg sync.WaitGroup
 		wg.Add(b.N)
