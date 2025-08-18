@@ -7,10 +7,6 @@ inputs:
   go_version:
     description: "Go version to use"
     required: true
-  scripts_folder:
-    description: "Scripts folder"
-    required: false
-    default: "."
 
 runs:
   using: "composite"
@@ -32,8 +28,8 @@ runs:
     - name: Run tests
       run: |
         docker ps -a
-        chmod +x ${{ inputs.scripts_folder }}/build/ci/build_test.sh
-        ${{ inputs.scripts_folder }}/build/ci/build_test.sh
+        chmod +x ./scripts/build/ci/build_test.sh
+        ./scripts/build/ci/build_test.sh
       shell: bash
 
     - name: Upload coverage HTML
