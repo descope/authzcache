@@ -100,54 +100,6 @@ runs:
         username: ${{ inputs.dockerhub_username }}
         password: ${{ inputs.dockerhub_token }}
 
-    - name: Create ECR repository and set permissions if needed
-      shell: bash
-      env:
-        REPO_NAME: "descope/${{steps.setup_build_args.outputs.repo_name}}"
-      run: |
-        # Create repository if it doesn't exist
-        if ! aws ecr describe-repositories --repository-names "$REPO_NAME" >/dev/null 2>&1; then
-          echo "Creating ECR repository: $REPO_NAME"
-          aws ecr create-repository --repository-name "$REPO_NAME" \
-            --image-scanning-configuration scanOnPush=true \
-            --encryption-configuration encryptionType=AES256
-        else
-          echo "ECR repository $REPO_NAME already exists."
-        fi
-
-        # Set repository policy if it doesn't exist
-        if ! aws ecr get-repository-policy --repository-name "$REPO_NAME" >/dev/null 2>&1; then
-          echo "Setting ECR repository policy for $REPO_NAME"
-          aws ecr set-repository-policy --repository-name "$REPO_NAME" --policy-text '{
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Sid": "cross-account-pull",
-                "Effect": "Allow",
-                "Principal": {
-                  "AWS": [
-                    "arn:aws:iam::808694526875:root",
-                    "arn:aws:iam::265102686009:root",
-                    "arn:aws:iam::882548883321:root"
-                  ]
-                },
-                "Action": [
-                  "ecr:BatchCheckLayerAvailability",
-                  "ecr:BatchGetImage",
-                  "ecr:DescribeImageScanFindings",
-                  "ecr:DescribeImages",
-                  "ecr:DescribeRepositories",
-                  "ecr:GetAuthorizationToken",
-                  "ecr:GetDownloadUrlForLayer",
-                  "ecr:GetRepositoryPolicy",
-                  "ecr:ListImages"
-                ]
-              }
-            ]
-          }'
-        else
-          echo "ECR repository policy already exists for $REPO_NAME"
-        fi
     - name: Extract metadata for GHCR and ECR
       id: meta
       uses: ./.github/actions/docker-metadata
