@@ -160,7 +160,7 @@ runs:
         fi
     - name: Extract metadata for GHCR and ECR
       id: meta
-      uses: descope/common/.github/actions/docker-metadata@main
+      uses: ./.github/actions/docker-metadata
       with:
         cache: "false"
         images: |
@@ -170,7 +170,7 @@ runs:
     - name: Extract metadata for DockerHub
       id: meta-dockerhub
       if: ${{ inputs.enable_dockerhub == 'true' }}
-      uses: descope/common/.github/actions/docker-metadata@main
+      uses: ./.github/actions/docker-metadata
       with:
         cache: "false"
         images: docker.io/descope/${{steps.setup_build_args.outputs.repo_name}}

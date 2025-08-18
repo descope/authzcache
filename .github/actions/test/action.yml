@@ -1,72 +1,63 @@
-name: Test
-description: "Run Go tests with coverage"
-
+name: Run Tests
+description: "Run Tests"
 inputs:
   min_coverage:
-    description: "Minimum coverage percentage"
+    description: "Minimum coverage"
     required: true
-    default: "80"
+  go_version:
+    description: "Go version to use"
+    required: true
+  scripts_folder:
+    description: "Scripts folder"
+    required: false
+    default: "."
+  APP_PEM:
+    description: "Github App Key"
+    required: true
+  APP_ID:
+    description: "Github App ID"
+    required: true
 
 runs:
   using: "composite"
   steps:
-    - name: Auth Setup
-      id: auth
-      uses: ./.github/actions/auth-setup
-      env:
-        RELEASE_APP_ID: ${{ env.RELEASE_APP_ID }}
-        RELEASE_APP_PEM: ${{ env.RELEASE_APP_PEM }}
-
-    - name: Setup Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+    - name: Setup
+      uses: ./.github/actions/setup
+      id: setup
       with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
-
-    - name: Download dependencies
-      env:
-        GOPRIVATE: github.com/descope/*
-      run: |
-        go mod download
-        go mod verify
-      shell: bash
-
+        go_version: ${{ inputs.go_version }}
+        APP_PEM: ${{ inputs.APP_PEM }}
+        APP_ID: ${{ inputs.APP_ID }}
     - name: Start services
-      run: |
-        if [ "${{ env.DATABASE_PASSWORD }}" == "" ]; then
-          echo "No database services needed"
-        else
-          echo "Starting database services..."
-          # Add specific service startup commands here if needed
-        fi
       shell: bash
+      run: |
+        if [ "$DATABASE_PASSWORD" == "" ]; then
+          echo "no need to start services"
+        else
+          make dev-env
+        fi
 
     - name: Run tests
-      env:
-        GOPRIVATE: github.com/descope/*
-        DB_AUTO_MIGRATE: false
       run: |
-        chmod +x ./scripts/build/ci/build_test.sh
-        ./scripts/build/ci/build_test.sh
+        docker ps -a
+        chmod +x ${{ inputs.scripts_folder }}/build/ci/build_test.sh
+        ${{ inputs.scripts_folder }}/build/ci/build_test.sh
       shell: bash
 
     - name: Upload coverage HTML
       uses: actions/upload-artifact@v4
       with:
         name: coverage.html
-        path: coverage.html
+        path: |
+          coverage.html
 
     - name: Convert coverage to lcov
       uses: jandelgado/gcov2lcov-action@v1.1.1
 
-    - name: Check coverage
-      run: |
-        COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-        MIN_COVERAGE=${{ inputs.min_coverage }}
-        echo "Coverage: ${COVERAGE}%"
-        echo "Minimum required: ${MIN_COVERAGE}%"
-        if (( $(echo "$COVERAGE < $MIN_COVERAGE" | bc -l) )); then
-          echo "Coverage ${COVERAGE}% is below minimum ${MIN_COVERAGE}%"
-          exit 1
-        fi
-      shell: bash
+    - name: Enforce coverage
+      uses: devmasx/coverage-check-action@v1.2.0
+      with:
+        type: lcov
+        result_path: coverage.lcov
+        min_coverage: ${{ inputs.min_coverage }}
+        token: ${{ steps.setup.outputs.token }}

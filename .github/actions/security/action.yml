@@ -1,39 +1,50 @@
-name: Security
-description: "Run security checks"
+name: Run Security Checks
+description: "Run Security Checks"
+
+inputs:
+  go_version:
+    description: "Go version to use"
+    required: true
+  scripts_folder:
+    description: "Scripts folder"
+    required: false
+    default: "."
+  APP_PEM:
+    description: "Github App Key"
+    required: true
+  APP_ID:
+    description: "Github App ID"
+    required: true
 
 runs:
   using: "composite"
   steps:
-    - name: Auth Setup
-      id: auth
-      uses: ./.github/actions/auth-setup
-      env:
-        RELEASE_APP_ID: ${{ env.RELEASE_APP_ID }}
-        RELEASE_APP_PEM: ${{ env.RELEASE_APP_PEM }}
-
     - name: Setup Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      if: ${{ hashFiles('go.mod') != '' }}
+      uses: ./.github/actions/setup
       with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
-
-    - name: Download dependencies
-      env:
-        GOPRIVATE: github.com/descope/*
-      run: |
-        go mod download
-        go mod verify
+        go_version: ${{ inputs.go_version }}
+        APP_PEM: ${{ inputs.APP_PEM }}
+        APP_ID: ${{ inputs.APP_ID }}
+    - name: Setup NodeJS if package.json exists
+      if: ${{ hashFiles('package.json') != '' }}
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      with:
+        node-version-file: package.json
+    - if: ${{ hashFiles('package.json') != '' }}
+      name: Install NodeJS dependencies
       shell: bash
-
-    - name: Run security checks
-      env:
-        GOPRIVATE: github.com/descope/*
       run: |
-        echo "Installing gosec..."
-        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-
-        echo "Running gosec security scanner..."
-        gosec ./...
-
-        echo "Security checks completed"
+        corepack enable
+        if [ -f "yarn.lock" ]; then
+          yarn install --immutable
+        elif [ -f "pnpm-lock.yaml" ]; then
+          pnpm install --frozen-lockfile
+        else
+          npm ci
+        fi
+    - if: ${{ hashFiles('package.json') != '' }}
+      name: Run Node Security Checks
       shell: bash
+      run: |
+        npm audit signatures
