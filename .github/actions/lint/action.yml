@@ -31,7 +31,7 @@ runs:
         TAR_OPTIONS: --skip-old-files
         GOPRIVATE: github.com/descope/*
       with:
-        github_token: ${{ steps.auth.outputs.token }}
+        github_token: ${{ github.token }}
         fail_level: any
         golangci_lint_flags: "--config=./scripts/lint/.golangci.yml"
         filter_mode: nofilter

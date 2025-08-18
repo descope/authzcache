@@ -48,4 +48,4 @@ runs:
         type: lcov
         result_path: coverage.lcov
         min_coverage: ${{ inputs.min_coverage }}
-        token: ${{ steps.setup.outputs.token }}
+        token: ${{ github.token }}
