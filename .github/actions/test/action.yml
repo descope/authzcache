@@ -4,10 +4,6 @@ inputs:
   min_coverage:
     description: "Minimum coverage"
     required: true
-  go_version:
-    description: "Go version to use (optional, will read from go.mod if not provided)"
-    required: false
-    default: ""
 
 runs:
   using: "composite"

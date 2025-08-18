@@ -2,10 +2,6 @@ name: Pack and Upload
 description: "Pack and Upload"
 
 inputs:
-  go_version:
-    description: "Go version to use (optional, will read from go.mod if not provided)"
-    required: false
-    default: ""
   ecr_aws_account:
     description: "AWS account for ECR images"
     required: false

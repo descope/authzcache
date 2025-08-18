@@ -1,12 +1,6 @@
 name: Run Security Checks
 description: "Run Security Checks"
 
-inputs:
-  go_version:
-    description: "Go version to use (optional, will read from go.mod if not provided)"
-    required: false
-    default: ""
-
 runs:
   using: "composite"
   steps:

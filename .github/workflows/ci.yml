@@ -53,7 +53,6 @@ jobs:
         with:
           min_coverage: "80"
         env:
-          GO_VERSION: ${{ env.GO_VERSION }}
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
           RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
           RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
