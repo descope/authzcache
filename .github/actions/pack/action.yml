@@ -3,8 +3,9 @@ description: "Pack and Upload"
 
 inputs:
   go_version:
-    description: "Go version to use"
+    description: "Go version to use (optional, will read from go.mod if not provided)"
     required: false
+    default: ""
   ecr_aws_account:
     description: "AWS account for ECR images"
     required: false
@@ -56,10 +57,7 @@ runs:
   steps:
     - name: Setup
       id: setup
-      if: ${{ inputs.go_version }}
       uses: ./.github/actions/setup
-      with:
-        go_version: ${{ inputs.go_version }}
 
     - name: Setup build args
       id: setup_build_args

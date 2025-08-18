@@ -3,17 +3,20 @@ description: "Run Security Checks"
 
 inputs:
   go_version:
-    description: "Go version to use"
-    required: true
+    description: "Go version to use (optional, will read from go.mod if not provided)"
+    required: false
+    default: ""
 
 runs:
   using: "composite"
   steps:
     - name: Setup Go
       if: ${{ hashFiles('go.mod') != '' }}
-      uses: ./.github/actions/setup
+      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
       with:
-        go_version: ${{ inputs.go_version }}
+        go-version-file: go.mod
+        cache: true
+        check-latest: true
     - name: Setup NodeJS if package.json exists
       if: ${{ hashFiles('package.json') != '' }}
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0

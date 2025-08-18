@@ -55,7 +55,6 @@ jobs:
         uses: ./.github/actions/test
         with:
           min_coverage: "80"
-          go_version: ${{ env.GO_VERSION }}
         env:
           GO_VERSION: ${{ env.GO_VERSION }}
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
@@ -73,8 +72,6 @@ jobs:
 
       - name: Security
         uses: ./.github/actions/security
-        with:
-          go_version: ${{ env.GO_VERSION }}
         env:
           GO_VERSION: ${{ env.GO_VERSION }}
           RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
@@ -95,8 +92,6 @@ jobs:
 
       - name: Pack and Upload
         uses: ./.github/actions/pack
-        with:
-          go_version: ${{ env.GO_VERSION }}
         env:
           RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
           RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}

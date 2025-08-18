@@ -5,8 +5,9 @@ inputs:
     description: "Minimum coverage"
     required: true
   go_version:
-    description: "Go version to use"
-    required: true
+    description: "Go version to use (optional, will read from go.mod if not provided)"
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -14,8 +15,6 @@ runs:
     - name: Setup
       uses: ./.github/actions/setup
       id: setup
-      with:
-        go_version: ${{ inputs.go_version }}
     - name: Start services
       shell: bash
       run: |

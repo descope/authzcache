@@ -2,8 +2,9 @@ name: Setup repo
 description: "Setup repo"
 inputs:
   go_version:
-    description: "Go version to use"
-    required: true
+    description: "Go version to use (optional, will read from go.mod if not provided)"
+    required: false
+    default: ""
   run_go_mod_tidy:
     description: "Run go mod tidy"
     required: false
@@ -29,7 +30,7 @@ runs:
         # do not error on existing files
         TAR_OPTIONS: --skip-old-files
       with:
-        go-version: ${{ inputs.go_version }}
+        go-version-file: go.mod
         cache: true
         check-latest: true
 
