@@ -3,7 +3,6 @@ name: CI
 on: push
 
 env:
-  GO_VERSION: ${{ vars.GO_VERSION || '1.21' }}
   DATABASE_PASSWORD: passwordless
 
 jobs:
