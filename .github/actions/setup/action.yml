@@ -4,12 +4,6 @@ inputs:
   go_version:
     description: "Go version to use"
     required: true
-  APP_PEM:
-    description: "Github App Key"
-    required: true
-  APP_ID:
-    description: "Github App ID"
-    required: true
   run_go_mod_tidy:
     description: "Run go mod tidy"
     required: false
@@ -26,8 +20,8 @@ runs:
       id: get_token
       uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a # v2.1.0
       with:
-        private_key: ${{ inputs.APP_PEM }}
-        app_id: ${{ inputs.APP_ID }}
+        private_key: ${{ env.RELEASE_APP_PEM }}
+        app_id: ${{ env.RELEASE_APP_ID }}
 
     - name: Set up Go
       uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0

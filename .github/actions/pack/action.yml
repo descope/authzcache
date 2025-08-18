@@ -9,12 +9,6 @@ inputs:
     description: "AWS account for ECR images"
     required: false
     default: "601853031418"
-  APP_PEM:
-    description: "Github App Key"
-    required: true
-  APP_ID:
-    description: "Github App ID"
-    required: true
   build_args:
     description: "Extra build args"
     required: false
@@ -66,8 +60,6 @@ runs:
       uses: ./.github/actions/setup
       with:
         go_version: ${{ inputs.go_version }}
-        APP_PEM: ${{ inputs.APP_PEM }}
-        APP_ID: ${{ inputs.APP_ID }}
 
     - name: Setup build args
       id: setup_build_args

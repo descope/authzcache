@@ -11,12 +11,6 @@ inputs:
     description: "Scripts folder"
     required: false
     default: "."
-  APP_PEM:
-    description: "Github App Key"
-    required: true
-  APP_ID:
-    description: "Github App ID"
-    required: true
 
 runs:
   using: "composite"
@@ -26,8 +20,6 @@ runs:
       id: setup
       with:
         go_version: ${{ inputs.go_version }}
-        APP_PEM: ${{ inputs.APP_PEM }}
-        APP_ID: ${{ inputs.APP_ID }}
     - name: Start services
       shell: bash
       run: |
