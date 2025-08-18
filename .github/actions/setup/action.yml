@@ -1,10 +1,6 @@
 name: Setup repo
 description: "Setup repo"
 inputs:
-  go_version:
-    description: "Go version to use (optional, will read from go.mod if not provided)"
-    required: false
-    default: ""
   run_go_mod_tidy:
     description: "Run go mod tidy"
     required: false
