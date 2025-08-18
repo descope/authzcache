@@ -1,0 +1,23 @@
+name: Auth Setup
+description: "Generate GitHub App token and configure Git for private repos"
+
+outputs:
+  token:
+    description: "Generated GitHub App token"
+    value: ${{ steps.app-token.outputs.token }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate GitHub App Token
+      id: app-token
+      uses: actions/create-github-app-token@5d869da34e18e7287c1daad50e0b8ea0f506ce69 # v1.11.0
+      with:
+        app-id: ${{ env.RELEASE_APP_ID }}
+        private-key: ${{ env.RELEASE_APP_PEM }}
+        owner: descope
+
+    - name: Configure Git for private repos
+      run: |
+        git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/descope".insteadOf "https://github.com/descope"
+      shell: bash
