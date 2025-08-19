@@ -5,13 +5,13 @@ go 1.24.3
 toolchain go1.24.5
 
 require (
-	github.com/descope/common v0.0.9-0.20250807220923-5060fab910b0
-	github.com/descope/go-sdk v1.6.14
+	github.com/descope/common v0.0.9-0.20250819074221-dfca97fae848
+	github.com/descope/go-sdk v1.6.16
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250528231433-f1797c28592e
 	github.com/descope/protoc-gen-validate v1.6.4
 	github.com/stretchr/testify v1.10.0
-	google.golang.org/grpc v1.74.1
+	google.golang.org/grpc v1.74.2
 	google.golang.org/protobuf v1.36.6
 )
 
@@ -69,7 +69,7 @@ require (
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
-	github.com/descope/authzservice v0.0.0-20250727165147-ef86abc2596d
+	github.com/descope/authzservice v0.0.0-20250811182338-285e22ae232a
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eapache/queue/v2 v2.0.0-20230407133247-75960ed334e4 // indirect
@@ -104,7 +104,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/nyaruka/phonenumbers v1.6.3 // indirect
+	github.com/nyaruka/phonenumbers v1.6.4 // indirect
 	github.com/outcaste-io/ristretto v0.2.3 // indirect
 	github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
