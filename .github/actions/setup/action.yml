@@ -1,0 +1,50 @@
+name: Setup repo
+description: "Setup repo"
+inputs:
+  run_go_mod_tidy:
+    description: "Run go mod tidy"
+    required: false
+    default: "true"
+outputs:
+  token:
+    description: "GitHub access token"
+    value: ${{ steps.get_token.outputs.token }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Get token
+      id: get_token
+      uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a # v2.1.0
+      with:
+        private_key: ${{ env.RELEASE_APP_PEM }}
+        app_id: ${{ env.RELEASE_APP_ID }}
+
+    - name: Set up Go
+      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      env:
+        # do not error on existing files
+        TAR_OPTIONS: --skip-old-files
+      with:
+        go-version-file: go.mod
+        cache: true
+        check-latest: true
+
+    - name: Go mod and diff check
+      if: ${{ inputs.run_go_mod_tidy == 'true' }}
+      env:
+        TOKEN: ${{ steps.get_token.outputs.token }}
+      run: |
+        git config --global url."https://x-access-token:${TOKEN}@github.com/descope".insteadOf "https://github.com/descope"
+        go mod download
+        go mod verify
+        go mod tidy -diff
+        go mod vendor
+        result1=$(git status --porcelain | { grep go.sum || true; })
+        result2=$(git status --porcelain | { grep go.mod || true; })
+        if [ ! -z "$result1" ] || [ ! -z "$result2" ]
+        then
+          echo "::error::go.sum or go.mod are outdated, you need to run \"rm -r go.sum && go mod tidy && go mod vendor\" locally and commit the changes"
+          exit 1
+        fi
+      shell: bash

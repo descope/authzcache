@@ -1,0 +1,114 @@
+run:
+  # timeout for analysis, e.g. 30s, 5m, default is 1m
+  timeout: 3m
+
+# all available settings of specific linters
+linters-settings:
+  gofmt:
+    # simplify code: gofmt with `-s` option, true by default
+    simplify: false
+  depguard:
+    rules:
+      packages-with-error-message:
+        files:
+          - "!**/masker/masker.go"
+        deny:
+          - pkg: "github.com/ggwhite/go-masker"
+            desc: "masking is allowed only by github.com/descope/common/pkg/common/masker"
+          - pkg: "github.com/sirupsen/logrus"
+            desc: "logging is allowed only with zerolog"
+          - pkg: "log"
+            desc: "logging is allowed only with zerolog"
+          - pkg: "github.com/golang/protobuf"
+            desc: "github.com/golang/protobuf is deprecated you should use google.golang.org/protobuf instead"
+  forbidigo:
+    # Do not allow identifiers
+    forbid:
+      - 'fmt\.Print.*(# Do not commit print statements\.)?'
+      - 'fmt\.Error.*(# Do not commit fmt error statements\.)?'
+      - 'errors\.New$(# Do not create new errors from the standard go errors package\.)?'
+      - 'json\.Marshal.*(# Use utils\.Marshal\.)?'
+      - 'json\.Unmarshal.*(# Use utils\.Unmarshal\.)?'
+      - '\.Msgf.*(# Do not use message formatting\.)?'
+    exclude-godoc-examples: true
+  revive:
+    # minimal confidence for issues, default is 0.8
+    confidence: 0.8
+    rules:
+      - name: defer
+        arguments: [["loop", "return"]]
+      - name: blank-imports
+      - name: context-as-argument
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: increment-decrement
+      - name: var-naming
+      - name: range
+      - name: receiver-naming
+      - name: indent-error-flow
+      - name: superfluous-else
+      - name: unreachable-code
+      - name: unused-parameter
+      - name: unconditional-recursion
+      - name: waitgroup-by-value
+      - name: duplicated-imports
+      - name: unreachable-code
+      - name: context-keys-type # Might cause slowness in lint
+      - name: time-naming # Might cause slowness in lint
+      - name: var-declaration # Might cause slowness in lint
+      - name: errorf # Might cause slowness in lint
+
+  govet:
+    # report about shadowed variables
+    #check-shadowing: true
+
+    # settings per analyzer
+    settings:
+      printf: # analyzer name, run `go tool vet help` to see all analyzers
+        funcs: # run `go tool vet help printf` to see available settings for `printf` analyzer
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+
+    # enable or disable analyzers by name
+    enable:
+      - atomicalign
+    enable-all: false
+    disable:
+      - shadow
+      - composites
+      - testinggoroutine
+    disable-all: false
+
+  gosec:
+    exclude-generated: true
+    excludes:
+      - "G104"
+
+linters:
+  enable:
+    - revive
+    - govet
+    - gofmt
+    - goimports
+    - godox
+    - depguard
+    - forbidigo
+    - gosec
+  disable-all: true
+
+issues:
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  # exclude-rules:
+
+  # Independently from option `exclude` we use default exclude patterns,
+  # it can be disabled by this option. To list all
+  # excluded by default patterns execute `golangci-lint run --help`.
+  # Default value for this option is true.
+  exclude-use-default: false
+
+  # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
+  max-issues-per-linter: 0
