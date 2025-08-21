@@ -5,7 +5,7 @@ go 1.24.3
 toolchain go1.24.5
 
 require (
-	github.com/descope/common v0.0.9-0.20250820092339-4124a2205ef3
+	github.com/descope/common v0.0.9-0.20250821184106-8f0d5e13a0ac
 	github.com/descope/go-sdk v1.6.16
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250528231433-f1797c28592e
@@ -64,7 +64,7 @@ require (
 	github.com/DataDog/opentelemetry-mapping-go/pkg/otlp/attributes v0.26.0 // indirect
 	github.com/DataDog/sketches-go v1.4.7 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/aws/aws-sdk-go v1.55.7 // indirect
+	github.com/aws/aws-sdk-go v1.55.8 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575 // indirect
