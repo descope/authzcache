@@ -769,8 +769,8 @@ github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvw
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
 github.com/descope/authzservice v0.0.0-20250820214814-47d9fe93f042 h1:BbttF1rNEcZCl/l3y5UtRoI33EtFL8vkkwXo3Pd9GkM=
 github.com/descope/authzservice v0.0.0-20250820214814-47d9fe93f042/go.mod h1:+CVNzOx4L0HsVg6OYeD99tuVCZk/KBOtH9S7EUk+4Po=
-github.com/descope/common v0.0.9-0.20250826110900-d84925af8a02 h1:Nj6lvT/QVDoOdLEj+1Ho0us87a3JtkR5pqJiIaBj7z4=
-github.com/descope/common v0.0.9-0.20250826110900-d84925af8a02/go.mod h1:FpcQLbooYYAilgc6Ux4fQ29WtjgPcpHe0qbLLRPXkTU=
+github.com/descope/common v0.0.9-0.20250826171401-d70e6b42a4b9 h1:TgXYOCuUgXd/KZmmwH8gjDOBYcH58FXvr/HppMbIAHo=
+github.com/descope/common v0.0.9-0.20250826171401-d70e6b42a4b9/go.mod h1:9PfHO5Z1nErDP2Uzi6s2Ai2Kea3tnVfb4mBns9j+9Qg=
 github.com/descope/go-sdk v1.6.16 h1:E+ByxR9Hq2W08bSJ7twr6FFsdJYQ2iJ1hh8A4pt7MIc=
 github.com/descope/go-sdk v1.6.16/go.mod h1:khLMD/1zglkkZCRg6xCA6DI8bXj7wAbZEOonwMrUkF4=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
@@ -1111,8 +1111,8 @@ github.com/puzpuzpuz/xsync/v3 v3.5.1 h1:GJYJZwO6IdxN/IKbneznS6yPkVC+c3zyY/j19c++
 github.com/puzpuzpuz/xsync/v3 v3.5.1/go.mod h1:VjzYrABPabuM4KyBh1Ftq6u8nhwY5tBPKP9jpmh0nnA=
 github.com/rabbitmq/amqp091-go v1.10.0 h1:STpn5XsHlHGcecLmMFCtg7mqq0RnD+zFr4uzukfVhBw=
 github.com/rabbitmq/amqp091-go v1.10.0/go.mod h1:Hy4jKW5kQART1u+JkDTF9YYOQUHXqMuhrgxOEeS7G4o=
-github.com/redis/go-redis/v9 v9.11.0 h1:E3S08Gl/nJNn5vkxd2i78wZxWAPNZgUNTp8WIJUAiIs=
-github.com/redis/go-redis/v9 v9.11.0/go.mod h1:huWgSWd8mW6+m0VPhJjSSQ+d6Nh1VICQ6Q5lHuCH/Iw=
+github.com/redis/go-redis/v9 v9.12.0 h1:XlVPGlflh4nxfhsNXPA8Qp6EmEfTo0rp8oaBzPipXnU=
+github.com/redis/go-redis/v9 v9.12.0/go.mod h1:huWgSWd8mW6+m0VPhJjSSQ+d6Nh1VICQ6Q5lHuCH/Iw=
 github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/richardartoul/molecule v1.0.1-0.20240607132359-c1a75a0f9580 h1:R6vS/Ql+nP6B8/XMBLHp376P/sCGhuiGAFw4kEcSItE=
 github.com/richardartoul/molecule v1.0.1-0.20240607132359-c1a75a0f9580/go.mod h1:vl5+MqJ1nBINuSsUI2mGgH79UweUT/B5Fy8857PqyyI=
