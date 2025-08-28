@@ -5,14 +5,14 @@ go 1.24.3
 toolchain go1.24.6
 
 require (
-	github.com/descope/common v0.0.9-0.20250827212518-4a4266d2655a
+	github.com/descope/common v0.0.9-0.20250828112856-bb641ea1b4b3
 	github.com/descope/go-sdk v1.6.16
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250528231433-f1797c28592e
 	github.com/descope/protoc-gen-validate v1.6.4
 	github.com/stretchr/testify v1.10.0
 	google.golang.org/grpc v1.74.2
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.36.7
 )
 
 require (
