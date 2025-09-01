@@ -19,11 +19,11 @@ require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/DataDog/datadog-agent/comp/core/tagger/origindetection v0.67.0 // indirect
 	github.com/DataDog/datadog-agent/pkg/version v0.67.0 // indirect
-	github.com/DataDog/dd-trace-go/contrib/google.golang.org/grpc/v2 v2.2.2-rc.1 // indirect
-	github.com/DataDog/dd-trace-go/contrib/redis/go-redis.v9/v2 v2.2.2-rc.1 // indirect
-	github.com/DataDog/dd-trace-go/instrumentation/testutils/grpc/v2 v2.2.2-rc.1 // indirect
-	github.com/DataDog/dd-trace-go/v2 v2.2.2-rc.1 // indirect
-	github.com/DataDog/go-libddwaf/v4 v4.3.0 // indirect
+	github.com/DataDog/dd-trace-go/contrib/google.golang.org/grpc/v2 v2.2.2 // indirect
+	github.com/DataDog/dd-trace-go/contrib/redis/go-redis.v9/v2 v2.2.2 // indirect
+	github.com/DataDog/dd-trace-go/instrumentation/testutils/grpc/v2 v2.2.2 // indirect
+	github.com/DataDog/dd-trace-go/v2 v2.2.2 // indirect
+	github.com/DataDog/go-libddwaf/v4 v4.3.2 // indirect
 	github.com/GeorgeD19/json-logic-go v0.0.0-20220225111652-48cc2d2c387e // indirect
 	github.com/Masterminds/semver/v3 v3.3.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
@@ -157,7 +157,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250603155806-513f23925822
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1 // indirect
-	gopkg.in/DataDog/dd-trace-go.v1 v1.74.4
+	gopkg.in/DataDog/dd-trace-go.v1 v1.74.5
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
