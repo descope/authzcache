@@ -70,7 +70,7 @@ require (
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
-	github.com/descope/authzservice v0.0.0-20250830213954-842bc02e834d
+	github.com/descope/authzservice v0.0.0-20250901131012-5fef246b4e33
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eapache/queue/v2 v2.0.0-20230407133247-75960ed334e4 // indirect
