@@ -767,8 +767,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvwDRwnI3hwNaAHRnc=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
-github.com/descope/authzservice v0.0.0-20250902024618-a86d162134aa h1:A+tXs9O4dw97uyWwkeJ8RyskKoZu1iHAseQr/JzYKW4=
-github.com/descope/authzservice v0.0.0-20250902024618-a86d162134aa/go.mod h1:qyZVLF07op/cxrFNAtJPCr0rYuzDSgB1rfLHYDFEvxo=
+github.com/descope/authzservice v0.0.0-20250902185019-b0c961b963da h1:QsynG3ryv+BkG7mFfbpgtTwM7e8fRJNMUcc1uZVTRCM=
+github.com/descope/authzservice v0.0.0-20250902185019-b0c961b963da/go.mod h1:3cn2GZyhwL73XcheITP87HBZpgpEltPk4+fIWBD+HGQ=
 github.com/descope/common v0.0.9-0.20250901200727-25235c8b99a4 h1:tBF1A7+r4EMOIo0mQwcyakgIRNKQaU/Qi3w1Ay4XEwA=
 github.com/descope/common v0.0.9-0.20250901200727-25235c8b99a4/go.mod h1:HE2gikAFK2EFYQyL/OF7dJhZwEvbHRQGapBKX+m4vks=
 github.com/descope/go-sdk v1.6.16 h1:E+ByxR9Hq2W08bSJ7twr6FFsdJYQ2iJ1hh8A4pt7MIc=
@@ -777,8 +777,8 @@ github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZD
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14/go.mod h1:NXzSaAKXU0dil+cxwRcnqgNPdZR0U571aLLqJaRibBw=
 github.com/descope/protoc-gen-mocker v1.0.1-0.20250901175055-e3710ae63ef1 h1:RIpmFsNvNzdziVh/qjCoQSv489CkcUGzGhqpf0YMsQ0=
 github.com/descope/protoc-gen-mocker v1.0.1-0.20250901175055-e3710ae63ef1/go.mod h1:76/vOdnpUC75++51v8yxewJHARIl7eEaW8Nivyn3iX4=
-github.com/descope/protoc-gen-validate v1.6.4 h1:jUuBh+/cj+T7p0t6XrU4EhD8oXQ+oIf/uPDZAIInGu0=
-github.com/descope/protoc-gen-validate v1.6.4/go.mod h1:a/luN44xX7fwhgwOsFn6oMfTERpFPubYCX+HWxvjf94=
+github.com/descope/protoc-gen-validate v1.6.5-0.20250901150145-8e9fd05dc057 h1:fFU8NvMAjuaG9TPDW+ActMYyg6rB1b7UefutltVegjc=
+github.com/descope/protoc-gen-validate v1.6.5-0.20250901150145-8e9fd05dc057/go.mod h1:ws572V2YqtTNFtT/2pUu7Acd6BD4S+fqmjUEecZ8tMM=
 github.com/descope/redismock/v9 v9.0.0-20250302075720-062168c6786d h1:kzcCBScRsXX5WBjNFRSnrw6Ca0/IhoHteddFpQXA4C0=
 github.com/descope/redismock/v9 v9.0.0-20250302075720-062168c6786d/go.mod h1:/Jd4ZxVyyzcve8JkmkKoyC4ZS3QTUMeAJwwXizB7xKw=
 github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2/go.mod h1:SqUrOPUnsFjfmXRMNPybcSiG0BgUW2AuFH8PAnS2iTw=
