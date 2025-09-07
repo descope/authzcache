@@ -134,10 +134,10 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvwDRwnI3hwNaAHRnc=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
-github.com/descope/authzservice v0.0.0-20250907042835-11ffb84b306f h1:/pvfeWc0NeOVO9IVU/4t+6MGlIJjTO8Hp6fu/NnxyFk=
-github.com/descope/authzservice v0.0.0-20250907042835-11ffb84b306f/go.mod h1:n7VzYv/YOfxyCUKwPAbo//BUjU7/WvpHKcnTtXzDkk0=
-github.com/descope/common v0.0.9-0.20250907033754-f76af60fa12c h1:yA2btgImmGV7r4+q/BkwkRw5z9lhiAplDydNwwPLH+g=
-github.com/descope/common v0.0.9-0.20250907033754-f76af60fa12c/go.mod h1:2tChi4glcomDjgCTfq9qD82XNzK07VE2SGBmqKtH1Vg=
+github.com/descope/authzservice v0.0.0-20250907130512-b3a8a6ea8693 h1:HkVO3x9hBWXqo73Y04QV+wjk8Kv+zsWc6R8wulHDoH8=
+github.com/descope/authzservice v0.0.0-20250907130512-b3a8a6ea8693/go.mod h1:4T5H0ObyIabcEJphlvpnyae4lsPjB7y/o2o/zt3ceUU=
+github.com/descope/common v0.0.9-0.20250907134524-746a9afac6d4 h1:maOC4E06Dgu5tBDEB4uxy6u+HLnNcHXXNlj8Eeh+pNw=
+github.com/descope/common v0.0.9-0.20250907134524-746a9afac6d4/go.mod h1:PTcYu3g+xHtSgdnTIlU+KXjtbLn68+UZcmpGpEFgLvE=
 github.com/descope/go-sdk v1.6.17 h1:PnIEi6OugUOh4RA5LrUdH8CZl0UhlPnvgzsOAtrRi2A=
 github.com/descope/go-sdk v1.6.17/go.mod h1:khLMD/1zglkkZCRg6xCA6DI8bXj7wAbZEOonwMrUkF4=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
@@ -485,8 +485,8 @@ golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJ
 golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20210220032951-036812b2e83c/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
-golang.org/x/sync v0.16.0 h1:ycBJEhp9p4vXvUZNszeOq0kGTPghopOL8q0fq3vstxw=
-golang.org/x/sync v0.16.0/go.mod h1:1dzgHSNfp02xaA81J2MS99Qcpr2w7fw1gpm99rleRqA=
+golang.org/x/sync v0.17.0 h1:l60nONMj9l5drqw6jlhIELNv9I0A4OFgRsG9k2oT9Ug=
+golang.org/x/sync v0.17.0/go.mod h1:9KTHXmSnoGruLpwFjVSX0lNNA75CykiMECbovNTZqGI=
 golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20190916202348-b4ddaad3f8a3/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
