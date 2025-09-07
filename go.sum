@@ -134,10 +134,10 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvwDRwnI3hwNaAHRnc=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
-github.com/descope/authzservice v0.0.0-20250904214321-45fed424d63c h1:olobswqC+8pkQXvU56RkjWkk0ohzYt0N0KIZ29e8OLg=
-github.com/descope/authzservice v0.0.0-20250904214321-45fed424d63c/go.mod h1:d6tI0VEga3idAjT3dKQvtcGv2kcZiAW9JaCyDf5Jz84=
-github.com/descope/common v0.0.9-0.20250905150107-7c165d337344 h1:S022FU9cm/f58w5YjWWv0EilS244mAjy5w39wGg9zco=
-github.com/descope/common v0.0.9-0.20250905150107-7c165d337344/go.mod h1:2tChi4glcomDjgCTfq9qD82XNzK07VE2SGBmqKtH1Vg=
+github.com/descope/authzservice v0.0.0-20250907042835-11ffb84b306f h1:/pvfeWc0NeOVO9IVU/4t+6MGlIJjTO8Hp6fu/NnxyFk=
+github.com/descope/authzservice v0.0.0-20250907042835-11ffb84b306f/go.mod h1:n7VzYv/YOfxyCUKwPAbo//BUjU7/WvpHKcnTtXzDkk0=
+github.com/descope/common v0.0.9-0.20250907033754-f76af60fa12c h1:yA2btgImmGV7r4+q/BkwkRw5z9lhiAplDydNwwPLH+g=
+github.com/descope/common v0.0.9-0.20250907033754-f76af60fa12c/go.mod h1:2tChi4glcomDjgCTfq9qD82XNzK07VE2SGBmqKtH1Vg=
 github.com/descope/go-sdk v1.6.17 h1:PnIEi6OugUOh4RA5LrUdH8CZl0UhlPnvgzsOAtrRi2A=
 github.com/descope/go-sdk v1.6.17/go.mod h1:khLMD/1zglkkZCRg6xCA6DI8bXj7wAbZEOonwMrUkF4=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
