@@ -134,10 +134,10 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvwDRwnI3hwNaAHRnc=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
-github.com/descope/authzservice v0.0.0-20250908090441-c1e801911600 h1:Z2AwX/psgEHkvtLMTDV4sts/NqKnkVmZIViv7Mf4cvk=
-github.com/descope/authzservice v0.0.0-20250908090441-c1e801911600/go.mod h1:a5sYqXrkk5mvNRiTH96QtLH21ugDul5XDIoKnLxntEo=
-github.com/descope/common v0.0.9-0.20250908083418-678e0db9a95a h1:2oeLcruf8MMiDJ4JNBSW4Ac2tVyf8QFAOCA1gjjaaLs=
-github.com/descope/common v0.0.9-0.20250908083418-678e0db9a95a/go.mod h1:OLBIZQSHNKjH2BJd7ZLo8Fo6YsuU6T5fzKMcwOCY8qU=
+github.com/descope/authzservice v0.0.0-20250908231518-8ef7a301a051 h1:gd9FJRvN2hJzT/pauBe69mUHXYz4XGQw9vQkmMC4AOY=
+github.com/descope/authzservice v0.0.0-20250908231518-8ef7a301a051/go.mod h1:Aqo8PxrxCTK+bE1rVU6qNul9tfWfhYXor5ke9DCXh80=
+github.com/descope/common v0.0.9-0.20250908221935-91a1c89acb4a h1:drTCfNiRTc/IDVWkpLBUZpyGo766SK3s9/nEX18Ob2c=
+github.com/descope/common v0.0.9-0.20250908221935-91a1c89acb4a/go.mod h1:DRTk3yRqXeNCdAXcjr2a/ot4yYX7+GGQPFM0a7TxyQU=
 github.com/descope/go-sdk v1.6.17 h1:PnIEi6OugUOh4RA5LrUdH8CZl0UhlPnvgzsOAtrRi2A=
 github.com/descope/go-sdk v1.6.17/go.mod h1:khLMD/1zglkkZCRg6xCA6DI8bXj7wAbZEOonwMrUkF4=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
@@ -233,8 +233,8 @@ github.com/hashicorp/golang-lru/v2 v2.0.7 h1:a+bsQ5rvGLjzHuww6tVxozPZFVghXaHOwFs
 github.com/hashicorp/golang-lru/v2 v2.0.7/go.mod h1:QeFd9opnmA6QUJc5vARoKUSoFhyfM2/ZepoAG6RGpeM=
 github.com/iancoleman/strcase v0.3.0 h1:nTXanmYxhfFAMjZL34Ov6gkzEsSJZ5DbhxWjvSASxEI=
 github.com/iancoleman/strcase v0.3.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47ZCWhYzw7ho=
-github.com/jarcoal/httpmock v1.4.0 h1:BvhqnH0JAYbNudL2GMJKgOHe2CtKlzJ/5rWKyp+hc2k=
-github.com/jarcoal/httpmock v1.4.0/go.mod h1:ftW1xULwo+j0R0JJkJIIi7UKigZUXCLLanykgjwBXL0=
+github.com/jarcoal/httpmock v1.4.1 h1:0Ju+VCFuARfFlhVXFc2HxlcQkfB+Xq12/EotHko+x2A=
+github.com/jarcoal/httpmock v1.4.1/go.mod h1:ftW1xULwo+j0R0JJkJIIi7UKigZUXCLLanykgjwBXL0=
 github.com/jmespath/go-jmespath v0.4.0 h1:BEgLn5cpjn8UN1mAw4NjwDrS35OdebyEtFe+9YPoQUg=
 github.com/jmespath/go-jmespath v0.4.0/go.mod h1:T8mJZnbsbmF+m6zOOFylbeCJqk5+pHWvzYPziyZiYoo=
 github.com/jmespath/go-jmespath/internal/testify v1.5.1 h1:shLQSRRSCCPj3f2gpwzGwWFoC7ycTf1rcQZHOlsJ6N8=
