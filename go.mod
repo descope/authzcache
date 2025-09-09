@@ -7,7 +7,7 @@ require (
 	github.com/descope/go-sdk v1.6.17
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250901175055-e3710ae63ef1
-	github.com/descope/protoc-gen-validate v1.6.5-0.20250901150145-8e9fd05dc057
+	github.com/descope/protoc-gen-validate v1.6.5
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.74.2
 	google.golang.org/protobuf v1.36.8
