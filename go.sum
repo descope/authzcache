@@ -35,8 +35,8 @@ github.com/DataDog/datadog-agent/pkg/util/scrubber v0.67.0 h1:aIWF85OKxXGo7rVyqJ
 github.com/DataDog/datadog-agent/pkg/util/scrubber v0.67.0/go.mod h1:Lfap5FuM4b/Pw9IrTuAvWBWZEmXOvZhCya3dYv4G8O0=
 github.com/DataDog/datadog-agent/pkg/version v0.67.0 h1:TB8H8r+laB1Qdttvvc6XJVyLGxp8E6j2f2Mh5IPbYmQ=
 github.com/DataDog/datadog-agent/pkg/version v0.67.0/go.mod h1:kvAw/WbI7qLAsDI2wHabZfM7Cv2zraD3JA3323GEB+8=
-github.com/DataDog/datadog-go/v5 v5.6.0 h1:2oCLxjF/4htd55piM75baflj/KoE6VYS7alEUqFvRDw=
-github.com/DataDog/datadog-go/v5 v5.6.0/go.mod h1:K9kcYBlxkcPP8tvvjZZKs/m1edNAUFzBbdpTUKfCsuw=
+github.com/DataDog/datadog-go/v5 v5.7.1 h1:dNhEwKaO3LJhGYKajl2DjobArfa5R9YF72z3Dy+PH3k=
+github.com/DataDog/datadog-go/v5 v5.7.1/go.mod h1:CA9Ih6tb3jtxk+ps1xvTnxmhjr7ldE8TiwrZyrm31ss=
 github.com/DataDog/dd-trace-go/contrib/google.golang.org/grpc/v2 v2.2.2 h1:P/gnJUX8KBWxOozGr8g+ziE6w4DLNGYageI9eu7xhsk=
 github.com/DataDog/dd-trace-go/contrib/google.golang.org/grpc/v2 v2.2.2/go.mod h1:nbbg9Hmfu+fBPe5uV0IFmhBuNX8+nEadKQBLjPlr4bA=
 github.com/DataDog/dd-trace-go/contrib/redis/go-redis.v9/v2 v2.2.2 h1:0qM2OPHOklJD8GpwmDvtNBOszViMrUbDPIDgCWb+Cvc=
@@ -136,8 +136,8 @@ github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvw
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
 github.com/descope/authzservice v0.0.0-20250910181454-17df6c74fbe7 h1:MjWuPTsarER+djlYfKjjN/jLRXtCa+KHklKmmjDuv/0=
 github.com/descope/authzservice v0.0.0-20250910181454-17df6c74fbe7/go.mod h1:lhO6CI+KMciyMlrUXEr4S5V8bbI/mvBGtNvJifdZ5pc=
-github.com/descope/common v0.0.9-0.20250910151212-559d5468f884 h1:aVes958betmGMwN6bZr7qKMZmbfI7xFmQkwhRk4F2Zo=
-github.com/descope/common v0.0.9-0.20250910151212-559d5468f884/go.mod h1:TlVL3lglEtR6Vv6cRiBpJLkH+WCaeJNeAndzlGILh1s=
+github.com/descope/common v0.0.9-0.20250911120142-9acf3acb785a h1:lpUUe99PUKi2Wxcqm9iDsDH+PlzuoDOL6HlikSdDn+o=
+github.com/descope/common v0.0.9-0.20250911120142-9acf3acb785a/go.mod h1:JJUnvblCnR7YCAZKYj7BT3Fil2mv1R4XwhwgWEjZNgs=
 github.com/descope/go-sdk v1.6.17 h1:PnIEi6OugUOh4RA5LrUdH8CZl0UhlPnvgzsOAtrRi2A=
 github.com/descope/go-sdk v1.6.17/go.mod h1:khLMD/1zglkkZCRg6xCA6DI8bXj7wAbZEOonwMrUkF4=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
