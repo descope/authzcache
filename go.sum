@@ -35,8 +35,8 @@ github.com/DataDog/datadog-agent/pkg/util/scrubber v0.67.0 h1:aIWF85OKxXGo7rVyqJ
 github.com/DataDog/datadog-agent/pkg/util/scrubber v0.67.0/go.mod h1:Lfap5FuM4b/Pw9IrTuAvWBWZEmXOvZhCya3dYv4G8O0=
 github.com/DataDog/datadog-agent/pkg/version v0.67.0 h1:TB8H8r+laB1Qdttvvc6XJVyLGxp8E6j2f2Mh5IPbYmQ=
 github.com/DataDog/datadog-agent/pkg/version v0.67.0/go.mod h1:kvAw/WbI7qLAsDI2wHabZfM7Cv2zraD3JA3323GEB+8=
-github.com/DataDog/datadog-go/v5 v5.7.1 h1:dNhEwKaO3LJhGYKajl2DjobArfa5R9YF72z3Dy+PH3k=
-github.com/DataDog/datadog-go/v5 v5.7.1/go.mod h1:CA9Ih6tb3jtxk+ps1xvTnxmhjr7ldE8TiwrZyrm31ss=
+github.com/DataDog/datadog-go/v5 v5.8.0 h1:pKZtux5CfqkqGYGvKCM3wV5i8sYAzcddK7nkrChUtxo=
+github.com/DataDog/datadog-go/v5 v5.8.0/go.mod h1:K9kcYBlxkcPP8tvvjZZKs/m1edNAUFzBbdpTUKfCsuw=
 github.com/DataDog/dd-trace-go/contrib/google.golang.org/grpc/v2 v2.2.3 h1:458Gxh1tnuHlEpcOlGDsqWF6+6loPaulp9jU6+Bc7Bc=
 github.com/DataDog/dd-trace-go/contrib/google.golang.org/grpc/v2 v2.2.3/go.mod h1:iZRCzAegAdFKY4411LDs+gdXb64/b+6t0KnOk0mpC6c=
 github.com/DataDog/dd-trace-go/contrib/redis/go-redis.v9/v2 v2.2.3 h1:Yo2xu7B4w7/hotAzORYtQZUjn5K4zXlBAl7upU/QCuQ=
@@ -136,10 +136,10 @@ github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvw
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
 github.com/descope/authzservice v0.0.0-20251005195115-2de2095e9cae h1:ziBuYVPuvfU8/64ifVLV27KGkv9ybED0tFKHzohcFJw=
 github.com/descope/authzservice v0.0.0-20251005195115-2de2095e9cae/go.mod h1:IEgKivcdHm4tWHf3fCO59eaCHs0xbf4nVA9a/ydethQ=
-github.com/descope/common v0.0.9-0.20251005211113-94fb01c125cd h1:xb9THfNo2jfM0b5RJADS2LpKhuX3WqPbp//FHemDitU=
-github.com/descope/common v0.0.9-0.20251005211113-94fb01c125cd/go.mod h1:ZnyVJRRr9A4R4ZPdTWUf62jOlFEolx+v0hCBcYvzUGA=
-github.com/descope/go-sdk v1.6.19 h1:4mj96rRm9oUwyWF1V1phwLVBk4zBhHEl5A19q1+x8ac=
-github.com/descope/go-sdk v1.6.19/go.mod h1:TQT6qC1ajRVdnrte8aS4Ny4+18wwRRogfY5qtp52XpU=
+github.com/descope/common v0.0.9-0.20251026093306-fe8747fba650 h1:F8zLTZOwU2ncE67Z2KOt4wY5BtCyq/NCn8+HXGt/Dms=
+github.com/descope/common v0.0.9-0.20251026093306-fe8747fba650/go.mod h1:eLJxKx6XYSlaOzlvW7whMILlu3i9FW8eTd1dMAd6UtI=
+github.com/descope/go-sdk v1.6.20 h1:tfoisfxLPqeXvtudv8fl1FB6hRtIyvc7QClygRCUDtg=
+github.com/descope/go-sdk v1.6.20/go.mod h1:TQT6qC1ajRVdnrte8aS4Ny4+18wwRRogfY5qtp52XpU=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14/go.mod h1:NXzSaAKXU0dil+cxwRcnqgNPdZR0U571aLLqJaRibBw=
 github.com/descope/protoc-gen-mocker v1.0.1-0.20250901175055-e3710ae63ef1 h1:RIpmFsNvNzdziVh/qjCoQSv489CkcUGzGhqpf0YMsQ0=
@@ -323,8 +323,8 @@ github.com/puzpuzpuz/xsync/v3 v3.5.1 h1:GJYJZwO6IdxN/IKbneznS6yPkVC+c3zyY/j19c++
 github.com/puzpuzpuz/xsync/v3 v3.5.1/go.mod h1:VjzYrABPabuM4KyBh1Ftq6u8nhwY5tBPKP9jpmh0nnA=
 github.com/rabbitmq/amqp091-go v1.10.0 h1:STpn5XsHlHGcecLmMFCtg7mqq0RnD+zFr4uzukfVhBw=
 github.com/rabbitmq/amqp091-go v1.10.0/go.mod h1:Hy4jKW5kQART1u+JkDTF9YYOQUHXqMuhrgxOEeS7G4o=
-github.com/redis/go-redis/v9 v9.14.0 h1:u4tNCjXOyzfgeLN+vAZaW1xUooqWDqVEsZN0U01jfAE=
-github.com/redis/go-redis/v9 v9.14.0/go.mod h1:huWgSWd8mW6+m0VPhJjSSQ+d6Nh1VICQ6Q5lHuCH/Iw=
+github.com/redis/go-redis/v9 v9.15.1 h1:BVn5z3pdIKIr5WI4Yv1MRXslB616gqBLBgVmhykiHIw=
+github.com/redis/go-redis/v9 v9.15.1/go.mod h1:u410H11HMLoB+TP67dz8rL9s6QW2j76l0//kSOd3370=
 github.com/richardartoul/molecule v1.0.1-0.20240607132359-c1a75a0f9580 h1:R6vS/Ql+nP6B8/XMBLHp376P/sCGhuiGAFw4kEcSItE=
 github.com/richardartoul/molecule v1.0.1-0.20240607132359-c1a75a0f9580/go.mod h1:vl5+MqJ1nBINuSsUI2mGgH79UweUT/B5Fy8857PqyyI=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
@@ -546,8 +546,8 @@ google.golang.org/grpc/examples v0.0.0-20230913203803-9deee9ba5f5b h1:Vtx2pOV8oN
 google.golang.org/grpc/examples v0.0.0-20230913203803-9deee9ba5f5b/go.mod h1:GGFp5xqHkVYOZBc9//ZnLinno7HB6j97fG1nL3au94o=
 google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
 google.golang.org/protobuf v1.33.0/go.mod h1:c6P6GXX6sHbq/GpV6MGZEdwhWPcYBgnhAHhKbcUYpos=
-google.golang.org/protobuf v1.36.9 h1:w2gp2mA27hUeUzj9Ex9FBjsBm40zfaDtEWow293U7Iw=
-google.golang.org/protobuf v1.36.9/go.mod h1:fuxRtAxBytpl4zzqUh6/eyUujkJdNiuEkXntxiD/uRU=
+google.golang.org/protobuf v1.36.10 h1:AYd7cD/uASjIL6Q9LiTjz8JLcrh/88q5UObnmY3aOOE=
+google.golang.org/protobuf v1.36.10/go.mod h1:HTf+CrKn2C3g5S8VImy6tdcUvCska2kB7j23XfzDpco=
 gopkg.in/DataDog/dd-trace-go.v1 v1.74.6 h1:VBxCK/WkaNjsM9Ygn57scwmiwMqF0gEbuE4C5c2TU5E=
 gopkg.in/DataDog/dd-trace-go.v1 v1.74.6/go.mod h1:jQL1vSDZhH+DJWUOYjkRQ+kU1HUXPvUK41gS1AvHOTE=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
