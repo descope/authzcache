@@ -39,7 +39,7 @@ For a locally run Docker container (as shown above) the URL will typically be `h
 
 Example code snippet:
 ```go
-...
+// Package declaration and imports would go here
 
   // Replace placeholders with your actual values.
   const (
