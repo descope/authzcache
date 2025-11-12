@@ -29,7 +29,7 @@ docker run -d \
 
 ## Health Check
 The service exposes health check endpoints for container orchestration:
-- HTTP: `GET http://localhost:8189/health`
+- HTTP: `GET http://localhost:8189/healthz`
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
