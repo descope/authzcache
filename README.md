@@ -7,6 +7,7 @@ Run the service with Docker:
 docker run -d \
   --name authzcache \
   -p 8189:8189 \
+  -e HTTP_HOST=0.0.0.0 \
   -e DESCOPE_MANAGEMENT_KEY=your_management_key_here \
   descope/authzcache:latest
 ```
