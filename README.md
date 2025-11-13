@@ -31,6 +31,41 @@ docker run -d \
 The service exposes health check endpoints for container orchestration:
 - HTTP: `GET http://localhost:8189/healthz`
 
+
+## Using From Your Application (Go Example)
+To have the Descope SDK use this cache container for accelerating FGA checks, pass its URL via the `FGACacheURL` configuration field when initializing your Descope SDK client. Point the URL to the running container/service inside your local environment or cluster.
+
+For a locally run Docker container (as shown above) the URL will typically be `http://localhost:8189` (or the mapped host/port you selected). In Kubernetes or another orchestrator, use the internal service DNS name, e.g. `http://authzcache.default.svc.cluster.local:8189`.
+
+Example code snippet:
+```go
+// Package declaration and imports would go here
+
+  // Replace placeholders with your actual values.
+  const (
+    YourProjectID                     = "your-project-id"
+    YourFGAReadWriteApprovedMGMTKey   = "your-management-key" // must have proper FGA permissions
+    URLToThisContainer                = "http://localhost:8189" // or cluster service URL
+  )
+
+  // Initialize the Descope SDK client with the AuthZ cache URL.
+  err := client.InitDescopeSDKClient(ctx, &azcf.DescopeSDKClientConfig{
+    ProjectID:    YourProjectID,
+    MgmtKey:      YourFGAReadWriteApprovedMGMTKey,
+    FGACacheURL:  URLToThisContainer,
+  })
+  if err != nil {
+    panic(err)
+  }
+
+  // Continue with your application logic...
+}
+```
+
+Notes:
+- Ensure the container is reachable from where your code runs (network policy / firewall / service mesh settings).
+- The cache automatically syncs with remote authorization data based on the polling interval environment variable.
+
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
