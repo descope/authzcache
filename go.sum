@@ -136,8 +136,8 @@ github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvw
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
 github.com/descope/authzservice v0.0.0-20251118162147-c3b1ad526590 h1:23UVYG//1JCUjIBP4MhwPz8Y4JwTOj0fwY8OJANBdx4=
 github.com/descope/authzservice v0.0.0-20251118162147-c3b1ad526590/go.mod h1:QMlaB1GbSOV4NHREpfKqlTpn4E25K7eL8ZDtl6m4fMQ=
-github.com/descope/common v0.0.9-0.20251118150449-19757f74b758 h1:YSrjKcVbH8MuFAO+XJvJR8vchHKcJJ5WbUFf5VyOmNo=
-github.com/descope/common v0.0.9-0.20251118150449-19757f74b758/go.mod h1:pVxBFxhBMooCMTEJMsNA5SroLnrKM+iKuy664LEHIFI=
+github.com/descope/common v0.0.9-0.20251118172205-196917ba733b h1:ryTa6wtnHkq08EnFbqRjXW7CvBkV1qmmcYbVXLTBzC0=
+github.com/descope/common v0.0.9-0.20251118172205-196917ba733b/go.mod h1:CM3VpUnNCnHiqx9Wnz+dgW3qymNFLq+Y2xooiIHwTWs=
 github.com/descope/go-sdk v1.6.21 h1:QS6EnDHrUs1+26+cqqc22QVp3SFmOztrLui5ZB0IdB0=
 github.com/descope/go-sdk v1.6.21/go.mod h1:C24zAs76uTyLcFjhvBJd5X8QL+wdbSJ86GUJVFJ8Pvo=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
@@ -321,8 +321,8 @@ github.com/puzpuzpuz/xsync/v3 v3.5.1 h1:GJYJZwO6IdxN/IKbneznS6yPkVC+c3zyY/j19c++
 github.com/puzpuzpuz/xsync/v3 v3.5.1/go.mod h1:VjzYrABPabuM4KyBh1Ftq6u8nhwY5tBPKP9jpmh0nnA=
 github.com/rabbitmq/amqp091-go v1.10.0 h1:STpn5XsHlHGcecLmMFCtg7mqq0RnD+zFr4uzukfVhBw=
 github.com/rabbitmq/amqp091-go v1.10.0/go.mod h1:Hy4jKW5kQART1u+JkDTF9YYOQUHXqMuhrgxOEeS7G4o=
-github.com/redis/go-redis/v9 v9.15.1 h1:BVn5z3pdIKIr5WI4Yv1MRXslB616gqBLBgVmhykiHIw=
-github.com/redis/go-redis/v9 v9.15.1/go.mod h1:u410H11HMLoB+TP67dz8rL9s6QW2j76l0//kSOd3370=
+github.com/redis/go-redis/v9 v9.16.0 h1:OotgqgLSRCmzfqChbQyG1PHC3tLNR89DG4jdOERSEP4=
+github.com/redis/go-redis/v9 v9.16.0/go.mod h1:u410H11HMLoB+TP67dz8rL9s6QW2j76l0//kSOd3370=
 github.com/richardartoul/molecule v1.0.1-0.20240607132359-c1a75a0f9580 h1:R6vS/Ql+nP6B8/XMBLHp376P/sCGhuiGAFw4kEcSItE=
 github.com/richardartoul/molecule v1.0.1-0.20240607132359-c1a75a0f9580/go.mod h1:vl5+MqJ1nBINuSsUI2mGgH79UweUT/B5Fy8857PqyyI=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
