@@ -35,12 +35,6 @@ github.com/DataDog/datadog-agent/pkg/version v0.67.0 h1:TB8H8r+laB1Qdttvvc6XJVyL
 github.com/DataDog/datadog-agent/pkg/version v0.67.0/go.mod h1:kvAw/WbI7qLAsDI2wHabZfM7Cv2zraD3JA3323GEB+8=
 github.com/DataDog/datadog-go/v5 v5.8.1 h1:+GOES5W9zpKlhwHptZVW2C0NLVf7ilr7pHkDcbNvpIc=
 github.com/DataDog/datadog-go/v5 v5.8.1/go.mod h1:K9kcYBlxkcPP8tvvjZZKs/m1edNAUFzBbdpTUKfCsuw=
-github.com/DataDog/dd-trace-go/contrib/google.golang.org/grpc/v2 v2.3.0 h1:RsG7ikiDzqb4hsDTA/aBi4JNNvt/llHMa49Bs/nSVEo=
-github.com/DataDog/dd-trace-go/contrib/google.golang.org/grpc/v2 v2.3.0/go.mod h1:eMKB0CndZdKT524xCVVYEcQ5Kq+IS1MDrtKKMU2QHOk=
-github.com/DataDog/dd-trace-go/contrib/redis/go-redis.v9/v2 v2.3.0 h1:8tSwz+Gw6SinAwq+LwLWE3lIhmv0Fk3sBFm7OVfBVDA=
-github.com/DataDog/dd-trace-go/contrib/redis/go-redis.v9/v2 v2.3.0/go.mod h1:200367pWlBj4AC/IeHe8Lg+2LACl9/IVx6KJPMuT8cM=
-github.com/DataDog/dd-trace-go/instrumentation/testutils/grpc/v2 v2.3.0 h1:gxVxT7zwQUillsY+3d1jkxvSuDA1QVyWzIepu3/f36E=
-github.com/DataDog/dd-trace-go/instrumentation/testutils/grpc/v2 v2.3.0/go.mod h1:UiNTJGDbbpmR+b14itm6f/bkBOGQBXHDkw6VU9VhrE0=
 github.com/DataDog/dd-trace-go/v2 v2.3.0 h1:0Y5kx+Wbod0z8moY0vUbKl6OM0oIV4zAynsVmsq+XT8=
 github.com/DataDog/dd-trace-go/v2 v2.3.0/go.mod h1:yFomJ/rqKNLDbS9ohIDibdz8q9GK0MUSSkBdVDCibGA=
 github.com/DataDog/go-libddwaf/v4 v4.3.2 h1:YGvW2Of1C4e1yU+p7iibmhN2zEOgi9XEchbhQjBxb/A=
@@ -136,8 +130,8 @@ github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvw
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
 github.com/descope/authzservice v0.0.0-20251126120526-93647285aab9 h1:waa8gVZdFpOIyLI0vq6kjLi9qPCEIb0RpM8SxIlOqUc=
 github.com/descope/authzservice v0.0.0-20251126120526-93647285aab9/go.mod h1:nBqEbj3oWnX8WtNeNFpBSZsy0StHMY8tk9p77pGFpzQ=
-github.com/descope/common v0.0.9-0.20251126094329-4e1d5b072bd6 h1:Z3sYRV0T1vmtLHS64WRY/woJiRUx8im06vLEiQf2X2U=
-github.com/descope/common v0.0.9-0.20251126094329-4e1d5b072bd6/go.mod h1:3x4mMDmsTElDnnoTDTWUIR486JRDKFWOOyHWFZZDRAI=
+github.com/descope/common v0.0.9-0.20251126142705-7aebd68950b0 h1:YvBHtaGB+tDt7jW8z83dsuwq8CPy5w2ZNx9/2dRvDwQ=
+github.com/descope/common v0.0.9-0.20251126142705-7aebd68950b0/go.mod h1:akqjymAgxl3qCOy6MUHYBFxI0S560Tr6P2gKBkiJ7KM=
 github.com/descope/go-sdk v1.6.21 h1:QS6EnDHrUs1+26+cqqc22QVp3SFmOztrLui5ZB0IdB0=
 github.com/descope/go-sdk v1.6.21/go.mod h1:C24zAs76uTyLcFjhvBJd5X8QL+wdbSJ86GUJVFJ8Pvo=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
