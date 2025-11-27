@@ -3,7 +3,7 @@ module github.com/descope/authzcache
 go 1.24.6
 
 require (
-	github.com/descope/common v0.0.9-0.20251126142705-7aebd68950b0
+	github.com/descope/common v0.0.9-0.20251127140816-bf64a8ba1375
 	github.com/descope/go-sdk v1.6.21
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20250901175055-e3710ae63ef1
@@ -43,7 +43,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
-	github.com/descope/authzservice v0.0.0-20251126232140-4140ff532992
+	github.com/descope/authzservice v0.0.0-20251127145704-346e19f99a21
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/ggwhite/go-masker/v2 v2.1.0 // indirect
