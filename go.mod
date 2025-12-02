@@ -43,7 +43,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
-	github.com/descope/authzservice v0.0.0-20251201212650-e08b9018f748
+	github.com/descope/authzservice v0.0.0-20251202091346-af7e39453068
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/ggwhite/go-masker/v2 v2.1.0 // indirect
