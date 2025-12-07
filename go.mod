@@ -3,11 +3,11 @@ module github.com/descope/authzcache
 go 1.24.6
 
 require (
-	github.com/descope/common v0.0.9-0.20251203223019-ab1373beab2a
+	github.com/descope/common v0.0.9-0.20251207003500-22e21babce2c
 	github.com/descope/go-sdk v1.6.21
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
-	github.com/descope/protoc-gen-mocker v1.0.1-0.20250901175055-e3710ae63ef1
-	github.com/descope/protoc-gen-validate v1.6.6-0.20251202161808-3475daf2f42c
+	github.com/descope/protoc-gen-mocker v1.0.1-0.20251205054330-d101601d3c6d
+	github.com/descope/protoc-gen-validate v1.6.6-0.20251205011043-243d36765067
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.76.0
 	google.golang.org/protobuf v1.36.10
@@ -43,7 +43,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
-	github.com/descope/authzservice v0.0.0-20251203025157-19a8e7798373
+	github.com/descope/authzservice v0.0.0-20251205030228-97a1e6241c06
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/ggwhite/go-masker/v2 v2.1.0 // indirect
