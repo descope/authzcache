@@ -22,6 +22,10 @@ type remoteChangesTracking struct {
 	remotePollingInterval time.Duration
 	remote                RemoteChangesChecker
 	tickHandler           func(ctx context.Context)
+	// cooldown tracking
+	cooldownWindow        time.Duration
+	firstErrorTime        *time.Time // pointer to distinguish between "no error" (nil) and "error at time zero" (non-nil)
+	cooldownTimer         *time.Timer
 }
 
 // cache key type aliases
@@ -64,6 +68,7 @@ func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChange
 			lastPollTime:          time.Now(),
 			remote:                remoteChangesChecker,
 			remotePollingInterval: time.Millisecond * time.Duration(config.GetRemotePollingIntervalInMillis()),
+			cooldownWindow:        time.Minute * time.Duration(config.GetPurgeCooldownWindowInMinutes()),
 		},
 	}
 	directRelationCache, err := lru.NewWithEvict[resourceTargetRelation, bool](config.GetDirectRelationCacheSizePerProject(), "authz-direct-relations-"+cctx.ProjectID(ctx), pc.removeIndexOnCacheEviction)
@@ -160,18 +165,22 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	if noRelations := pc.directRelationCache.Len(ctx) == 0 && pc.indirectRelationCache.Len(ctx) == 0; noRelations {
 		pc.remoteChanges.lastPollTime = time.Now()
 		pc.schemaCache = nil
+		// cancel any pending cooldown since there's nothing to purge
+		pc.cancelCooldown()
 		cctx.Logger(ctx).Debug().Msg("No cached relations, skipping remote changes check")
 		return
 	}
 	// get the changes since the last poll time
 	cctx.Logger(ctx).Debug().Msg("Checking for remote changes...")
 	remoteChanges, err := pc.fetchRemoteChanges(ctx)
-	// if there was an error, we need to purge all caches
+	// if there was an error, handle it with cooldown logic
 	if err != nil {
-		cctx.Logger(ctx).Error().Err(err).Msg("Failed to get new remote changes, purging all caches")
-		pc.purgeAllCaches(ctx)
+		cctx.Logger(ctx).Error().Err(err).Msg("Failed to get new remote changes")
+		pc.handleErrorWithCooldown(ctx)
 		return
 	}
+	// successful response - cancel any pending cooldown
+	pc.cancelCooldown()
 	// if the schema changed, we need to purge all caches
 	if remoteChanges.SchemaChanged {
 		cctx.Logger(ctx).Info().Msg("Remote changes show schema changed, purging all caches")
@@ -346,4 +355,58 @@ func (pc *projectAuthzCache) purgeRelationCaches(ctx context.Context) {
 	pc.directTargetsIndex = make(map[target]map[resource][]resourceTargetRelation)
 	pc.directRelationCache.Purge(ctx)
 	pc.indirectRelationCache.Purge(ctx)
+}
+
+// handleErrorWithCooldown manages the cooldown logic when an error occurs
+func (pc *projectAuthzCache) handleErrorWithCooldown(ctx context.Context) {
+	// if cooldown window is 0, purge immediately (legacy behavior)
+	if pc.remoteChanges.cooldownWindow == 0 {
+		cctx.Logger(ctx).Warn().Msg("Purging all caches immediately (no cooldown configured)")
+		pc.purgeAllCaches(ctx)
+		return
+	}
+
+	// if this is the first error, start the cooldown timer
+	if pc.remoteChanges.firstErrorTime == nil {
+		now := time.Now()
+		pc.remoteChanges.firstErrorTime = &now
+		cctx.Logger(ctx).Warn().
+			Dur("cooldown_window", pc.remoteChanges.cooldownWindow).
+			Msg("First error detected, starting cooldown window before purge")
+
+		// start the cooldown timer
+		pc.remoteChanges.cooldownTimer = time.AfterFunc(pc.remoteChanges.cooldownWindow, func() {
+			pc.mutex.Lock()
+			defer pc.mutex.Unlock()
+			// only purge if we're still in error state
+			if pc.remoteChanges.firstErrorTime != nil {
+				cctx.Logger(ctx).Warn().
+					Time("first_error", *pc.remoteChanges.firstErrorTime).
+					Dur("cooldown_elapsed", time.Since(*pc.remoteChanges.firstErrorTime)).
+					Msg("Cooldown window elapsed, purging all caches")
+				pc.purgeAllCaches(ctx)
+				pc.remoteChanges.firstErrorTime = nil
+				pc.remoteChanges.cooldownTimer = nil
+			}
+		})
+	} else {
+		// subsequent error during cooldown - log but don't reset timer
+		elapsed := time.Since(*pc.remoteChanges.firstErrorTime)
+		remaining := pc.remoteChanges.cooldownWindow - elapsed
+		cctx.Logger(ctx).Warn().
+			Dur("elapsed", elapsed).
+			Dur("remaining", remaining).
+			Msg("Continuing error during cooldown window")
+	}
+}
+
+// cancelCooldown cancels any pending cooldown timer
+func (pc *projectAuthzCache) cancelCooldown() {
+	if pc.remoteChanges.cooldownTimer != nil {
+		pc.remoteChanges.cooldownTimer.Stop()
+		pc.remoteChanges.cooldownTimer = nil
+	}
+	if pc.remoteChanges.firstErrorTime != nil {
+		pc.remoteChanges.firstErrorTime = nil
+	}
 }
