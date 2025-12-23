@@ -136,3 +136,41 @@ func TestGetSDKDebugLog(t *testing.T) {
 		})
 	}
 }
+
+func TestGetPurgeCooldownWindowInMinutes(t *testing.T) {
+	tests := []struct {
+		name     string
+		cooldown int
+		expected int
+	}{
+		{
+			name:     "Config value set to positive",
+			cooldown: 30,
+			expected: 30,
+		},
+		{
+			name:     "Config value set to zero",
+			cooldown: 0,
+			expected: 0,
+		},
+		{
+			name:     "Config value set to negative (should return 0)",
+			cooldown: -5,
+			expected: 0,
+		},
+		{
+			name:     "Config value not set (default 0)",
+			expected: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.name != "Config value not set (default 0)" {
+				t.Setenv(ConfigKeyPurgeCooldownWindowInMinutes, strconv.Itoa(tt.cooldown))
+			}
+			actual := GetPurgeCooldownWindowInMinutes()
+			require.Equal(t, tt.expected, actual)
+		})
+	}
+}
