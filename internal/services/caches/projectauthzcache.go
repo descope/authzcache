@@ -375,10 +375,12 @@ func (pc *projectAuthzCache) handleErrorWithCooldown(ctx context.Context) {
 			Msg("First error detected, starting cooldown window before purge")
 
 		// start the cooldown timer - use background context as the timer may outlive the current request context
+		// Note: The timer callback acquires the mutex and checks firstErrorTime to prevent purging if
+		// cancelCooldown() was called (which sets firstErrorTime to nil) before the timer fires.
 		pc.remoteChanges.cooldownTimer = time.AfterFunc(pc.remoteChanges.cooldownWindow, func() {
 			pc.mutex.Lock()
 			defer pc.mutex.Unlock()
-			// only purge if we're still in error state
+			// only purge if we're still in error state (not cancelled)
 			if pc.remoteChanges.firstErrorTime != nil {
 				bgCtx := context.Background()
 				cctx.Logger(bgCtx).Warn().
@@ -402,6 +404,8 @@ func (pc *projectAuthzCache) handleErrorWithCooldown(ctx context.Context) {
 }
 
 // cancelCooldown cancels any pending cooldown timer
+// This function must be called while holding the mutex.
+// It's safe to call even if the timer has already fired or doesn't exist.
 func (pc *projectAuthzCache) cancelCooldown() {
 	if pc.remoteChanges.cooldownTimer != nil {
 		pc.remoteChanges.cooldownTimer.Stop()
