@@ -1,6 +1,6 @@
 # we use the build platform because we cross compile the go binary for the target platform
 # that way we don't use emulation and slow down builds
-FROM --platform=${BUILDPLATFORM} golang:1.24 AS builder
+FROM --platform=${BUILDPLATFORM} golang:1.25 AS builder
 RUN go version
 
 ARG repo_name
