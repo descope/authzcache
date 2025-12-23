@@ -388,6 +388,7 @@ func (pc *projectAuthzCache) handleErrorWithCooldown(ctx context.Context) {
 					Dur("cooldown_elapsed", time.Since(*pc.remoteChanges.firstErrorTime)).
 					Msg("Cooldown window elapsed, purging all caches")
 				pc.purgeAllCaches(bgCtx)
+				// Clean up timer state (don't call cancelCooldown() since timer already fired)
 				pc.remoteChanges.firstErrorTime = nil
 				pc.remoteChanges.cooldownTimer = nil
 			}
