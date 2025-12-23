@@ -231,7 +231,7 @@ func TestHandleRemotePollingTick_CooldownWindowZero(t *testing.T) {
 	ctx := context.TODO()
 	cache, remoteChecker := setup(t)
 	// explicitly set cooldown window to 0
-	cache.remoteChanges.cooldownWindow = 0
+	cache.remoteChanges.purgeCooldownWindow = 0
 	// simulate an error from remote changes checker
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		return nil, assert.AnError
@@ -249,8 +249,7 @@ func TestHandleRemotePollingTick_CooldownWindowZero(t *testing.T) {
 		assert.False(t, ok)
 	}
 	assert.Nil(t, cache.GetSchema())
-	assert.Nil(t, cache.remoteChanges.firstErrorTime, "no cooldown should be active")
-	assert.Nil(t, cache.remoteChanges.cooldownTimer, "no timer should be active")
+	assert.Nil(t, cache.remoteChanges.purgeCooldownTimer, "no timer should be active")
 }
 
 func TestHandleRemotePollingTick_CooldownWindowStartsOnFirstError(t *testing.T) {
@@ -258,7 +257,7 @@ func TestHandleRemotePollingTick_CooldownWindowStartsOnFirstError(t *testing.T) 
 	ctx := context.TODO()
 	cache, remoteChecker := setup(t)
 	// set cooldown window to 5 minutes
-	cache.remoteChanges.cooldownWindow = 5 * time.Minute
+	cache.remoteChanges.purgeCooldownWindow = 5 * time.Minute
 	// simulate an error
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		return nil, assert.AnError
@@ -268,7 +267,6 @@ func TestHandleRemotePollingTick_CooldownWindowStartsOnFirstError(t *testing.T) 
 	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
 	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
 	// call the tick handler
-	timeBeforeError := time.Now()
 	cache.updateCacheWithRemotePolling(ctx)
 	// verify that caches were NOT purged
 	for _, cr := range cachedRelations {
@@ -277,9 +275,7 @@ func TestHandleRemotePollingTick_CooldownWindowStartsOnFirstError(t *testing.T) 
 	}
 	assert.NotNil(t, cache.GetSchema(), "schema should still be cached")
 	// verify cooldown is active
-	assert.NotNil(t, cache.remoteChanges.firstErrorTime, "cooldown should be active")
-	assert.True(t, cache.remoteChanges.firstErrorTime.After(timeBeforeError) || cache.remoteChanges.firstErrorTime.Equal(timeBeforeError))
-	assert.NotNil(t, cache.remoteChanges.cooldownTimer, "timer should be active")
+	assert.NotNil(t, cache.remoteChanges.purgeCooldownTimer, "timer should be active")
 }
 
 func TestHandleRemotePollingTick_SuccessfulResponseCancelsCooldown(t *testing.T) {
@@ -287,7 +283,7 @@ func TestHandleRemotePollingTick_SuccessfulResponseCancelsCooldown(t *testing.T)
 	ctx := context.TODO()
 	cache, remoteChecker := setup(t)
 	// set cooldown window to 5 minutes
-	cache.remoteChanges.cooldownWindow = 5 * time.Minute
+	cache.remoteChanges.purgeCooldownWindow = 5 * time.Minute
 	// first call: simulate an error to start cooldown
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		return nil, assert.AnError
@@ -298,16 +294,14 @@ func TestHandleRemotePollingTick_SuccessfulResponseCancelsCooldown(t *testing.T)
 	// trigger first error
 	cache.updateCacheWithRemotePolling(ctx)
 	// verify cooldown is active
-	require.NotNil(t, cache.remoteChanges.firstErrorTime, "cooldown should be active after error")
-	require.NotNil(t, cache.remoteChanges.cooldownTimer, "timer should be active")
+	require.NotNil(t, cache.remoteChanges.purgeCooldownTimer, "timer should be active")
 	// second call: simulate successful response
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		return &descope.AuthzModified{SchemaChanged: false}, nil
 	}
 	cache.updateCacheWithRemotePolling(ctx)
 	// verify cooldown was cancelled
-	assert.Nil(t, cache.remoteChanges.firstErrorTime, "cooldown should be cancelled")
-	assert.Nil(t, cache.remoteChanges.cooldownTimer, "timer should be cancelled")
+	assert.Nil(t, cache.remoteChanges.purgeCooldownTimer, "timer should be cancelled")
 	// verify caches are still valid
 	for _, cr := range cachedRelations {
 		_, _, ok := cache.CheckRelation(ctx, cr.r)
@@ -322,7 +316,7 @@ func TestHandleRemotePollingTick_CooldownWindowElapsesAndPurges(t *testing.T) {
 	cache, remoteChecker := setup(t)
 	// set cooldown window to a very short duration for testing
 	cooldownDuration := 100 * time.Millisecond
-	cache.remoteChanges.cooldownWindow = cooldownDuration
+	cache.remoteChanges.purgeCooldownWindow = cooldownDuration
 	// simulate an error
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		return nil, assert.AnError
@@ -334,7 +328,7 @@ func TestHandleRemotePollingTick_CooldownWindowElapsesAndPurges(t *testing.T) {
 	// trigger error to start cooldown
 	cache.updateCacheWithRemotePolling(ctx)
 	// verify cooldown is active and cache is still valid
-	require.NotNil(t, cache.remoteChanges.firstErrorTime)
+	require.NotNil(t, cache.remoteChanges.purgeCooldownTimer)
 	require.Greater(t, cache.directRelationCache.Len(ctx), 0, "cache should still be valid immediately after error")
 	// wait for cooldown to elapse with generous buffer to avoid flakiness
 	time.Sleep(cooldownDuration + 50*time.Millisecond)
@@ -351,7 +345,7 @@ func TestHandleRemotePollingTick_SubsequentErrorsDuringCooldown(t *testing.T) {
 	ctx := context.TODO()
 	cache, remoteChecker := setup(t)
 	// set cooldown window to 5 minutes
-	cache.remoteChanges.cooldownWindow = 5 * time.Minute
+	cache.remoteChanges.purgeCooldownWindow = 5 * time.Minute
 	// simulate an error
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		return nil, assert.AnError
@@ -361,15 +355,14 @@ func TestHandleRemotePollingTick_SubsequentErrorsDuringCooldown(t *testing.T) {
 	updateBothCachesWithChecks(ctx, t, cache)
 	// trigger first error
 	cache.updateCacheWithRemotePolling(ctx)
-	firstErrorTime := cache.remoteChanges.firstErrorTime
-	require.NotNil(t, firstErrorTime)
+	firstTimer := cache.remoteChanges.purgeCooldownTimer
+	require.NotNil(t, firstTimer)
 	// wait a bit
 	time.Sleep(10 * time.Millisecond)
 	// trigger second error
 	cache.updateCacheWithRemotePolling(ctx)
-	// verify that the first error time didn't change
-	assert.Equal(t, firstErrorTime, cache.remoteChanges.firstErrorTime, "first error time should not be reset")
-	assert.NotNil(t, cache.remoteChanges.cooldownTimer, "timer should still be active")
+	// verify that the timer didn't change (same timer instance)
+	assert.Same(t, firstTimer, cache.remoteChanges.purgeCooldownTimer, "timer should not be reset")
 	// cache should still be valid
 	assert.Greater(t, cache.directRelationCache.Len(ctx), 0)
 }
