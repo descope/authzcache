@@ -321,7 +321,8 @@ func TestHandleRemotePollingTick_CooldownWindowElapsesAndPurges(t *testing.T) {
 	ctx := context.TODO()
 	cache, remoteChecker := setup(t)
 	// set cooldown window to a very short duration for testing
-	cache.remoteChanges.cooldownWindow = 50 * time.Millisecond
+	cooldownDuration := 100 * time.Millisecond
+	cache.remoteChanges.cooldownWindow = cooldownDuration
 	// simulate an error
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		return nil, assert.AnError
@@ -335,8 +336,8 @@ func TestHandleRemotePollingTick_CooldownWindowElapsesAndPurges(t *testing.T) {
 	// verify cooldown is active and cache is still valid
 	require.NotNil(t, cache.remoteChanges.firstErrorTime)
 	require.Greater(t, cache.directRelationCache.Len(ctx), 0, "cache should still be valid immediately after error")
-	// wait for cooldown to elapse (with some buffer)
-	time.Sleep(100 * time.Millisecond)
+	// wait for cooldown to elapse with generous buffer to avoid flakiness
+	time.Sleep(cooldownDuration + 50*time.Millisecond)
 	// verify that caches were purged
 	cache.mutex.RLock()
 	defer cache.mutex.RUnlock()

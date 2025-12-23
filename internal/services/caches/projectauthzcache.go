@@ -374,17 +374,18 @@ func (pc *projectAuthzCache) handleErrorWithCooldown(ctx context.Context) {
 			Dur("cooldown_window", pc.remoteChanges.cooldownWindow).
 			Msg("First error detected, starting cooldown window before purge")
 
-		// start the cooldown timer
+		// start the cooldown timer - use background context as the timer may outlive the current request context
 		pc.remoteChanges.cooldownTimer = time.AfterFunc(pc.remoteChanges.cooldownWindow, func() {
 			pc.mutex.Lock()
 			defer pc.mutex.Unlock()
 			// only purge if we're still in error state
 			if pc.remoteChanges.firstErrorTime != nil {
-				cctx.Logger(ctx).Warn().
+				bgCtx := context.Background()
+				cctx.Logger(bgCtx).Warn().
 					Time("first_error", *pc.remoteChanges.firstErrorTime).
 					Dur("cooldown_elapsed", time.Since(*pc.remoteChanges.firstErrorTime)).
 					Msg("Cooldown window elapsed, purging all caches")
-				pc.purgeAllCaches(ctx)
+				pc.purgeAllCaches(bgCtx)
 				pc.remoteChanges.firstErrorTime = nil
 				pc.remoteChanges.cooldownTimer = nil
 			}
