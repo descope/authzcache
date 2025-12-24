@@ -23,7 +23,7 @@ docker run -d \
 - `AUTHZCACHE_DIRECT_RELATION_CACHE_SIZE_PER_PROJECT` - Direct relation cache size per project (default: 1,000,000)
 - `AUTHZCACHE_INDIRECT_RELATION_CACHE_SIZE_PER_PROJECT` - Indirect relation cache size per project (default: 1,000,000)
 - `AUTHZCACHE_REMOTE_POLLING_INTERVAL_IN_MILLIS` - Remote polling interval in milliseconds (default: 15,000)
-- `AUTHZCACHE_PURGE_COOLDOWN_WINDOW_IN_MINUTES` - Cooldown window in minutes before purging cache on refresh error (default: 0, meaning immediate purge). When set to a positive value, the cache will wait for the specified duration after the first error before purging. If a successful response is received during the cooldown window, the purge is cancelled. This provides a balance between data freshness and availability during temporary service disruptions.
+- `AUTHZCACHE_PURGE_COOLDOWN_WINDOW_IN_MINUTES` - Cooldown window in minutes before purging cache on refresh error (default: 0, meaning immediate purge). When set to a positive value, the cache will wait for the specified duration after the first error before purging. If a successful response is received during the cooldown window, the purge is cancelled. This provides a balance between data freshness and availability during temporary service disruptions. During this window, the cache continues serving stale and potentially invalid authorization data, which may not reflect current permissions.
 
 ## Ports
 - **8189** - HTTP REST API endpoint
