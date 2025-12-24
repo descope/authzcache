@@ -226,6 +226,147 @@ func TestHandleRemotePollingTick_RemoteChangesError(t *testing.T) {
 	assert.Greater(t, cache.remoteChanges.lastPollTime, timeBeforePolling)
 }
 
+func TestHandleRemotePollingTick_CooldownWindowZero(t *testing.T) {
+	// Test that with cooldown window = 0 (default), the cache is purged immediately on error
+	ctx := context.TODO()
+	cache, remoteChecker := setup(t)
+	// explicitly set cooldown window to 0
+	cache.remoteChanges.purgeCooldownWindow = 0
+	// simulate an error from remote changes checker
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		return nil, assert.AnError
+	}
+	// populate the cache
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
+	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
+	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
+	require.Greater(t, cache.indirectRelationCache.Len(ctx), 0)
+	// call the tick handler
+	cache.updateCacheWithRemotePolling(ctx)
+	// verify that all caches were purged immediately
+	for _, cr := range cachedRelations {
+		_, _, ok := cache.CheckRelation(ctx, cr.r)
+		assert.False(t, ok)
+	}
+	assert.Nil(t, cache.GetSchema())
+	assert.Nil(t, cache.remoteChanges.purgeCooldownTimer, "no timer should be active")
+}
+
+func TestHandleRemotePollingTick_CooldownWindowStartsOnFirstError(t *testing.T) {
+	// Test that cooldown timer starts on first error and cache is NOT purged immediately
+	ctx := context.TODO()
+	cache, remoteChecker := setup(t)
+	// set cooldown window to 5 minutes
+	cache.remoteChanges.purgeCooldownWindow = 5 * time.Minute
+	// simulate an error
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		return nil, assert.AnError
+	}
+	// populate the cache
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
+	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
+	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
+	// call the tick handler
+	cache.updateCacheWithRemotePolling(ctx)
+	// verify that caches were NOT purged
+	for _, cr := range cachedRelations {
+		_, _, ok := cache.CheckRelation(ctx, cr.r)
+		assert.True(t, ok, "cache should still be valid during cooldown")
+	}
+	assert.NotNil(t, cache.GetSchema(), "schema should still be cached")
+	// verify cooldown is active
+	assert.NotNil(t, cache.remoteChanges.purgeCooldownTimer, "timer should be active")
+}
+
+func TestHandleRemotePollingTick_SuccessfulResponseCancelsCooldown(t *testing.T) {
+	// Test that a successful response during cooldown cancels the purge
+	ctx := context.TODO()
+	cache, remoteChecker := setup(t)
+	// set cooldown window to 5 minutes
+	cache.remoteChanges.purgeCooldownWindow = 5 * time.Minute
+	// first call: simulate an error to start cooldown
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		return nil, assert.AnError
+	}
+	// populate the cache
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
+	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
+	// trigger first error
+	cache.updateCacheWithRemotePolling(ctx)
+	// verify cooldown is active
+	require.NotNil(t, cache.remoteChanges.purgeCooldownTimer, "timer should be active")
+	// second call: simulate successful response
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		return &descope.AuthzModified{SchemaChanged: false}, nil
+	}
+	cache.updateCacheWithRemotePolling(ctx)
+	// verify cooldown was cancelled
+	assert.Nil(t, cache.remoteChanges.purgeCooldownTimer, "timer should be cancelled")
+	// verify caches are still valid
+	for _, cr := range cachedRelations {
+		_, _, ok := cache.CheckRelation(ctx, cr.r)
+		assert.True(t, ok, "cache should still be valid after successful response")
+	}
+	assert.NotNil(t, cache.GetSchema())
+}
+
+func TestHandleRemotePollingTick_CooldownWindowElapsesAndPurges(t *testing.T) {
+	// Test that cache is purged after cooldown window elapses
+	ctx := context.TODO()
+	cache, remoteChecker := setup(t)
+	// set cooldown window to a very short duration for testing
+	cooldownDuration := 100 * time.Millisecond
+	cache.remoteChanges.purgeCooldownWindow = cooldownDuration
+	// simulate an error
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		return nil, assert.AnError
+	}
+	// populate the cache
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
+	updateBothCachesWithChecks(ctx, t, cache)
+	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
+	// trigger error to start cooldown
+	cache.updateCacheWithRemotePolling(ctx)
+	// verify cooldown is active and cache is still valid
+	require.NotNil(t, cache.remoteChanges.purgeCooldownTimer)
+	require.Greater(t, cache.directRelationCache.Len(ctx), 0, "cache should still be valid immediately after error")
+	// wait for cooldown to elapse with generous buffer to avoid flakiness
+	time.Sleep(cooldownDuration + 50*time.Millisecond)
+	// verify that caches were purged
+	assert.Nil(t, cache.GetSchema(), "schema should be purged after cooldown")
+	cache.mutex.RLock()
+	defer cache.mutex.RUnlock()
+	assert.Equal(t, 0, cache.directRelationCache.Len(ctx), "cache should be purged after cooldown")
+	assert.Equal(t, 0, cache.indirectRelationCache.Len(ctx), "cache should be purged after cooldown")
+}
+
+func TestHandleRemotePollingTick_SubsequentErrorsDuringCooldown(t *testing.T) {
+	// Test that subsequent errors during cooldown don't reset the timer
+	ctx := context.TODO()
+	cache, remoteChecker := setup(t)
+	// set cooldown window to 5 minutes
+	cache.remoteChanges.purgeCooldownWindow = 5 * time.Minute
+	// simulate an error
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		return nil, assert.AnError
+	}
+	// populate the cache
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
+	updateBothCachesWithChecks(ctx, t, cache)
+	// trigger first error
+	cache.updateCacheWithRemotePolling(ctx)
+	firstTimer := cache.remoteChanges.purgeCooldownTimer
+	require.NotNil(t, firstTimer)
+	// wait a bit
+	time.Sleep(10 * time.Millisecond)
+	// trigger second error
+	cache.updateCacheWithRemotePolling(ctx)
+	// verify that the timer didn't change (same timer instance)
+	assert.Same(t, firstTimer, cache.remoteChanges.purgeCooldownTimer, "timer should not be reset")
+	// cache should still be valid
+	assert.Greater(t, cache.directRelationCache.Len(ctx), 0)
+}
+
 func TestHandleRemotePollingTick_RemoteSchemaChange(t *testing.T) {
 	ctx := context.TODO()
 	cache, remoteChecker := setup(t)
@@ -363,6 +504,210 @@ func TestRemotePolling(t *testing.T) {
 	mutex.RLock() // must lock to avoid race condition between the test and the goroutine started in StartRemoteChangesPolling
 	defer mutex.RUnlock()
 	assert.True(t, tickHandlerCalled)
+}
+
+func TestCooldownMechanism_ConcurrentStressTest(t *testing.T) {
+	// This test verifies thread safety of the cooldown mechanism by running concurrent
+	// operations that interact with the cache and cooldown timer. We want to try and ensure:
+	// 1. No panics from concurrent access
+	// 2. No deadlocks
+	// 3. No race conditions (run with -race flag)
+	ctx := context.TODO()
+	cache, remoteChecker := setup(t)
+
+	// set cooldown window to a short duration
+	cache.remoteChanges.purgeCooldownWindow = 50 * time.Millisecond
+
+	// track error count for randomizing responses
+	var errorCount, successCount int64
+	var responseMutex sync.Mutex
+
+	// remote checker randomly returns errors or successes
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		responseMutex.Lock()
+		defer responseMutex.Unlock()
+		// randomly return error ~40% of the time
+		if time.Now().UnixNano()%10 < 4 {
+			errorCount++
+			return nil, assert.AnError
+		}
+		successCount++
+		// randomly return different types of successful responses
+		switch time.Now().UnixNano() % 3 {
+		case 0:
+			return &descope.AuthzModified{SchemaChanged: true}, nil
+		case 1:
+			return &descope.AuthzModified{
+				Resources: []string{"r1", "r2"},
+				Targets:   []string{"t1", "t2"},
+			}, nil
+		default:
+			return &descope.AuthzModified{}, nil
+		}
+	}
+
+	const numGoroutines = 100
+	const iterationsPerGoroutine = 50
+
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+
+	// channel to collect any panics
+	panicChan := make(chan interface{}, numGoroutines)
+
+	for g := 0; g < numGoroutines; g++ {
+		go func(goroutineID int) {
+			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					panicChan <- r
+				}
+			}()
+
+			for i := 0; i < iterationsPerGoroutine; i++ {
+				// randomly choose an operation based on iteration and goroutine ID
+				op := (goroutineID + i) % 7
+
+				switch op {
+				case 0:
+					// trigger remote polling (this exercises the cooldown logic)
+					cache.updateCacheWithRemotePolling(ctx)
+				case 1:
+					// update cache with schema
+					cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: uuid.NewString()})
+				case 2:
+					// add relations
+					cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{
+						{Resource: "r" + uuid.NewString(), Target: "t" + uuid.NewString(), Relation: "owner"},
+					})
+				case 3:
+					// delete relations
+					cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{
+						{Resource: "r" + uuid.NewString(), Target: "t" + uuid.NewString(), Relation: "owner"},
+					})
+				case 4:
+					// check relation
+					cache.CheckRelation(ctx, &descope.FGARelation{
+						Resource: "r" + uuid.NewString(),
+						Target:   "t" + uuid.NewString(),
+						Relation: "owner",
+					})
+				case 5:
+					// update cache with checks
+					cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+						{
+							Allowed:  true,
+							Relation: &descope.FGARelation{Resource: "r" + uuid.NewString(), Target: "t" + uuid.NewString(), Relation: "owner"},
+							Info:     &descope.FGACheckInfo{Direct: i%2 == 0},
+						},
+					})
+				case 6:
+					// get schema (read operation)
+					_ = cache.GetSchema()
+				}
+
+				// add small random delay to increase contention variety
+				if i%10 == 0 {
+					time.Sleep(time.Duration(i%5) * time.Microsecond)
+				}
+			}
+		}(g)
+	}
+
+	// wait for all goroutines to complete with a timeout
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// success - all goroutines completed
+	case <-time.After(30 * time.Second):
+		t.Fatal("Test timed out - possible deadlock detected")
+	}
+
+	// check for any panics
+	close(panicChan)
+	var panics []interface{}
+	for p := range panicChan {
+		panics = append(panics, p)
+	}
+	if len(panics) > 0 {
+		t.Fatalf("Panics detected during concurrent execution: %v", panics)
+	}
+
+	// log statistics
+	responseMutex.Lock()
+	t.Logf("Test completed successfully. Errors: %d, Successes: %d", errorCount, successCount)
+	responseMutex.Unlock()
+}
+
+func TestCooldownMechanism_ConcurrentPollingWithTimerExpiry(t *testing.T) {
+	// This test specifically focuses on the race between timer expiry and successful responses
+	ctx := context.TODO()
+	cache, remoteChecker := setup(t)
+
+	// use a very short cooldown to increase timer expiry frequency
+	cache.remoteChanges.purgeCooldownWindow = 5 * time.Millisecond
+
+	var callCount int64
+	var callMutex sync.Mutex
+
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		callMutex.Lock()
+		callCount++
+		current := callCount
+		callMutex.Unlock()
+
+		// alternate between error and success to trigger cooldown start/cancel frequently
+		if current%2 == 0 {
+			return nil, assert.AnError
+		}
+		return &descope.AuthzModified{}, nil
+	}
+
+	const numGoroutines = 50
+	const iterations = 100
+
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+
+	for g := 0; g < numGoroutines; g++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < iterations; i++ {
+				// populate some data before polling
+				cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+					{
+						Allowed:  true,
+						Relation: &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"},
+						Info:     &descope.FGACheckInfo{Direct: true},
+					},
+				})
+				// trigger polling
+				cache.updateCacheWithRemotePolling(ctx)
+				// small sleep to allow timer callbacks to potentially fire
+				if i%20 == 0 {
+					time.Sleep(time.Millisecond)
+				}
+			}
+		}()
+	}
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		t.Logf("Test completed successfully with %d remote calls", callCount)
+	case <-time.After(30 * time.Second):
+		t.Fatal("Test timed out - possible deadlock detected")
+	}
 }
 
 func TestUnderstandEvictionCallback(t *testing.T) {
