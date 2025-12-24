@@ -333,11 +333,11 @@ func TestHandleRemotePollingTick_CooldownWindowElapsesAndPurges(t *testing.T) {
 	// wait for cooldown to elapse with generous buffer to avoid flakiness
 	time.Sleep(cooldownDuration + 50*time.Millisecond)
 	// verify that caches were purged
+	assert.Nil(t, cache.GetSchema(), "schema should be purged after cooldown")
 	cache.mutex.RLock()
 	defer cache.mutex.RUnlock()
 	assert.Equal(t, 0, cache.directRelationCache.Len(ctx), "cache should be purged after cooldown")
 	assert.Equal(t, 0, cache.indirectRelationCache.Len(ctx), "cache should be purged after cooldown")
-	assert.Nil(t, cache.GetSchema(), "schema should be purged after cooldown")
 }
 
 func TestHandleRemotePollingTick_SubsequentErrorsDuringCooldown(t *testing.T) {
