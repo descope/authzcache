@@ -76,6 +76,12 @@ func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChange
 	}
 	pc.directRelationCache = directRelationCache
 	pc.remoteChanges.tickHandler = pc.updateCacheWithRemotePolling // set the tick handler (to be used in the polling goroutine)
+	cctx.Logger(ctx).Info().
+		Int("direct_relation_cache_size", config.GetDirectRelationCacheSizePerProject()).
+		Int("indirect_relation_cache_size", config.GetIndirectRelationCacheSizePerProject()).
+		Int("remote_polling_interval_ms", config.GetRemotePollingIntervalInMillis()).
+		Int("purge_cooldown_window_minutes", config.GetPurgeCooldownWindowInMinutes()).
+		Msg("Project authz cache initialized")
 	return pc, nil
 }
 
@@ -377,9 +383,8 @@ func (pc *projectAuthzCache) purgeAfterCooldown(ctx context.Context, err error) 
 			defer pc.mutex.Unlock()
 			// only purge if we're still in error state (not cancelled)
 			if pc.remoteChanges.purgeCooldownTimer != nil {
-				bgCtx := context.Background()
-				cctx.Logger(bgCtx).Error().Dur("cooldown_window", pc.remoteChanges.purgeCooldownWindow).Msg("Cooldown window elapsed, purging all caches")
-				pc.purgeAllCaches(bgCtx)
+				cctx.Logger(ctx).Error().Dur("cooldown_window", pc.remoteChanges.purgeCooldownWindow).Msg("Cooldown window elapsed, purging all caches")
+				pc.purgeAllCaches(ctx)
 				// Clean up timer state (don't call cancelPurgeCooldown() since timer already fired)
 				pc.remoteChanges.purgeCooldownTimer = nil
 			}
