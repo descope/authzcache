@@ -375,16 +375,17 @@ func (pc *projectAuthzCache) purgeAfterCooldown(ctx context.Context, err error) 
 	if pc.remoteChanges.purgeCooldownTimer == nil {
 		cctx.Logger(ctx).Error().Err(err).Dur("cooldown_window", pc.remoteChanges.purgeCooldownWindow).Msg("First error detected, starting cooldown window before purge")
 
-		// start the cooldown timer - use background context as the timer may outlive the current request context
+		// start the cooldown timer - use new context as the timer may outlive the current request context
 		// Note: The timer callback acquires the mutex and checks that purgeCooldownTimer is not nil to prevent purging if
 		// cancelPurgeCooldown() was called in a race condition just before the timer fires (it sets purgeCooldownTimer to nil).
+		timerCtx := context.WithoutCancel(ctx)
 		pc.remoteChanges.purgeCooldownTimer = time.AfterFunc(pc.remoteChanges.purgeCooldownWindow, func() {
 			pc.mutex.Lock()
 			defer pc.mutex.Unlock()
 			// only purge if we're still in error state (not cancelled)
 			if pc.remoteChanges.purgeCooldownTimer != nil {
-				cctx.Logger(ctx).Error().Dur("cooldown_window", pc.remoteChanges.purgeCooldownWindow).Msg("Cooldown window elapsed, purging all caches")
-				pc.purgeAllCaches(ctx)
+				cctx.Logger(timerCtx).Error().Dur("cooldown_window", pc.remoteChanges.purgeCooldownWindow).Msg("Cooldown window elapsed, purging all caches")
+				pc.purgeAllCaches(timerCtx)
 				// Clean up timer state (don't call cancelPurgeCooldown() since timer already fired)
 				pc.remoteChanges.purgeCooldownTimer = nil
 			}
