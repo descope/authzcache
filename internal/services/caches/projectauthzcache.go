@@ -80,6 +80,8 @@ func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChange
 }
 
 func (pc *projectAuthzCache) GetSchema() *descope.FGASchema {
+	pc.mutex.RLock()
+	defer pc.mutex.RUnlock()
 	return pc.schemaCache
 }
 
@@ -339,6 +341,7 @@ func (pc *projectAuthzCache) removeIndexOnCacheEviction(key resourceTargetRelati
 	pc.removeKeyFromTargetIndex(resource, target, key)
 }
 
+// must be called while holding the mutex
 func (pc *projectAuthzCache) purgeAllCaches(ctx context.Context) {
 	pc.schemaCache = nil
 	pc.purgeRelationCaches(ctx)
