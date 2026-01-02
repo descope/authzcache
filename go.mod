@@ -10,7 +10,7 @@ require (
 	github.com/descope/protoc-gen-validate v1.6.6-0.20251205011043-243d36765067
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.77.0
-	google.golang.org/protobuf v1.36.10
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
