@@ -47,7 +47,7 @@ func serve() {
 			},
 		},
 		server.ServerOptions{
-			ServiceMiddlwares: []func(context.Context) func(h http.Handler) http.Handler{
+			ServiceMiddlewares: []func(context.Context) func(h http.Handler) http.Handler{
 				middlewares.ProjectIDParser,
 			},
 			SkipInitCommonProjectCache: true,
