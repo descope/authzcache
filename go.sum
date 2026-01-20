@@ -89,8 +89,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvwDRwnI3hwNaAHRnc=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
-github.com/descope/authzservice v0.0.0-20260120041107-ce192fec7173 h1:JG1gE7e5NMP3WnV+LIwjET7eSTaghF47UpTB8YGwVzI=
-github.com/descope/authzservice v0.0.0-20260120041107-ce192fec7173/go.mod h1:QsJ+5GA+iQUMKlxUhDXE8T5OIGo8tHB5IO5M1JN5oZ0=
+github.com/descope/authzservice v0.0.0-20260120162657-6cb88f4aabb2 h1:2iGHQwu21bgvZCQREQmiI3VhulDDwLgpBrPRU4F60Ac=
+github.com/descope/authzservice v0.0.0-20260120162657-6cb88f4aabb2/go.mod h1:Pus4wRK8z5SITrocG9ZfSdIL02UU2qAAx0bDKKJkTjQ=
 github.com/descope/common v0.0.9-0.20260120112229-54a458a597c2 h1:YPLXque/GDbsEbjPZ4dk6LATfIm1Y2VQKMe9tgsa6HQ=
 github.com/descope/common v0.0.9-0.20260120112229-54a458a597c2/go.mod h1:ULTYA8n7ccuFaHEAvAT3TB+UUmKXK/8wGg5YhXX7LyI=
 github.com/descope/go-sdk v1.7.0 h1:DIRmnA4Q8TDtWdGJ9z0I11+AWMrzyNiiozFH557LrgQ=
