@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"context"
 	"os"
 	"strings"
 
@@ -17,7 +18,7 @@ var managementKey = strings.Trim(os.Getenv(descope.EnvironmentVariableManagement
 
 func NewDescopeClientWithProjectID(projectID string, loggerInstance logger.LoggerInterface) (sdk.Management, error) {
 	if projectID == "" {
-		return nil, ae.UnknownProject.New("projectID is empty")
+		return nil, ae.UnknownProject.New(context.Background(), "projectID is empty")
 	}
 	descopeClient, err := client.NewWithConfig(&client.Config{
 		ProjectID:           projectID,
