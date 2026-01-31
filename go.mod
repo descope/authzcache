@@ -3,11 +3,11 @@ module github.com/descope/authzcache
 go 1.24.6
 
 require (
-	github.com/descope/common v0.0.9-0.20260129221717-5d573f8a4f3d
+	github.com/descope/common v0.0.9-0.20260130222408-3eb47570cd16
 	github.com/descope/go-sdk v1.7.0
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
-	github.com/descope/protoc-gen-mocker v1.0.1-0.20260119161505-525f3cf04e27
-	github.com/descope/protoc-gen-validate v1.6.6-0.20260105200610-fd22b8e896a5
+	github.com/descope/protoc-gen-mocker v1.0.1-0.20260131000527-713084f460e5
+	github.com/descope/protoc-gen-validate v1.6.6-0.20260130233208-17cb4645344a
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.78.0
 	google.golang.org/protobuf v1.36.11
@@ -78,12 +78,12 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/exp v0.0.0-20250606033433-dcc06ee1d476 // indirect
-	golang.org/x/mod v0.30.0 // indirect
-	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/mod v0.31.0 // indirect
+	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
-	golang.org/x/tools v0.39.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/tools v0.40.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251222181119-0a764e51fe1b
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251222181119-0a764e51fe1b // indirect
