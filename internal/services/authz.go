@@ -16,6 +16,8 @@ type AuthzCache interface {
 	CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error
 	DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error
 	Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error)
+	WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string) ([]string, error)
+	WhatCanTargetAccess(ctx context.Context, target string) ([]*descope.AuthzRelation, error)
 }
 
 type RemoteClientCreator func(projectID string, logger logger.LoggerInterface) (sdk.Management, error)
@@ -140,26 +142,55 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	return result, nil
 }
 
+func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string) ([]string, error) {
+	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
+	if err != nil {
+		return nil, err // notest
+	}
+	if targets, ok := projectCache.GetWhoCanAccessCached(ctx, resource, relationDefinition, namespace); ok {
+		cctx.Logger(ctx).Debug().Str("resource", resource).Msg("WhoCanAccess cache hit")
+		return targets, nil
+	}
+	targets, err := mgmtSDK.Authz().WhoCanAccess(ctx, resource, relationDefinition, namespace)
+	if err != nil {
+		return nil, err // notest
+	}
+	projectCache.SetWhoCanAccessCached(ctx, resource, relationDefinition, namespace, targets)
+	return targets, nil
+}
+
+func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string) ([]*descope.AuthzRelation, error) {
+	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
+	if err != nil {
+		return nil, err // notest
+	}
+	if relations, ok := projectCache.GetWhatCanTargetAccessCached(ctx, target); ok {
+		cctx.Logger(ctx).Debug().Str("target", target).Msg("WhatCanTargetAccess cache hit")
+		return relations, nil
+	}
+	relations, err := mgmtSDK.Authz().WhatCanTargetAccess(ctx, target)
+	if err != nil {
+		return nil, err // notest
+	}
+	projectCache.SetWhatCanTargetAccessCached(ctx, target, relations)
+	return relations, nil
+}
+
 func (a *authzCache) getOrCreateProjectCache(ctx context.Context) (caches.ProjectAuthzCache, sdk.Management, error) {
 	projectID := cctx.ProjectID(ctx)
 	if p, ok := a.projects.Load(projectID); ok {
 		return p.(project).cache, p.(project).mgmtSDK, nil
 	}
 	cctx.Logger(ctx).Info().Msg("Creating new project cache")
-	// create project mgmt sdk
 	projectMgmtSDK, err := a.remoteClientCreator(projectID, cctx.Logger(ctx))
 	if err != nil {
 		return nil, nil, err // notest
 	}
-	// create project cache
 	projectCache, err := a.projectCacheCreator(ctx, projectMgmtSDK.Authz())
 	if err != nil {
 		return nil, nil, err // notest
 	}
-	// start remote changes polling
 	projectCache.StartRemoteChangesPolling(ctx)
-	// save cache and sdk
 	a.projects.Store(projectID, project{cache: projectCache, mgmtSDK: projectMgmtSDK})
-	// return cache and sdk
 	return projectCache, projectMgmtSDK, nil
 }
