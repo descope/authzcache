@@ -3,7 +3,7 @@ module github.com/descope/authzcache
 go 1.24.6
 
 require (
-	github.com/descope/common v0.0.9-0.20260205031854-a9f0312df220
+	github.com/descope/common v0.0.9-0.20260206130059-3be0f1a6d7a2
 	github.com/descope/go-sdk v1.8.0
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20260131000527-713084f460e5
