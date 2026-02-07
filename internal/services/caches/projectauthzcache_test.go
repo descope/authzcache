@@ -148,6 +148,44 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 	assert.Equal(t, 0, len(cache.directTargetsIndex), "%v", cache.directTargetsIndex)
 }
 
+func TestUpdateCacheWithAddedRelations_PurgesLookupCache(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	cache.lookupCacheEnabled = true
+	cache.SetWhoCanAccessCached(ctx, "doc1", "viewer", "docs", []string{"user1", "user2"})
+	cache.SetWhatCanTargetAccessCached(ctx, "user1", []*descope.AuthzRelation{{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs", Target: "user1"}})
+	targets, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
+	require.True(t, ok)
+	require.Equal(t, []string{"user1", "user2"}, targets)
+	relations, ok := cache.GetWhatCanTargetAccessCached(ctx, "user1")
+	require.True(t, ok)
+	require.Len(t, relations, 1)
+	cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{{Resource: "doc1", Target: "user3", Relation: "viewer"}})
+	_, ok = cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
+	assert.False(t, ok, "lookup cache should be purged after adding relations")
+	_, ok = cache.GetWhatCanTargetAccessCached(ctx, "user1")
+	assert.False(t, ok, "lookup cache should be purged after adding relations")
+}
+
+func TestUpdateCacheWithDeletedRelations_PurgesLookupCache(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	cache.lookupCacheEnabled = true
+	cache.SetWhoCanAccessCached(ctx, "doc1", "viewer", "docs", []string{"user1", "user2"})
+	cache.SetWhatCanTargetAccessCached(ctx, "user1", []*descope.AuthzRelation{{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs", Target: "user1"}})
+	targets, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
+	require.True(t, ok)
+	require.Equal(t, []string{"user1", "user2"}, targets)
+	relations, ok := cache.GetWhatCanTargetAccessCached(ctx, "user1")
+	require.True(t, ok)
+	require.Len(t, relations, 1)
+	cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{{Resource: "doc1", Target: "user1", Relation: "viewer"}})
+	_, ok = cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
+	assert.False(t, ok, "lookup cache should be purged after deleting relations")
+	_, ok = cache.GetWhatCanTargetAccessCached(ctx, "user1")
+	assert.False(t, ok, "lookup cache should be purged after deleting relations")
+}
+
 func TestEmptyActions(t *testing.T) {
 	ctx := context.TODO()
 	// pre populate the cache

@@ -152,6 +152,9 @@ func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, 
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
 	pc.indirectRelationCache.Purge(ctx) // added (direct) relations can change the result of indirect checks, so we must purge all indirect relations
+	if pc.lookupCache != nil {
+		pc.lookupCache.Purge(ctx) // added relations can change lookup results (WhoCanAccess/WhatCanTargetAccess)
+	}
 	for _, r := range relations {
 		pc.addDirectRelation(ctx, r, true)
 	}
@@ -164,6 +167,9 @@ func (pc *projectAuthzCache) UpdateCacheWithDeletedRelations(ctx context.Context
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
 	pc.indirectRelationCache.Purge(ctx) // deleted (direct) relations can change the result of indirect checks, so we must purge all indirect relations
+	if pc.lookupCache != nil {
+		pc.lookupCache.Purge(ctx) // deleted relations can change lookup results (WhoCanAccess/WhatCanTargetAccess)
+	}
 	for _, r := range relations {
 		pc.removeDirectRelation(ctx, r)
 	}
