@@ -503,12 +503,16 @@ func (pc *projectAuthzCache) GetWhatCanTargetAccessCached(ctx context.Context, t
 	if time.Now().After(entry.ExpiresAt) {
 		return nil, false
 	}
-	relations := make([]*descope.AuthzRelation, len(entry.Results))
-	for i, r := range entry.Results {
+	relations := make([]*descope.AuthzRelation, 0, len(entry.Results))
+	for _, r := range entry.Results {
 		parts := strings.SplitN(r, "|", 3)
-		if len(parts) == 3 {
-			relations[i] = &descope.AuthzRelation{Resource: parts[0], RelationDefinition: parts[1], Namespace: parts[2], Target: target}
+		if len(parts) != 3 {
+			continue
 		}
+		relations = append(relations, &descope.AuthzRelation{Resource: parts[0], RelationDefinition: parts[1], Namespace: parts[2], Target: target})
+	}
+	if len(relations) == 0 {
+		return nil, false
 	}
 	return relations, true
 }
