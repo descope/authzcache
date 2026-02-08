@@ -238,6 +238,9 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	}
 	cctx.Logger(ctx).Debug().Msg(fmt.Sprintf("Remote changes found, Resources: %v, Targets: %v, updating caches", remoteChanges.Resources, remoteChanges.Targets))
 	pc.indirectRelationCache.Purge(ctx)
+	if pc.lookupCache != nil {
+		pc.lookupCache.Purge(ctx)
+	}
 	for _, r := range remoteChanges.Resources {
 		pc.removeDirectRelationByResource(ctx, resource(r))
 	}
