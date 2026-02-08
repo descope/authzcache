@@ -431,3 +431,103 @@ func TestWhoCanAccess_EmptyCacheHitFallsBackToSDK(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{"user1"}, result)
 }
+
+func TestWhoCanAccess_DirectRelationRemoved_FilteredImmediately(t *testing.T) {
+	ac, _, mockCache := injectAuthzMocks(t)
+	mockCache.GetWhoCanAccessCachedFunc = func(_ context.Context, _, _, _ string) ([]string, bool) {
+		return []string{"user1", "user2", "user3"}, true
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
+		if r.Target == "user2" {
+			return false, true, true
+		}
+		return true, true, true
+	}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
+	result, err := ac.WhoCanAccess(context.TODO(), "doc1", "viewer", "docs")
+	require.NoError(t, err)
+	require.Equal(t, []string{"user1", "user3"}, result)
+}
+
+func TestWhoCanAccess_IndirectRelationRemoved_FilteredImmediately(t *testing.T) {
+	ac, _, mockCache := injectAuthzMocks(t)
+	mockCache.GetWhoCanAccessCachedFunc = func(_ context.Context, _, _, _ string) ([]string, bool) {
+		return []string{"user1", "user2", "user3"}, true
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
+		if r.Target == "user2" {
+			return false, false, true
+		}
+		return true, false, true
+	}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
+	result, err := ac.WhoCanAccess(context.TODO(), "doc1", "viewer", "docs")
+	require.NoError(t, err)
+	require.Equal(t, []string{"user1", "user3"}, result)
+}
+
+func TestWhoCanAccess_NewCandidateAddedViaLocalMutation_VisibleImmediately(t *testing.T) {
+	ac, _, mockCache := injectAuthzMocks(t)
+	callCount := 0
+	mockCache.GetWhoCanAccessCachedFunc = func(_ context.Context, _, _, _ string) ([]string, bool) {
+		callCount++
+		if callCount == 1 {
+			return []string{"user1", "user2"}, true
+		}
+		return []string{"user1", "user2", "user3"}, true
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (allowed bool, direct bool, ok bool) {
+		return true, true, true
+	}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
+	result1, err := ac.WhoCanAccess(context.TODO(), "doc1", "viewer", "docs")
+	require.NoError(t, err)
+	require.Equal(t, []string{"user1", "user2"}, result1)
+	result2, err := ac.WhoCanAccess(context.TODO(), "doc1", "viewer", "docs")
+	require.NoError(t, err)
+	require.Equal(t, []string{"user1", "user2", "user3"}, result2)
+}
+
+func TestWhatCanTargetAccess_DirectRelationRemoved_FilteredImmediately(t *testing.T) {
+	ac, _, mockCache := injectAuthzMocks(t)
+	mockCache.GetWhatCanTargetAccessCachedFunc = func(_ context.Context, _ string) ([]*descope.AuthzRelation, bool) {
+		return []*descope.AuthzRelation{
+			{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs", Target: "user1"},
+			{Resource: "doc2", RelationDefinition: "editor", Namespace: "docs", Target: "user1"},
+			{Resource: "doc3", RelationDefinition: "viewer", Namespace: "docs", Target: "user1"},
+		}, true
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
+		if r.Resource == "doc2" {
+			return false, true, true
+		}
+		return true, true, true
+	}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
+	result, err := ac.WhatCanTargetAccess(context.TODO(), "user1")
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+	require.Equal(t, "doc1", result[0].Resource)
+	require.Equal(t, "doc3", result[1].Resource)
+}
+
+func TestWhatCanTargetAccess_IndirectRelationRemoved_FilteredImmediately(t *testing.T) {
+	ac, _, mockCache := injectAuthzMocks(t)
+	mockCache.GetWhatCanTargetAccessCachedFunc = func(_ context.Context, _ string) ([]*descope.AuthzRelation, bool) {
+		return []*descope.AuthzRelation{
+			{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs", Target: "user1"},
+			{Resource: "doc2", RelationDefinition: "editor", Namespace: "docs", Target: "user1"},
+		}, true
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
+		if r.Resource == "doc2" {
+			return false, false, true
+		}
+		return true, false, true
+	}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
+	result, err := ac.WhatCanTargetAccess(context.TODO(), "user1")
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	require.Equal(t, "doc1", result[0].Resource)
+}

@@ -3,6 +3,7 @@ package caches
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -152,11 +153,9 @@ func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, 
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
 	pc.indirectRelationCache.Purge(ctx) // added (direct) relations can change the result of indirect checks, so we must purge all indirect relations
-	if pc.lookupCache != nil {
-		pc.lookupCache.Purge(ctx) // added relations can change lookup results (WhoCanAccess/WhatCanTargetAccess)
-	}
 	for _, r := range relations {
 		pc.addDirectRelation(ctx, r, true)
+		pc.addToLookupCache(ctx, r)
 	}
 }
 
@@ -167,9 +166,7 @@ func (pc *projectAuthzCache) UpdateCacheWithDeletedRelations(ctx context.Context
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
 	pc.indirectRelationCache.Purge(ctx) // deleted (direct) relations can change the result of indirect checks, so we must purge all indirect relations
-	if pc.lookupCache != nil {
-		pc.lookupCache.Purge(ctx) // deleted relations can change lookup results (WhoCanAccess/WhatCanTargetAccess)
-	}
+	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation
 	for _, r := range relations {
 		pc.removeDirectRelation(ctx, r)
 	}
@@ -238,9 +235,7 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	}
 	cctx.Logger(ctx).Debug().Msg(fmt.Sprintf("Remote changes found, Resources: %v, Targets: %v, updating caches", remoteChanges.Resources, remoteChanges.Targets))
 	pc.indirectRelationCache.Purge(ctx)
-	if pc.lookupCache != nil {
-		pc.lookupCache.Purge(ctx)
-	}
+	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation
 	for _, r := range remoteChanges.Resources {
 		pc.removeDirectRelationByResource(ctx, resource(r))
 	}
@@ -557,4 +552,25 @@ func (pc *projectAuthzCache) InvalidateLookupCache(ctx context.Context) {
 	defer pc.mutex.Unlock()
 	pc.lookupCache.Purge(ctx)
 	cctx.Logger(ctx).Info().Msg("Lookup cache invalidated")
+}
+
+// addToLookupCache adds a direct relation to existing lookup cache entries.
+// Must be called while holding the mutex.
+func (pc *projectAuthzCache) addToLookupCache(ctx context.Context, r *descope.FGARelation) {
+	if !pc.lookupCacheEnabled || pc.lookupCache == nil {
+		return
+	}
+	wcaKey := whoCanAccessKey(r.Resource, r.Relation, r.ResourceType)
+	if entry, ok := pc.lookupCache.Get(ctx, wcaKey); ok && time.Now().Before(entry.ExpiresAt) {
+		if !slices.Contains(entry.Results, r.Target) {
+			entry.Results = append(entry.Results, r.Target)
+		}
+	}
+	wctaKey := whatCanTargetAccessKey(r.Target)
+	if entry, ok := pc.lookupCache.Get(ctx, wctaKey); ok && time.Now().Before(entry.ExpiresAt) {
+		newResult := r.Resource + "|" + r.Relation + "|" + r.ResourceType
+		if !slices.Contains(entry.Results, newResult) {
+			entry.Results = append(entry.Results, newResult)
+		}
+	}
 }

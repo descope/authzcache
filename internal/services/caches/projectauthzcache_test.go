@@ -148,42 +148,36 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 	assert.Equal(t, 0, len(cache.directTargetsIndex), "%v", cache.directTargetsIndex)
 }
 
-func TestUpdateCacheWithAddedRelations_PurgesLookupCache(t *testing.T) {
+func TestUpdateCacheWithAddedRelations_AddsToLookupCache(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)
 	cache.lookupCacheEnabled = true
 	cache.SetWhoCanAccessCached(ctx, "doc1", "viewer", "docs", []string{"user1", "user2"})
-	cache.SetWhatCanTargetAccessCached(ctx, "user1", []*descope.AuthzRelation{{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs", Target: "user1"}})
+	cache.SetWhatCanTargetAccessCached(ctx, "user3", []*descope.AuthzRelation{{Resource: "other", RelationDefinition: "editor", Namespace: "docs", Target: "user3"}})
+	cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{{Resource: "doc1", Target: "user3", Relation: "viewer", ResourceType: "docs"}})
 	targets, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
-	require.True(t, ok)
-	require.Equal(t, []string{"user1", "user2"}, targets)
-	relations, ok := cache.GetWhatCanTargetAccessCached(ctx, "user1")
-	require.True(t, ok)
-	require.Len(t, relations, 1)
-	cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{{Resource: "doc1", Target: "user3", Relation: "viewer"}})
-	_, ok = cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
-	assert.False(t, ok, "lookup cache should be purged after adding relations")
-	_, ok = cache.GetWhatCanTargetAccessCached(ctx, "user1")
-	assert.False(t, ok, "lookup cache should be purged after adding relations")
+	assert.True(t, ok, "lookup cache entry should still exist")
+	assert.Contains(t, targets, "user1", "existing target should remain")
+	assert.Contains(t, targets, "user2", "existing target should remain")
+	assert.Contains(t, targets, "user3", "new target should be added to lookup cache")
+	relations, ok := cache.GetWhatCanTargetAccessCached(ctx, "user3")
+	assert.True(t, ok, "lookup cache entry should still exist")
+	assert.Len(t, relations, 2, "new relation should be added to existing entry")
 }
 
-func TestUpdateCacheWithDeletedRelations_PurgesLookupCache(t *testing.T) {
+func TestUpdateCacheWithDeletedRelations_DoesNotPurgeLookupCache(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)
 	cache.lookupCacheEnabled = true
 	cache.SetWhoCanAccessCached(ctx, "doc1", "viewer", "docs", []string{"user1", "user2"})
 	cache.SetWhatCanTargetAccessCached(ctx, "user1", []*descope.AuthzRelation{{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs", Target: "user1"}})
-	targets, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
-	require.True(t, ok)
-	require.Equal(t, []string{"user1", "user2"}, targets)
-	relations, ok := cache.GetWhatCanTargetAccessCached(ctx, "user1")
-	require.True(t, ok)
-	require.Len(t, relations, 1)
 	cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{{Resource: "doc1", Target: "user1", Relation: "viewer"}})
-	_, ok = cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
-	assert.False(t, ok, "lookup cache should be purged after deleting relations")
-	_, ok = cache.GetWhatCanTargetAccessCached(ctx, "user1")
-	assert.False(t, ok, "lookup cache should be purged after deleting relations")
+	targets, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
+	assert.True(t, ok, "lookup cache should NOT be purged - candidate filtering handles removed access")
+	assert.Equal(t, []string{"user1", "user2"}, targets, "candidates remain until filtered by CheckRelation")
+	relations, ok := cache.GetWhatCanTargetAccessCached(ctx, "user1")
+	assert.True(t, ok, "lookup cache should NOT be purged")
+	assert.Len(t, relations, 1, "candidates remain until filtered by CheckRelation")
 }
 
 func TestEmptyActions(t *testing.T) {
@@ -490,27 +484,23 @@ func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {
 	assert.True(t, atLeastOneStillInCache)
 }
 
-func TestHandleRemotePollingTick_RemoteRelationChange_PurgesLookupCache(t *testing.T) {
+func TestHandleRemotePollingTick_RemoteRelationChange_DoesNotPurgeLookupCache(t *testing.T) {
 	ctx := context.TODO()
 	cache, remoteChecker := setup(t)
 	cache.lookupCacheEnabled = true
 	updateBothCachesWithChecks(ctx, t, cache)
 	cache.SetWhoCanAccessCached(ctx, "doc1", "viewer", "docs", []string{"user1", "user2"})
 	cache.SetWhatCanTargetAccessCached(ctx, "user1", []*descope.AuthzRelation{{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs", Target: "user1"}})
-	targets, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
-	require.True(t, ok)
-	require.Equal(t, []string{"user1", "user2"}, targets)
-	relations, ok := cache.GetWhatCanTargetAccessCached(ctx, "user1")
-	require.True(t, ok)
-	require.Len(t, relations, 1)
 	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
 		return &descope.AuthzModified{Resources: []string{"some-resource"}, Targets: []string{"some-target"}}, nil
 	}
 	cache.updateCacheWithRemotePolling(ctx)
-	_, ok = cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
-	assert.False(t, ok, "lookup cache should be purged after remote relation changes")
-	_, ok = cache.GetWhatCanTargetAccessCached(ctx, "user1")
-	assert.False(t, ok, "lookup cache should be purged after remote relation changes")
+	targets, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
+	assert.True(t, ok, "lookup cache should NOT be purged - candidate filtering handles stale candidates")
+	assert.Equal(t, []string{"user1", "user2"}, targets)
+	relations, ok := cache.GetWhatCanTargetAccessCached(ctx, "user1")
+	assert.True(t, ok, "lookup cache should NOT be purged")
+	assert.Len(t, relations, 1)
 }
 
 func TestHandleRemotePollingTick_NoRemoteChanges(t *testing.T) {
