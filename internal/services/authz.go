@@ -16,6 +16,8 @@ type AuthzCache interface {
 	CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error
 	DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error
 	Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error)
+	WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string) ([]string, error)
+	WhatCanTargetAccess(ctx context.Context, target string) ([]*descope.AuthzRelation, error)
 }
 
 type RemoteClientCreator func(projectID string, logger logger.LoggerInterface) (sdk.Management, error)
@@ -140,26 +142,119 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	return result, nil
 }
 
+func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string) ([]string, error) {
+	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
+	if err != nil {
+		return nil, err // notest
+	}
+	candidates, cacheHit := projectCache.GetWhoCanAccessCached(ctx, resource, relationDefinition, namespace)
+	if cacheHit && len(candidates) > 0 {
+		verified, err := a.filterWhoCanAccessCandidates(ctx, resource, relationDefinition, namespace, candidates)
+		if err != nil {
+			return nil, err // notest
+		}
+		cctx.Logger(ctx).Debug().
+			Str("resource", resource).
+			Int("candidates", len(candidates)).
+			Int("verified", len(verified)).
+			Msg("WhoCanAccess cache hit with candidate filtering")
+		return verified, nil
+	}
+	targets, err := mgmtSDK.Authz().WhoCanAccess(ctx, resource, relationDefinition, namespace)
+	if err != nil {
+		return nil, err // notest
+	}
+	projectCache.SetWhoCanAccessCached(ctx, resource, relationDefinition, namespace, targets)
+	return targets, nil
+}
+
+func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource, relationDefinition, namespace string, candidates []string) ([]string, error) {
+	relations := make([]*descope.FGARelation, len(candidates))
+	for i, target := range candidates {
+		relations[i] = &descope.FGARelation{
+			Resource:     resource,
+			ResourceType: namespace,
+			Relation:     relationDefinition,
+			Target:       target,
+		}
+	}
+	checks, err := a.Check(ctx, relations)
+	if err != nil {
+		return nil, err
+	}
+	var verified []string
+	for i, check := range checks {
+		if check.Allowed {
+			verified = append(verified, candidates[i])
+		}
+	}
+	return verified, nil
+}
+
+func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string) ([]*descope.AuthzRelation, error) {
+	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
+	if err != nil {
+		return nil, err // notest
+	}
+	candidates, cacheHit := projectCache.GetWhatCanTargetAccessCached(ctx, target)
+	if cacheHit && len(candidates) > 0 {
+		verified, err := a.filterWhatCanTargetAccessCandidates(ctx, target, candidates)
+		if err != nil {
+			return nil, err // notest
+		}
+		cctx.Logger(ctx).Debug().
+			Str("target", target).
+			Int("candidates", len(candidates)).
+			Int("verified", len(verified)).
+			Msg("WhatCanTargetAccess cache hit with candidate filtering")
+		return verified, nil
+	}
+	relations, err := mgmtSDK.Authz().WhatCanTargetAccess(ctx, target)
+	if err != nil {
+		return nil, err // notest
+	}
+	projectCache.SetWhatCanTargetAccessCached(ctx, target, relations)
+	return relations, nil
+}
+
+func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, target string, candidates []*descope.AuthzRelation) ([]*descope.AuthzRelation, error) {
+	relations := make([]*descope.FGARelation, len(candidates))
+	for i, r := range candidates {
+		relations[i] = &descope.FGARelation{
+			Resource:     r.Resource,
+			ResourceType: r.Namespace,
+			Relation:     r.RelationDefinition,
+			Target:       target,
+		}
+	}
+	checks, err := a.Check(ctx, relations)
+	if err != nil {
+		return nil, err
+	}
+	var verified []*descope.AuthzRelation
+	for i, check := range checks {
+		if check.Allowed {
+			verified = append(verified, candidates[i])
+		}
+	}
+	return verified, nil
+}
+
 func (a *authzCache) getOrCreateProjectCache(ctx context.Context) (caches.ProjectAuthzCache, sdk.Management, error) {
 	projectID := cctx.ProjectID(ctx)
 	if p, ok := a.projects.Load(projectID); ok {
 		return p.(project).cache, p.(project).mgmtSDK, nil
 	}
 	cctx.Logger(ctx).Info().Msg("Creating new project cache")
-	// create project mgmt sdk
 	projectMgmtSDK, err := a.remoteClientCreator(projectID, cctx.Logger(ctx))
 	if err != nil {
 		return nil, nil, err // notest
 	}
-	// create project cache
 	projectCache, err := a.projectCacheCreator(ctx, projectMgmtSDK.Authz())
 	if err != nil {
 		return nil, nil, err // notest
 	}
-	// start remote changes polling
 	projectCache.StartRemoteChangesPolling(ctx)
-	// save cache and sdk
 	a.projects.Store(projectID, project{cache: projectCache, mgmtSDK: projectMgmtSDK})
-	// return cache and sdk
 	return projectCache, projectMgmtSDK, nil
 }

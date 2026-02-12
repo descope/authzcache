@@ -3,6 +3,7 @@ package caches
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +32,14 @@ type remoteChangesTracking struct {
 type resourceTargetRelation string
 type resource string
 type target string
+type lookupKey string
+
+// LookupCacheEntry holds a cached lookup result with TTL tracking
+type LookupCacheEntry struct {
+	Results   []string
+	CachedAt  time.Time
+	ExpiresAt time.Time
+}
 
 type projectAuthzCache struct {
 	schemaCache           *descope.FGASchema                                   // schema
@@ -38,6 +47,10 @@ type projectAuthzCache struct {
 	directResourcesIndex  map[resource]map[target][]resourceTargetRelation
 	directTargetsIndex    map[target]map[resource][]resourceTargetRelation
 	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, bool] // resource:target:relation -> bool, e.g. file1:user2:owner -> false
+	lookupCache           *lru.MonitoredLRUCache[lookupKey, *LookupCacheEntry] // lookup cache for WhoCanAccess/WhatCanTargetAccess
+	lookupCacheEnabled    bool
+	lookupCacheTTL        time.Duration
+	lookupCacheMaxResult  int
 	remoteChanges         *remoteChangesTracking
 	mutex                 sync.RWMutex
 }
@@ -50,6 +63,12 @@ type ProjectAuthzCache interface {
 	UpdateCacheWithDeletedRelations(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck)
 	StartRemoteChangesPolling(ctx context.Context)
+	// Lookup cache methods
+	GetWhoCanAccessCached(ctx context.Context, resource, relationDefinition, namespace string) (targets []string, ok bool)
+	SetWhoCanAccessCached(ctx context.Context, resource, relationDefinition, namespace string, targets []string)
+	GetWhatCanTargetAccessCached(ctx context.Context, target string) (relations []*descope.AuthzRelation, ok bool)
+	SetWhatCanTargetAccessCached(ctx context.Context, target string, relations []*descope.AuthzRelation)
+	InvalidateLookupCache(ctx context.Context)
 }
 
 var _ ProjectAuthzCache = &projectAuthzCache{} // ensure projectAuthzCache implements ProjectAuthzCache
@@ -59,10 +78,22 @@ func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChange
 	if err != nil {
 		return nil, err // notest
 	}
+	lookupCacheEnabled := config.GetLookupCacheEnabled()
+	var lookupCache *lru.MonitoredLRUCache[lookupKey, *LookupCacheEntry]
+	if lookupCacheEnabled {
+		lookupCache, err = lru.New[lookupKey, *LookupCacheEntry](config.GetLookupCacheSizePerProject(), "authz-lookup-"+cctx.ProjectID(ctx))
+		if err != nil {
+			return nil, err // notest
+		}
+	}
 	pc := &projectAuthzCache{
 		directResourcesIndex:  make(map[resource]map[target][]resourceTargetRelation),
 		directTargetsIndex:    make(map[target]map[resource][]resourceTargetRelation),
 		indirectRelationCache: indirectRelationCache,
+		lookupCache:           lookupCache,
+		lookupCacheEnabled:    lookupCacheEnabled,
+		lookupCacheTTL:        time.Second * time.Duration(config.GetLookupCacheTTLInSeconds()),
+		lookupCacheMaxResult:  config.GetLookupCacheMaxResultSize(),
 		remoteChanges: &remoteChangesTracking{
 			lastPollTime:          time.Now(),
 			remote:                remoteChangesChecker,
@@ -75,12 +106,16 @@ func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChange
 		return nil, err // notest
 	}
 	pc.directRelationCache = directRelationCache
-	pc.remoteChanges.tickHandler = pc.updateCacheWithRemotePolling // set the tick handler (to be used in the polling goroutine)
+	pc.remoteChanges.tickHandler = pc.updateCacheWithRemotePolling
 	cctx.Logger(ctx).Info().
 		Int("direct_relation_cache_size", config.GetDirectRelationCacheSizePerProject()).
 		Int("indirect_relation_cache_size", config.GetIndirectRelationCacheSizePerProject()).
 		Int("remote_polling_interval_ms", config.GetRemotePollingIntervalInMillis()).
 		Int("purge_cooldown_window_minutes", config.GetPurgeCooldownWindowInMinutes()).
+		Bool("lookup_cache_enabled", lookupCacheEnabled).
+		Int("lookup_cache_size", config.GetLookupCacheSizePerProject()).
+		Int("lookup_cache_ttl_seconds", config.GetLookupCacheTTLInSeconds()).
+		Int("lookup_cache_max_result", config.GetLookupCacheMaxResultSize()).
 		Msg("Project authz cache initialized")
 	return pc, nil
 }
@@ -120,6 +155,7 @@ func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, 
 	pc.indirectRelationCache.Purge(ctx) // added (direct) relations can change the result of indirect checks, so we must purge all indirect relations
 	for _, r := range relations {
 		pc.addDirectRelation(ctx, r, true)
+		pc.addToLookupCache(ctx, r)
 	}
 }
 
@@ -130,6 +166,7 @@ func (pc *projectAuthzCache) UpdateCacheWithDeletedRelations(ctx context.Context
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
 	pc.indirectRelationCache.Purge(ctx) // deleted (direct) relations can change the result of indirect checks, so we must purge all indirect relations
+	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation
 	for _, r := range relations {
 		pc.removeDirectRelation(ctx, r)
 	}
@@ -198,6 +235,7 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	}
 	cctx.Logger(ctx).Debug().Msg(fmt.Sprintf("Remote changes found, Resources: %v, Targets: %v, updating caches", remoteChanges.Resources, remoteChanges.Targets))
 	pc.indirectRelationCache.Purge(ctx)
+	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation
 	for _, r := range remoteChanges.Resources {
 		pc.removeDirectRelationByResource(ctx, resource(r))
 	}
@@ -360,6 +398,9 @@ func (pc *projectAuthzCache) purgeRelationCaches(ctx context.Context) {
 	pc.directTargetsIndex = make(map[target]map[resource][]resourceTargetRelation)
 	pc.directRelationCache.Purge(ctx)
 	pc.indirectRelationCache.Purge(ctx)
+	if pc.lookupCache != nil {
+		pc.lookupCache.Purge(ctx)
+	}
 }
 
 // purgeAfterCooldown manages the cooldown logic when an error occurs, must be called while holding the mutex.
@@ -406,4 +447,130 @@ func (pc *projectAuthzCache) cancelPurgeCooldown(ctx context.Context) {
 	cctx.Logger(ctx).Info().Msg("Successful remote poll during cooldown window, cancelling pending purge")
 	pc.remoteChanges.purgeCooldownTimer.Stop()
 	pc.remoteChanges.purgeCooldownTimer = nil
+}
+
+func whoCanAccessKey(resource, relationDefinition, namespace string) lookupKey {
+	return lookupKey("wca:" + resource + ":" + relationDefinition + ":" + namespace)
+}
+
+func whatCanTargetAccessKey(target string) lookupKey {
+	return lookupKey("wcta:" + target)
+}
+
+func (pc *projectAuthzCache) GetWhoCanAccessCached(ctx context.Context, resource, relationDefinition, namespace string) ([]string, bool) {
+	if !pc.lookupCacheEnabled || pc.lookupCache == nil {
+		return nil, false
+	}
+	pc.mutex.RLock()
+	defer pc.mutex.RUnlock()
+	key := whoCanAccessKey(resource, relationDefinition, namespace)
+	entry, ok := pc.lookupCache.Get(ctx, key)
+	if !ok {
+		return nil, false
+	}
+	if time.Now().After(entry.ExpiresAt) {
+		return nil, false
+	}
+	return entry.Results, true
+}
+
+func (pc *projectAuthzCache) SetWhoCanAccessCached(ctx context.Context, resource, relationDefinition, namespace string, targets []string) {
+	if !pc.lookupCacheEnabled || pc.lookupCache == nil {
+		return
+	}
+	if len(targets) > pc.lookupCacheMaxResult {
+		cctx.Logger(ctx).Debug().Int("result_size", len(targets)).Int("max_size", pc.lookupCacheMaxResult).Msg("Skipping lookup cache - result too large")
+		return
+	}
+	pc.mutex.Lock()
+	defer pc.mutex.Unlock()
+	key := whoCanAccessKey(resource, relationDefinition, namespace)
+	now := time.Now()
+	pc.lookupCache.Add(ctx, key, &LookupCacheEntry{
+		Results:   targets,
+		CachedAt:  now,
+		ExpiresAt: now.Add(pc.lookupCacheTTL),
+	})
+}
+
+func (pc *projectAuthzCache) GetWhatCanTargetAccessCached(ctx context.Context, target string) ([]*descope.AuthzRelation, bool) {
+	if !pc.lookupCacheEnabled || pc.lookupCache == nil {
+		return nil, false
+	}
+	pc.mutex.RLock()
+	defer pc.mutex.RUnlock()
+	key := whatCanTargetAccessKey(target)
+	entry, ok := pc.lookupCache.Get(ctx, key)
+	if !ok {
+		return nil, false
+	}
+	if time.Now().After(entry.ExpiresAt) {
+		return nil, false
+	}
+	relations := make([]*descope.AuthzRelation, 0, len(entry.Results))
+	for _, r := range entry.Results {
+		parts := strings.SplitN(r, "|", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		relations = append(relations, &descope.AuthzRelation{Resource: parts[0], RelationDefinition: parts[1], Namespace: parts[2], Target: target})
+	}
+	if len(relations) == 0 {
+		return nil, false
+	}
+	return relations, true
+}
+
+func (pc *projectAuthzCache) SetWhatCanTargetAccessCached(ctx context.Context, target string, relations []*descope.AuthzRelation) {
+	if !pc.lookupCacheEnabled || pc.lookupCache == nil {
+		return
+	}
+	if len(relations) > pc.lookupCacheMaxResult {
+		cctx.Logger(ctx).Debug().Int("result_size", len(relations)).Int("max_size", pc.lookupCacheMaxResult).Msg("Skipping lookup cache - result too large")
+		return
+	}
+	pc.mutex.Lock()
+	defer pc.mutex.Unlock()
+	key := whatCanTargetAccessKey(target)
+	results := make([]string, len(relations))
+	for i, r := range relations {
+		results[i] = r.Resource + "|" + r.RelationDefinition + "|" + r.Namespace
+	}
+	now := time.Now()
+	pc.lookupCache.Add(ctx, key, &LookupCacheEntry{
+		Results:   results,
+		CachedAt:  now,
+		ExpiresAt: now.Add(pc.lookupCacheTTL),
+	})
+}
+
+func (pc *projectAuthzCache) InvalidateLookupCache(ctx context.Context) {
+	if !pc.lookupCacheEnabled || pc.lookupCache == nil {
+		return
+	}
+	pc.mutex.Lock()
+	defer pc.mutex.Unlock()
+	pc.lookupCache.Purge(ctx)
+	cctx.Logger(ctx).Info().Msg("Lookup cache invalidated")
+}
+
+// addToLookupCache adds a direct relation to existing lookup cache entries.
+// Must be called while holding the mutex.
+func (pc *projectAuthzCache) addToLookupCache(ctx context.Context, r *descope.FGARelation) {
+	if !pc.lookupCacheEnabled || pc.lookupCache == nil {
+		return
+	}
+	wcaKey := whoCanAccessKey(r.Resource, r.Relation, r.ResourceType)
+	if entry, ok := pc.lookupCache.Get(ctx, wcaKey); ok && time.Now().Before(entry.ExpiresAt) {
+		if !slices.Contains(entry.Results, r.Target) {
+			entry.Results = append(entry.Results, r.Target)
+		}
+	}
+	wctaKey := whatCanTargetAccessKey(r.Target)
+	if entry, ok := pc.lookupCache.Get(ctx, wctaKey); ok && time.Now().Before(entry.ExpiresAt) {
+		newResult := r.Resource + "|" + r.Relation + "|" + r.ResourceType
+		if !slices.Contains(entry.Results, newResult) {
+			entry.Results = append(entry.Results, newResult)
+		}
+	}
 }
