@@ -78,7 +78,7 @@ runs:
         password: ${{ inputs.action_token}}
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+      uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
       with:
         aws-region: us-east-1
         role-to-assume: arn:aws:iam::${{ inputs.ecr_aws_account }}:role/GitHubActionsECR
@@ -172,7 +172,7 @@ runs:
         subject-digest: ${{ steps.push.outputs.digest }}
         push-to-registry: true
     - name: Install Cosign
-      uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
+      uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
 
     - name: Sign the image with Cosign (keyless)
       shell: bash
