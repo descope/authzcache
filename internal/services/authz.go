@@ -149,7 +149,7 @@ func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinit
 	}
 	candidates, cacheHit := projectCache.GetWhoCanAccessCached(ctx, resource, relationDefinition, namespace)
 	if cacheHit && len(candidates) > 0 {
-		verified, err := a.filterWhoCanAccessCandidates(ctx, projectCache, mgmtSDK, resource, relationDefinition, namespace, candidates)
+		verified, err := a.filterWhoCanAccessCandidates(ctx, resource, relationDefinition, namespace, candidates)
 		if err != nil {
 			return nil, err // notest
 		}
@@ -168,7 +168,7 @@ func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinit
 	return targets, nil
 }
 
-func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, projectCache caches.ProjectAuthzCache, mgmtSDK sdk.Management, resource, relationDefinition, namespace string, candidates []string) ([]string, error) {
+func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource, relationDefinition, namespace string, candidates []string) ([]string, error) {
 	relations := make([]*descope.FGARelation, len(candidates))
 	for i, target := range candidates {
 		relations[i] = &descope.FGARelation{
@@ -178,7 +178,7 @@ func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, projectCa
 			Target:       target,
 		}
 	}
-	checks, err := a.checkRelationsWithCache(ctx, projectCache, mgmtSDK, relations)
+	checks, err := a.Check(ctx, relations)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string) ([]
 	}
 	candidates, cacheHit := projectCache.GetWhatCanTargetAccessCached(ctx, target)
 	if cacheHit && len(candidates) > 0 {
-		verified, err := a.filterWhatCanTargetAccessCandidates(ctx, projectCache, mgmtSDK, target, candidates)
+		verified, err := a.filterWhatCanTargetAccessCandidates(ctx, target, candidates)
 		if err != nil {
 			return nil, err // notest
 		}
@@ -217,7 +217,7 @@ func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string) ([]
 	return relations, nil
 }
 
-func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, projectCache caches.ProjectAuthzCache, mgmtSDK sdk.Management, target string, candidates []*descope.AuthzRelation) ([]*descope.AuthzRelation, error) {
+func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, target string, candidates []*descope.AuthzRelation) ([]*descope.AuthzRelation, error) {
 	relations := make([]*descope.FGARelation, len(candidates))
 	for i, r := range candidates {
 		relations[i] = &descope.FGARelation{
@@ -227,7 +227,7 @@ func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, pr
 			Target:       target,
 		}
 	}
-	checks, err := a.checkRelationsWithCache(ctx, projectCache, mgmtSDK, relations)
+	checks, err := a.Check(ctx, relations)
 	if err != nil {
 		return nil, err
 	}
@@ -238,40 +238,6 @@ func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, pr
 		}
 	}
 	return verified, nil
-}
-
-func (a *authzCache) checkRelationsWithCache(ctx context.Context, projectCache caches.ProjectAuthzCache, mgmtSDK sdk.Management, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
-	var cachedChecks []*descope.FGACheck
-	var toCheckViaSDK []*descope.FGARelation
-	indexToCachedChecks := make(map[int]*descope.FGACheck, len(relations))
-	for i, r := range relations {
-		if allowed, direct, ok := projectCache.CheckRelation(ctx, r); ok {
-			check := &descope.FGACheck{Allowed: allowed, Relation: r, Info: &descope.FGACheckInfo{Direct: direct}}
-			cachedChecks = append(cachedChecks, check)
-			indexToCachedChecks[i] = check
-		} else {
-			toCheckViaSDK = append(toCheckViaSDK, r)
-		}
-	}
-	if len(toCheckViaSDK) == 0 {
-		return cachedChecks, nil
-	}
-	sdkChecks, err := mgmtSDK.FGA().Check(ctx, toCheckViaSDK)
-	if err != nil {
-		return nil, err
-	}
-	projectCache.UpdateCacheWithChecks(ctx, sdkChecks)
-	var result []*descope.FGACheck
-	var j int
-	for i := range relations {
-		if check, ok := indexToCachedChecks[i]; ok {
-			result = append(result, check)
-		} else {
-			result = append(result, sdkChecks[j])
-			j++
-		}
-	}
-	return result, nil
 }
 
 func (a *authzCache) getOrCreateProjectCache(ctx context.Context) (caches.ProjectAuthzCache, sdk.Management, error) {
