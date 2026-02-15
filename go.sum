@@ -89,10 +89,10 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvwDRwnI3hwNaAHRnc=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
-github.com/descope/authzservice v0.0.0-20260210081126-47e44eb808b3 h1:3WCOUI/9oMhw88FAIfPaaAxZKEw168KC5M3w/knDQlQ=
-github.com/descope/authzservice v0.0.0-20260210081126-47e44eb808b3/go.mod h1:uxffyw/t53Y4Tr364IkwTfV5gAMa1OPvrhEpGZFU1R4=
-github.com/descope/common v0.0.9-0.20260211110849-ab7338773fc5 h1:PgFGsHnV/Hd7Il6VZGfjRmuVMexx7JnxKIaD/Z90TsU=
-github.com/descope/common v0.0.9-0.20260211110849-ab7338773fc5/go.mod h1:uEzuxgXRIjdHq+IJXm2VJfQGytDYniTriePmPqMG4Zc=
+github.com/descope/authzservice v0.0.0-20260211180101-34388db2031d h1:crMeGAoIhxxB2oxOrBnEWUAOqK8iV2j0eKLWAYupLxs=
+github.com/descope/authzservice v0.0.0-20260211180101-34388db2031d/go.mod h1:ToEhQIV9j05idVaXlKsAYm6NZCHKAx4IhGzne/VjoUc=
+github.com/descope/common v0.0.9-0.20260215090453-0761bdea35f6 h1:uopcq0eKq9nYeo3nVSfN0Uh9T3+9DaGFMWZmlY7sKFw=
+github.com/descope/common v0.0.9-0.20260215090453-0761bdea35f6/go.mod h1:AGnO46dXLyIsPLcyA5JEyUiURSWJlDPaX3V+nr0eORU=
 github.com/descope/go-sdk v1.8.0 h1:nP6himT1kbEsnDiLUR+2/W9CKJ8kHuhMOHloyBC02OU=
 github.com/descope/go-sdk v1.8.0/go.mod h1:lCwCgYOfrgjANMsR2BVe1yfX0Siwd2NjNAig0myWZqY=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
@@ -101,8 +101,8 @@ github.com/descope/protoc-gen-mocker v1.0.1-0.20260210200602-d38e8ef28dd5 h1:xFv
 github.com/descope/protoc-gen-mocker v1.0.1-0.20260210200602-d38e8ef28dd5/go.mod h1:1M7p4fHa/nvSWZz7Kg0sydDaF0TwWmd/srlt9zfh7e8=
 github.com/descope/protoc-gen-validate v1.6.6-0.20260210193117-f4dcf383411a h1:gsF8bcQc3OBDJOE6qSw4BFthrZVkJTMMOngtRe7faAc=
 github.com/descope/protoc-gen-validate v1.6.6-0.20260210193117-f4dcf383411a/go.mod h1:f86fk6E83SCLhpM8/P3+ui0CRQuNMXvWrqUWVrSKKIo=
-github.com/descope/redismock/v9 v9.0.0-20260211095157-721949e39da4 h1:KXstOBDzz8vt/WeuT2J+DQ9bKJHQpNdD64TA8wTScTY=
-github.com/descope/redismock/v9 v9.0.0-20260211095157-721949e39da4/go.mod h1:Ez/s/KwtXhyBr14i+D66mYm77rBK9OIPL42ypCWkwoI=
+github.com/descope/redismock/v9 v9.0.0-20260211170354-02987e071265 h1:JMFNEPlFaMpEm0D+Md6dxUEowM3heEWaid5dyFA2Vmg=
+github.com/descope/redismock/v9 v9.0.0-20260211170354-02987e071265/go.mod h1:Ez/s/KwtXhyBr14i+D66mYm77rBK9OIPL42ypCWkwoI=
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f h1:lO4WD4F/rVNCu3HqELle0jiPLLBs70cWOduZpkS1E78=
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f/go.mod h1:cuUVRXasLTGF7a8hSLbxyZXjz+1KgoB3wDUb6vlszIc=
 github.com/envoyproxy/go-control-plane v0.13.5-0.20251024222203-75eaa193e329 h1:K+fnvUM0VZ7ZFJf0n4L/BRlnsb9pL/GuDG6FqaH+PwM=
