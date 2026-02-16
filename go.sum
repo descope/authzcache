@@ -91,8 +91,8 @@ github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvw
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
 github.com/descope/authzservice v0.0.0-20260211180101-34388db2031d h1:crMeGAoIhxxB2oxOrBnEWUAOqK8iV2j0eKLWAYupLxs=
 github.com/descope/authzservice v0.0.0-20260211180101-34388db2031d/go.mod h1:ToEhQIV9j05idVaXlKsAYm6NZCHKAx4IhGzne/VjoUc=
-github.com/descope/common v0.0.9-0.20260216112443-d585a401aade h1:Vo5mp2+ove9JPcD14pogN5DJ9v8vFTPj4yxdu6OmmEQ=
-github.com/descope/common v0.0.9-0.20260216112443-d585a401aade/go.mod h1:AGnO46dXLyIsPLcyA5JEyUiURSWJlDPaX3V+nr0eORU=
+github.com/descope/common v0.0.9-0.20260216130256-96eb9ac23907 h1:ZABQ2zI83/q1CI1xaYnda6ZvrU3wMdCFwfo+tiZuc6c=
+github.com/descope/common v0.0.9-0.20260216130256-96eb9ac23907/go.mod h1:rc/p5aE8LmOAtU70Y+vXzd+t4o/hg97len3eqvRtCZI=
 github.com/descope/go-sdk v1.8.0 h1:nP6himT1kbEsnDiLUR+2/W9CKJ8kHuhMOHloyBC02OU=
 github.com/descope/go-sdk v1.8.0/go.mod h1:lCwCgYOfrgjANMsR2BVe1yfX0Siwd2NjNAig0myWZqY=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
@@ -235,8 +235,8 @@ github.com/prometheus/procfs v0.16.1 h1:hZ15bTNuirocR6u0JZ6BAHHmwS1p8B4P6MRqxtzM
 github.com/prometheus/procfs v0.16.1/go.mod h1:teAbpZRB1iIAJYREa1LsoWUXykVXA1KlTmWl8x/U+Is=
 github.com/rabbitmq/amqp091-go v1.10.0 h1:STpn5XsHlHGcecLmMFCtg7mqq0RnD+zFr4uzukfVhBw=
 github.com/rabbitmq/amqp091-go v1.10.0/go.mod h1:Hy4jKW5kQART1u+JkDTF9YYOQUHXqMuhrgxOEeS7G4o=
-github.com/redis/go-redis/v9 v9.17.2 h1:P2EGsA4qVIM3Pp+aPocCJ7DguDHhqrXNhVcEp4ViluI=
-github.com/redis/go-redis/v9 v9.17.2/go.mod h1:u410H11HMLoB+TP67dz8rL9s6QW2j76l0//kSOd3370=
+github.com/redis/go-redis/v9 v9.17.3 h1:fN29NdNrE17KttK5Ndf20buqfDZwGNgoUr9qjl1DQx4=
+github.com/redis/go-redis/v9 v9.17.3/go.mod h1:u410H11HMLoB+TP67dz8rL9s6QW2j76l0//kSOd3370=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
 github.com/rs/xid v1.6.0/go.mod h1:7XoLgs4eV+QndskICGsho+ADou8ySMSjJKDIan90Nz0=
