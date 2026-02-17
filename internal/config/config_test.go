@@ -137,6 +137,43 @@ func TestGetSDKDebugLog(t *testing.T) {
 	}
 }
 
+func TestGetAsyncCacheUpdate(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		setEnv   bool
+		expected bool
+	}{
+		{
+			name:     "Config value not set (default true)",
+			setEnv:   false,
+			expected: true,
+		},
+		{
+			name:     "Config value set to false",
+			value:    "false",
+			setEnv:   true,
+			expected: false,
+		},
+		{
+			name:     "Config value set to true",
+			value:    "true",
+			setEnv:   true,
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setEnv {
+				t.Setenv(ConfigKeyAsyncCacheUpdate, tt.value)
+			}
+			actual := GetAsyncCacheUpdate()
+			require.Equal(t, tt.expected, actual)
+		})
+	}
+}
+
 func TestGetPurgeCooldownWindowInMinutes(t *testing.T) {
 	tests := []struct {
 		name     string
