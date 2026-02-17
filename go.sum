@@ -89,12 +89,12 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvwDRwnI3hwNaAHRnc=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
-github.com/descope/authzservice v0.0.0-20260211180101-34388db2031d h1:crMeGAoIhxxB2oxOrBnEWUAOqK8iV2j0eKLWAYupLxs=
-github.com/descope/authzservice v0.0.0-20260211180101-34388db2031d/go.mod h1:ToEhQIV9j05idVaXlKsAYm6NZCHKAx4IhGzne/VjoUc=
+github.com/descope/authzservice v0.0.0-20260217070011-bb428751ee1d h1:IRvKzYFiqe4dOFheqVdduzkTvSbF2FT2ew1BnOAdKcw=
+github.com/descope/authzservice v0.0.0-20260217070011-bb428751ee1d/go.mod h1:ToEhQIV9j05idVaXlKsAYm6NZCHKAx4IhGzne/VjoUc=
 github.com/descope/common v0.0.9-0.20260216215246-30cebccbe496 h1:UApKPH8AnQj+nph5g+d4fiVLoW2Bwk4NCtGo48p6GI8=
 github.com/descope/common v0.0.9-0.20260216215246-30cebccbe496/go.mod h1:rc/p5aE8LmOAtU70Y+vXzd+t4o/hg97len3eqvRtCZI=
-github.com/descope/go-sdk v1.8.0 h1:nP6himT1kbEsnDiLUR+2/W9CKJ8kHuhMOHloyBC02OU=
-github.com/descope/go-sdk v1.8.0/go.mod h1:lCwCgYOfrgjANMsR2BVe1yfX0Siwd2NjNAig0myWZqY=
+github.com/descope/go-sdk v1.9.0 h1:mQUP1TtCK7AupkR7/u88XiUb/uWYl6RuQMlVLE4jPKM=
+github.com/descope/go-sdk v1.9.0/go.mod h1:lCwCgYOfrgjANMsR2BVe1yfX0Siwd2NjNAig0myWZqY=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14/go.mod h1:NXzSaAKXU0dil+cxwRcnqgNPdZR0U571aLLqJaRibBw=
 github.com/descope/protoc-gen-mocker v1.0.1-0.20260210200602-d38e8ef28dd5 h1:xFvHyxLGvL5SB9v2Z6xBT38xTEqRU36f7gkG6rN15Yk=
