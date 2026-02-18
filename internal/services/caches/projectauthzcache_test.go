@@ -852,6 +852,38 @@ func TestRemoveIndexOnEviction(t *testing.T) {
 	assert.True(t, ok)
 }
 
+func TestRemoveIndexOnEviction_ColonInIDs(t *testing.T) {
+	ctx := context.TODO()
+	// set cache size to 2 so that 3rd addition triggers an eviction
+	t.Setenv(config.ConfigKeyDirectRelationCacheSizePerProject, "2")
+	cache, _ := setup(t)
+	// use IDs that contain colons (e.g., "org:r1", "user:t1")
+	r1 := &descope.FGARelation{Resource: "org:r1", Target: "user:t1", Relation: "owner"}
+	r2 := &descope.FGARelation{Resource: "org:r1", Target: "user:t2", Relation: "owner"}
+	r3 := &descope.FGARelation{Resource: "org:r1", Target: "user:t3", Relation: "owner"}
+	cache.addDirectRelation(ctx, r1, true)
+	cache.addDirectRelation(ctx, r2, true)
+	// assert all indices created and added
+	assert.True(t, slices.Contains(cache.directResourcesIndex["org:r1"]["user:t1"], key(r1)))
+	assert.True(t, slices.Contains(cache.directResourcesIndex["org:r1"]["user:t2"], key(r2)))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["user:t1"]["org:r1"], key(r1)))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["user:t2"]["org:r1"], key(r2)))
+	// add 3rd relation (triggers eviction of r1)
+	cache.addDirectRelation(ctx, r3, true)
+	// assert that r1 was evicted from the cache and indices (no orphaned entries)
+	_, _, ok := cache.CheckRelation(ctx, r1)
+	assert.False(t, ok)
+	_, ok = cache.directResourcesIndex["org:r1"]["user:t1"]
+	assert.False(t, ok, "evicted key should be removed from resource index")
+	_, ok = cache.directTargetsIndex["user:t1"]["org:r1"]
+	assert.False(t, ok, "evicted key should be removed from target index")
+	// assert that r2 and r3 are still present
+	assert.True(t, slices.Contains(cache.directResourcesIndex["org:r1"]["user:t2"], key(r2)))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["user:t2"]["org:r1"], key(r2)))
+	assert.True(t, slices.Contains(cache.directResourcesIndex["org:r1"]["user:t3"], key(r3)))
+	assert.True(t, slices.Contains(cache.directTargetsIndex["user:t3"]["org:r1"], key(r3)))
+}
+
 // benchmark cache checks with 1,000,000 direct relations
 func BenchmarkCheckRelation(b *testing.B) {
 	// prepare the cache with 1,000,000 direct relations
