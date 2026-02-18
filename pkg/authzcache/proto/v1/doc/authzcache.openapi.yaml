@@ -6,6 +6,54 @@ info:
     title: AuthzCache API
     version: 0.0.1
 paths:
+    /v1/mgmt/authz/re/targetall:
+        post:
+            tags:
+                - AuthzCache
+            summary: Find what a target can access
+            description: Find what a target can access.
+            operationId: WhatCanTargetAccess
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/authzv1.WhatCanTargetAccessRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/authzv1.WhatCanTargetAccessResponse'
+            security:
+                - AuthProjectIdMgmtKey: []
+            x-publishYaml: fga
+            x-order: 6
+    /v1/mgmt/authz/re/who:
+        post:
+            tags:
+                - AuthzCache
+            summary: Find who can access a resource
+            description: Find who can access a resource.
+            operationId: WhoCanAccess
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/authzv1.WhoCanAccessRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/authzv1.WhoCanAccessResponse'
+            security:
+                - AuthProjectIdMgmtKey: []
+            x-publishYaml: fga
+            x-order: 5
     /v1/mgmt/fga/check:
         post:
             tags:
@@ -182,6 +230,38 @@ components:
         authzv1.DeleteTuplesResponse:
             type: object
             properties: {}
+        authzv1.Relation:
+            type: object
+            properties:
+                resource:
+                    type: string
+                    description: Relation is defined on the resource
+                relationDefinition:
+                    type: string
+                    description: The name of the relation definition
+                namespace:
+                    type: string
+                    description: The namespace of the relation definition
+                target:
+                    type: string
+                    description: The target for given the relation
+                targetNamespace:
+                    type: string
+                    description: The target namespace for the relation
+                targetSetResource:
+                    type: string
+                    description: The targetSet target resource for the relation
+                targetSetRelationDefinition:
+                    type: string
+                    description: The targetSet target relation definition for the relation
+                targetSetRelationDefinitionNamespace:
+                    type: string
+                    description: The targetSet target relation definition namespace for the relation
+                query:
+                    allOf:
+                        - $ref: '#/components/schemas/authzv1.UserQuery'
+                    description: User query for a list of users target
+            description: Relation is specified between resource and target where target can be direct target (user or related resource), targetSet (anyone who has another relation), and list of users matching query
         authzv1.SaveDSLSchemaRequest:
             type: object
             properties:
@@ -204,5 +284,64 @@ components:
                     type: string
                 targetType:
                     type: string
+        authzv1.UserQuery:
+            type: object
+            properties:
+                tenants:
+                    type: array
+                    items:
+                        type: string
+                    description: If not empty then users must be members of at least one of these tenants
+                roles:
+                    type: array
+                    items:
+                        type: string
+                    description: If not empty then users must have one of the specified roles
+                text:
+                    type: string
+                    description: Full text search across relevant columns (displayName, email, tenants, status)
+                statuses:
+                    type: array
+                    items:
+                        type: string
+                    description: If not empty then users must be in one of the given statuses
+                ssoOnly:
+                    type: boolean
+                    description: Return only users that have SSO external IDs
+                withTestUser:
+                    type: boolean
+                    description: Return also users which are test users
+                customAttributes:
+                    type: object
+                    description: If provided, filter by these custom attributes
+        authzv1.WhatCanTargetAccessRequest:
+            type: object
+            properties:
+                target:
+                    type: string
+        authzv1.WhatCanTargetAccessResponse:
+            type: object
+            properties:
+                relations:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/authzv1.Relation'
+        authzv1.WhoCanAccessRequest:
+            type: object
+            properties:
+                resource:
+                    type: string
+                relationDefinition:
+                    type: string
+                namespace:
+                    type: string
+            description: Query the list of users who have the relation to the resource
+        authzv1.WhoCanAccessResponse:
+            type: object
+            properties:
+                targets:
+                    type: array
+                    items:
+                        type: string
 tags:
     - name: AuthzCache
