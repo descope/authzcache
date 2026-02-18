@@ -575,7 +575,7 @@ func BenchmarkCheck(b *testing.B) {
 			mockFGA := &mocksmgmt.MockFGA{
 				CheckResponse: sdkResponse,
 				CheckAssert: func(_ []*descope.FGARelation) {
-					time.Sleep(time.Millisecond) // simulate realistic SDK latency
+					time.Sleep(time.Millisecond) // simulate SDK latency
 				},
 			}
 			mockSDK := &mocksmgmt.MockManagement{
