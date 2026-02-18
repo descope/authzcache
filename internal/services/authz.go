@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/descope/authzcache/internal/config"
 	"github.com/descope/authzcache/internal/services/caches"
 	cctx "github.com/descope/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
@@ -117,11 +116,7 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 		return nil, err // notest
 	}
 	// update cache
-	if config.GetAsyncCacheUpdate() {
-		go projectCache.UpdateCacheWithChecks(context.WithoutCancel(ctx), sdkChecks)
-	} else {
-		projectCache.UpdateCacheWithChecks(ctx, sdkChecks)
-	}
+	projectCache.UpdateCacheWithChecks(ctx, sdkChecks)
 	// merge cached and sdk checks in the same order as input relations and return them
 	var result []*descope.FGACheck
 	var j int
