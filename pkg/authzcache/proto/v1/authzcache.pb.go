@@ -29,7 +29,7 @@ var File_authzcache_proto protoreflect.FileDescriptor
 
 const file_authzcache_proto_rawDesc = "" +
 	"\n" +
-	"\x10authzcache.proto\x12\bauthzcv1\x1a\x1cgoogle/api/annotations.proto\x1a\fmocker.proto\x1a\x1bopenapiv3/annotations.proto\x1a\x0evalidate.proto\x1a\x0ev1/authz.proto2\xb2\b\n" +
+	"\x10authzcache.proto\x12\bauthzcv1\x1a\x1cgoogle/api/annotations.proto\x1a\fmocker.proto\x1a\x1bopenapiv3/annotations.proto\x1a\x0evalidate.proto\x1a\x0ev1/authz.proto2\xe2\f\n" +
 	"\n" +
 	"AuthzCache\x12\x85\x02\n" +
 	"\x0fCreateFGASchema\x12\x1d.authzv1.SaveDSLSchemaRequest\x1a\x1e.authzv1.SaveDSLSchemaResponse\"\xb2\x01\xbaG\x90\x01\x12\x1bCreate the given FGA Schema\x1a\x1cCreate the given FGA Schema.*\x0fCreateFGASchemaZ\x1a\n" +
@@ -51,32 +51,50 @@ const file_authzcache_proto_rawDesc = "" +
 	"\x18\n" +
 	"\x14AuthProjectIdMgmtKey\x12\x00j\x16\n" +
 	"\rx-publishYaml\x12\x05\x12\x03fgaj\x0e\n" +
-	"\ax-order\x12\x03\x12\x013\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/mgmt/fga/checkBw\xba~=\b\x01\"\fgrpcauthzcv1*\x10authzcacheclient2\x19pkg/authzcache/test/mocksZ5github.com/descope/authzcache/pkg/authzcache/proto/v1b\x06proto3"
+	"\ax-order\x12\x03\x12\x013\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/v1/mgmt/fga/check\x12\x85\x02\n" +
+	"\fWhoCanAccess\x12\x1c.authzv1.WhoCanAccessRequest\x1a\x1d.authzv1.WhoCanAccessResponse\"\xb7\x01\xbaG\x93\x01\x12\x1eFind who can access a resource\x1a\x1fFind who can access a resource.*\fWhoCanAccessZ\x1a\n" +
+	"\x18\n" +
+	"\x14AuthProjectIdMgmtKey\x12\x00j\x16\n" +
+	"\rx-publishYaml\x12\x05\x12\x03fgaj\x0e\n" +
+	"\ax-order\x12\x03\x12\x015\x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/v1/mgmt/authz/re/who\x12\xa5\x02\n" +
+	"\x13WhatCanTargetAccess\x12#.authzv1.WhatCanTargetAccessRequest\x1a$.authzv1.WhatCanTargetAccessResponse\"\xc2\x01\xbaG\x98\x01\x12\x1dFind what a target can access\x1a\x1eFind what a target can access.*\x13WhatCanTargetAccessZ\x1a\n" +
+	"\x18\n" +
+	"\x14AuthProjectIdMgmtKey\x12\x00j\x16\n" +
+	"\rx-publishYaml\x12\x05\x12\x03fgaj\x0e\n" +
+	"\ax-order\x12\x03\x12\x016\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/v1/mgmt/authz/re/targetallBw\xba~=\b\x01\"\fgrpcauthzcv1*\x10authzcacheclient2\x19pkg/authzcache/test/mocksZ5github.com/descope/authzcache/pkg/authzcache/proto/v1b\x06proto3"
 
 var file_authzcache_proto_goTypes = []any{
-	(*v1.SaveDSLSchemaRequest)(nil),  // 0: authzv1.SaveDSLSchemaRequest
-	(*v1.CreateTuplesRequest)(nil),   // 1: authzv1.CreateTuplesRequest
-	(*v1.DeleteTuplesRequest)(nil),   // 2: authzv1.DeleteTuplesRequest
-	(*v1.CheckRequest)(nil),          // 3: authzv1.CheckRequest
-	(*v1.SaveDSLSchemaResponse)(nil), // 4: authzv1.SaveDSLSchemaResponse
-	(*v1.CreateTuplesResponse)(nil),  // 5: authzv1.CreateTuplesResponse
-	(*v1.DeleteTuplesResponse)(nil),  // 6: authzv1.DeleteTuplesResponse
-	(*v1.CheckResponse)(nil),         // 7: authzv1.CheckResponse
+	(*v1.SaveDSLSchemaRequest)(nil),        // 0: authzv1.SaveDSLSchemaRequest
+	(*v1.CreateTuplesRequest)(nil),         // 1: authzv1.CreateTuplesRequest
+	(*v1.DeleteTuplesRequest)(nil),         // 2: authzv1.DeleteTuplesRequest
+	(*v1.CheckRequest)(nil),                // 3: authzv1.CheckRequest
+	(*v1.WhoCanAccessRequest)(nil),         // 4: authzv1.WhoCanAccessRequest
+	(*v1.WhatCanTargetAccessRequest)(nil),  // 5: authzv1.WhatCanTargetAccessRequest
+	(*v1.SaveDSLSchemaResponse)(nil),       // 6: authzv1.SaveDSLSchemaResponse
+	(*v1.CreateTuplesResponse)(nil),        // 7: authzv1.CreateTuplesResponse
+	(*v1.DeleteTuplesResponse)(nil),        // 8: authzv1.DeleteTuplesResponse
+	(*v1.CheckResponse)(nil),               // 9: authzv1.CheckResponse
+	(*v1.WhoCanAccessResponse)(nil),        // 10: authzv1.WhoCanAccessResponse
+	(*v1.WhatCanTargetAccessResponse)(nil), // 11: authzv1.WhatCanTargetAccessResponse
 }
 var file_authzcache_proto_depIdxs = []int32{
-	0, // 0: authzcv1.AuthzCache.CreateFGASchema:input_type -> authzv1.SaveDSLSchemaRequest
-	1, // 1: authzcv1.AuthzCache.CreateFGARelations:input_type -> authzv1.CreateTuplesRequest
-	2, // 2: authzcv1.AuthzCache.DeleteFGARelations:input_type -> authzv1.DeleteTuplesRequest
-	3, // 3: authzcv1.AuthzCache.Check:input_type -> authzv1.CheckRequest
-	4, // 4: authzcv1.AuthzCache.CreateFGASchema:output_type -> authzv1.SaveDSLSchemaResponse
-	5, // 5: authzcv1.AuthzCache.CreateFGARelations:output_type -> authzv1.CreateTuplesResponse
-	6, // 6: authzcv1.AuthzCache.DeleteFGARelations:output_type -> authzv1.DeleteTuplesResponse
-	7, // 7: authzcv1.AuthzCache.Check:output_type -> authzv1.CheckResponse
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0,  // 0: authzcv1.AuthzCache.CreateFGASchema:input_type -> authzv1.SaveDSLSchemaRequest
+	1,  // 1: authzcv1.AuthzCache.CreateFGARelations:input_type -> authzv1.CreateTuplesRequest
+	2,  // 2: authzcv1.AuthzCache.DeleteFGARelations:input_type -> authzv1.DeleteTuplesRequest
+	3,  // 3: authzcv1.AuthzCache.Check:input_type -> authzv1.CheckRequest
+	4,  // 4: authzcv1.AuthzCache.WhoCanAccess:input_type -> authzv1.WhoCanAccessRequest
+	5,  // 5: authzcv1.AuthzCache.WhatCanTargetAccess:input_type -> authzv1.WhatCanTargetAccessRequest
+	6,  // 6: authzcv1.AuthzCache.CreateFGASchema:output_type -> authzv1.SaveDSLSchemaResponse
+	7,  // 7: authzcv1.AuthzCache.CreateFGARelations:output_type -> authzv1.CreateTuplesResponse
+	8,  // 8: authzcv1.AuthzCache.DeleteFGARelations:output_type -> authzv1.DeleteTuplesResponse
+	9,  // 9: authzcv1.AuthzCache.Check:output_type -> authzv1.CheckResponse
+	10, // 10: authzcv1.AuthzCache.WhoCanAccess:output_type -> authzv1.WhoCanAccessResponse
+	11, // 11: authzcv1.AuthzCache.WhatCanTargetAccess:output_type -> authzv1.WhatCanTargetAccessResponse
+	6,  // [6:12] is the sub-list for method output_type
+	0,  // [0:6] is the sub-list for method input_type
+	0,  // [0:0] is the sub-list for extension type_name
+	0,  // [0:0] is the sub-list for extension extendee
+	0,  // [0:0] is the sub-list for field type_name
 }
 
 func init() { file_authzcache_proto_init() }

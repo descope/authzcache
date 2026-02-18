@@ -85,4 +85,38 @@ service AuthzCache {
       security: {additional_properties:{name:"AuthProjectIdMgmtKey",value:{}}}
     };
   }
+
+  rpc WhoCanAccess(authzv1.WhoCanAccessRequest) returns(authzv1.WhoCanAccessResponse) {
+    option (google.api.http) = {
+      post: "/v1/mgmt/authz/re/who"
+      body: "*"
+    };
+    option (openapi.v3.operation) = {
+      operation_id: "WhoCanAccess",
+      description: "Find who can access a resource.",
+      summary: "Find who can access a resource"
+      specification_extension: [
+        {name:"x-publishYaml",value:{yaml:"fga"}},
+        {name:"x-order",value:{yaml:"5"}}
+      ],
+      security: {additional_properties:{name:"AuthProjectIdMgmtKey",value:{}}}
+    };
+  }
+
+  rpc WhatCanTargetAccess(authzv1.WhatCanTargetAccessRequest) returns(authzv1.WhatCanTargetAccessResponse) {
+    option (google.api.http) = {
+      post: "/v1/mgmt/authz/re/targetall"
+      body: "*"
+    };
+    option (openapi.v3.operation) = {
+      operation_id: "WhatCanTargetAccess",
+      description: "Find what a target can access.",
+      summary: "Find what a target can access"
+      specification_extension: [
+        {name:"x-publishYaml",value:{yaml:"fga"}},
+        {name:"x-order",value:{yaml:"6"}}
+      ],
+      security: {additional_properties:{name:"AuthProjectIdMgmtKey",value:{}}}
+    };
+  }
 }

@@ -85,6 +85,40 @@ func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest)
 	return &authzv1.CheckResponse{Tuples: responseTuples}, nil
 }
 
+func (ac *authzController) WhoCanAccess(ctx context.Context, req *authzv1.WhoCanAccessRequest) (*authzv1.WhoCanAccessResponse, error) {
+	cctx.Logger(ctx).Info().Msg("Checking who can access")
+	targets, err := ac.authzCache.WhoCanAccess(ctx, req.Resource, req.RelationDefinition, req.Namespace)
+	if err != nil {
+		return nil, se.ServiceErrorFromSdkError(ctx, err)
+	}
+	return &authzv1.WhoCanAccessResponse{Targets: targets}, nil
+}
+
+func (ac *authzController) WhatCanTargetAccess(ctx context.Context, req *authzv1.WhatCanTargetAccessRequest) (*authzv1.WhatCanTargetAccessResponse, error) {
+	cctx.Logger(ctx).Info().Msg("Checking what can target access")
+	relations, err := ac.authzCache.WhatCanTargetAccess(ctx, req.Target)
+	if err != nil {
+		return nil, se.ServiceErrorFromSdkError(ctx, err)
+	}
+	protoRelations := make([]*authzv1.Relation, len(relations))
+	for i, r := range relations {
+		protoRelations[i] = relationFromAuthzRelation(r)
+	}
+	return &authzv1.WhatCanTargetAccessResponse{Relations: protoRelations}, nil
+}
+
+func relationFromAuthzRelation(r *descope.AuthzRelation) *authzv1.Relation {
+	return &authzv1.Relation{
+		Resource:                             r.Resource,
+		RelationDefinition:                   r.RelationDefinition,
+		Namespace:                            r.Namespace,
+		Target:                               r.Target,
+		TargetSetResource:                    r.TargetSetResource,
+		TargetSetRelationDefinition:          r.TargetSetRelationDefinition,
+		TargetSetRelationDefinitionNamespace: r.TargetSetRelationDefinitionNamespace,
+	}
+}
+
 func relationsFromTuples(tuples []*authzv1.Tuple) []*descope.FGARelation {
 	relations := make([]*descope.FGARelation, len(tuples))
 	for i, t := range tuples {
