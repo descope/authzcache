@@ -26,6 +26,16 @@ func (m *mockRemoteChangesChecker) GetModified(ctx context.Context, since time.T
 
 var _ RemoteChangesChecker = &mockRemoteChangesChecker{} // ensure mockRemoteChangesChecker implements RemoteChangesChecker
 
+// checkRelation is a test helper that calls CheckRelations with a single relation
+func checkRelation(ctx context.Context, cache ProjectAuthzCache, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
+	_, _, indexToCheck := cache.CheckRelations(ctx, []*descope.FGARelation{r})
+	check, ok := indexToCheck[0]
+	if !ok {
+		return false, false, false
+	}
+	return check.Allowed, check.Info.Direct, true
+}
+
 // helper struct to hold a cached relation and its expected allowed value
 type cachedRelation struct {
 	allowed bool
@@ -66,7 +76,7 @@ func TestUpdateCacheWithChecks(t *testing.T) {
 	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
 	// validate CheckRelation results
 	for _, cr := range cachedRelations {
-		allowed, direct, ok := cache.CheckRelation(ctx, cr.r)
+		allowed, direct, ok := checkRelation(ctx, cache, cr.r)
 		assert.True(t, ok)
 		assert.Equal(t, cr.allowed, allowed)
 		assert.Equal(t, cr.direct, direct)
@@ -77,7 +87,7 @@ func TestUpdateCacheWithChecks(t *testing.T) {
 	for _, cr := range cachedRelations {
 		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: cr.allowed, Relation: cr.r, Info: &descope.FGACheckInfo{Direct: cr.direct}}})
 		// validate CheckRelation after the 2nd update, should return the same results
-		allowed, direct, ok := cache.CheckRelation(ctx, cr.r)
+		allowed, direct, ok := checkRelation(ctx, cache, cr.r)
 		assert.True(t, ok)
 		assert.Equal(t, cr.allowed, allowed)
 		assert.Equal(t, cr.direct, direct)
@@ -102,14 +112,14 @@ func TestUpdateCacheWithAddedRelations(t *testing.T) {
 	// direct old relations should still be there, indirect should now be removed
 	for _, old := range oldRelations {
 		expectedToRemainInCache := old.direct // non direct relations should have been removed, direct should still be there
-		allowed, _, ok := cache.CheckRelation(ctx, old.r)
+		allowed, _, ok := checkRelation(ctx, cache, old.r)
 		assert.Equal(t, expectedToRemainInCache, ok)
 		expectedAllowed := expectedToRemainInCache && old.allowed
 		assert.Equal(t, expectedAllowed, allowed) // if the relation is still in the cache, it should have the same allowed value
 	}
 	// all new relations should be allowed
 	for _, r := range newRelations {
-		allowed, _, ok := cache.CheckRelation(ctx, r)
+		allowed, _, ok := checkRelation(ctx, cache, r)
 		assert.True(t, ok)
 		assert.True(t, allowed)
 	}
@@ -130,7 +140,7 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 	// 3. all indirect relations are removed
 	for _, old := range oldRelations {
 		expectedToRemainInCache := old.direct && old.r != toDelete.r
-		allowed, _, ok := cache.CheckRelation(ctx, old.r)
+		allowed, _, ok := checkRelation(ctx, cache, old.r)
 		assert.Equal(t, expectedToRemainInCache, ok)
 		expectedAllowed := expectedToRemainInCache && old.allowed
 		assert.Equal(t, expectedAllowed, allowed)
@@ -138,7 +148,7 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 	// delete all remaining direct relations + perform re-deletes
 	for _, old := range oldRelations {
 		cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{old.r})
-		allowed, direct, ok := cache.CheckRelation(ctx, old.r)
+		allowed, direct, ok := checkRelation(ctx, cache, old.r)
 		assert.False(t, ok)
 		assert.False(t, allowed)
 		assert.False(t, direct)
@@ -196,7 +206,7 @@ func TestEmptyActions(t *testing.T) {
 	assert.Equal(t, expectedDirectSize, cache.directRelationCache.Len(ctx))
 	assert.Equal(t, expectedIndirectSize, cache.indirectRelationCache.Len(ctx))
 	for _, cr := range cachedRelations {
-		allowed, direct, ok := cache.CheckRelation(ctx, cr.r)
+		allowed, direct, ok := checkRelation(ctx, cache, cr.r)
 		assert.True(t, ok)
 		assert.Equal(t, cr.allowed, allowed)
 		assert.Equal(t, cr.direct, direct)
@@ -246,7 +256,7 @@ func TestHandleRemotePollingTick_RemoteChangesError(t *testing.T) {
 	require.True(t, remoteCalled)
 	// verify that all relations were invalidated
 	for _, cr := range cachedRelations {
-		_, _, ok := cache.CheckRelation(ctx, cr.r)
+		_, _, ok := checkRelation(ctx, cache, cr.r)
 		assert.False(t, ok)
 	}
 	// verify indices are now empty
@@ -277,7 +287,7 @@ func TestHandleRemotePollingTick_CooldownWindowZero(t *testing.T) {
 	cache.updateCacheWithRemotePolling(ctx)
 	// verify that all caches were purged immediately
 	for _, cr := range cachedRelations {
-		_, _, ok := cache.CheckRelation(ctx, cr.r)
+		_, _, ok := checkRelation(ctx, cache, cr.r)
 		assert.False(t, ok)
 	}
 	assert.Nil(t, cache.GetSchema())
@@ -302,7 +312,7 @@ func TestHandleRemotePollingTick_CooldownWindowStartsOnFirstError(t *testing.T) 
 	cache.updateCacheWithRemotePolling(ctx)
 	// verify that caches were NOT purged
 	for _, cr := range cachedRelations {
-		_, _, ok := cache.CheckRelation(ctx, cr.r)
+		_, _, ok := checkRelation(ctx, cache, cr.r)
 		assert.True(t, ok, "cache should still be valid during cooldown")
 	}
 	assert.NotNil(t, cache.GetSchema(), "schema should still be cached")
@@ -336,7 +346,7 @@ func TestHandleRemotePollingTick_SuccessfulResponseCancelsCooldown(t *testing.T)
 	assert.Nil(t, cache.remoteChanges.purgeCooldownTimer, "timer should be cancelled")
 	// verify caches are still valid
 	for _, cr := range cachedRelations {
-		_, _, ok := cache.CheckRelation(ctx, cr.r)
+		_, _, ok := checkRelation(ctx, cache, cr.r)
 		assert.True(t, ok, "cache should still be valid after successful response")
 	}
 	assert.NotNil(t, cache.GetSchema())
@@ -421,7 +431,7 @@ func TestHandleRemotePollingTick_RemoteSchemaChange(t *testing.T) {
 	assert.Nil(t, cache.GetSchema())
 	// verify that all relations were invalidated
 	for _, cr := range cachedRelations {
-		allowed, direct, ok := cache.CheckRelation(ctx, cr.r)
+		allowed, direct, ok := checkRelation(ctx, cache, cr.r)
 		assert.False(t, ok)
 		assert.False(t, allowed)
 		assert.False(t, direct)
@@ -462,7 +472,7 @@ func TestHandleRemotePollingTick_RemoteRelationChange(t *testing.T) {
 	for _, cr := range cachedRelations {
 		expectedToRemainInCache := cr.direct && cr.r.Resource != resourceChanged && cr.r.Target != targetChanged
 		atLeastOneStillInCache = atLeastOneStillInCache || expectedToRemainInCache
-		allowed, _, ok := cache.CheckRelation(ctx, cr.r)
+		allowed, _, ok := checkRelation(ctx, cache, cr.r)
 		assert.Equal(t, expectedToRemainInCache, ok, "relation: %v cache state is wrong", cr.r)
 		// if the relation is still in the cache, it should have the same allowed value
 		expectedAllowed := expectedToRemainInCache && cr.allowed
@@ -526,7 +536,7 @@ func TestHandleRemotePollingTick_NoRemoteChanges(t *testing.T) {
 	assert.NotNil(t, cache.GetSchema())
 	// verify that all relations are still in the cache
 	for _, cr := range cachedRelations {
-		allowed, direct, ok := cache.CheckRelation(ctx, cr.r)
+		allowed, direct, ok := checkRelation(ctx, cache, cr.r)
 		assert.True(t, ok)
 		assert.Equal(t, cr.allowed, allowed)
 		assert.Equal(t, cr.direct, direct)
@@ -638,7 +648,7 @@ func TestCooldownMechanism_ConcurrentStressTest(t *testing.T) {
 					})
 				case 4:
 					// check relation
-					cache.CheckRelation(ctx, &descope.FGARelation{
+					checkRelation(ctx, cache, &descope.FGARelation{
 						Resource: "r" + uuid.NewString(),
 						Target:   "t" + uuid.NewString(),
 						Relation: "owner",
@@ -835,7 +845,7 @@ func TestRemoveIndexOnEviction(t *testing.T) {
 	// add 3rd relation (this should trigger an eviction)
 	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"}, true)
 	// assert that the 1st relation was evicted from the cache and the indices
-	_, _, ok := cache.CheckRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})
+	_, _, ok := checkRelation(ctx, cache, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})
 	assert.False(t, ok)
 	_, ok = cache.directResourcesIndex["r1"]["t1"]
 	assert.False(t, ok)
@@ -846,9 +856,9 @@ func TestRemoveIndexOnEviction(t *testing.T) {
 	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
 	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t3"], key(&descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"})))
 	assert.True(t, slices.Contains(cache.directTargetsIndex["t3"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"})))
-	_, _, ok = cache.CheckRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})
+	_, _, ok = checkRelation(ctx, cache, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})
 	assert.True(t, ok)
-	_, _, ok = cache.CheckRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"})
+	_, _, ok = checkRelation(ctx, cache, &descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"})
 	assert.True(t, ok)
 }
 
@@ -889,7 +899,7 @@ func BenchmarkCheckRelation(b *testing.B) {
 			go func() {
 				defer wg.Done()
 				j := i % 1_000_000
-				cache.CheckRelation(ctx, &descope.FGARelation{Resource: resources[j], Target: targets[j], Relation: "owner"}) // true
+				checkRelation(ctx, cache, &descope.FGARelation{Resource: resources[j], Target: targets[j], Relation: "owner"}) // true
 			}()
 		}
 		wg.Wait()
@@ -902,7 +912,7 @@ func BenchmarkCheckRelation(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			go func() {
 				defer wg.Done()
-				cache.CheckRelation(ctx, &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"}) // false
+				checkRelation(ctx, cache, &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"}) // false
 			}()
 		}
 		wg.Wait()

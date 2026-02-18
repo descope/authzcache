@@ -2,7 +2,10 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/go-sdk/descope"
@@ -530,4 +533,94 @@ func TestWhatCanTargetAccess_IndirectRelationRemoved_FilteredImmediately(t *test
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 	require.Equal(t, "doc1", result[0].Resource)
+}
+
+func BenchmarkCheck(b *testing.B) {
+	for _, numRelations := range []int{500, 1000, 5000} {
+		name := fmt.Sprintf("relations=%d", numRelations)
+		b.Run(name, func(b *testing.B) {
+			ctx := context.TODO()
+			projectCache, err := caches.NewProjectAuthzCache(ctx, nil)
+			if err != nil {
+				b.Fatal(err)
+			}
+			halfIdx := numRelations / 2
+			// pre-populate cache with first half — these are always cache hits
+			fixedRelations := make([]*descope.FGARelation, halfIdx)
+			cachedChecks := make([]*descope.FGACheck, halfIdx)
+			for i := range halfIdx {
+				fixedRelations[i] = &descope.FGARelation{
+					Resource:     fmt.Sprintf("cached-r-%d", i),
+					Target:       fmt.Sprintf("cached-t-%d", i),
+					Relation:     "viewer",
+					ResourceType: "doc",
+				}
+				cachedChecks[i] = &descope.FGACheck{
+					Allowed:  i%2 == 0,
+					Relation: fixedRelations[i],
+					Info:     &descope.FGACheckInfo{Direct: true},
+				}
+			}
+			projectCache.UpdateCacheWithChecks(ctx, cachedChecks)
+			// SDK response for the miss half (fixed length, reused across goroutines)
+			missCount := numRelations - halfIdx
+			sdkResponse := make([]*descope.FGACheck, missCount)
+			for i := range sdkResponse {
+				sdkResponse[i] = &descope.FGACheck{
+					Allowed:  i%2 == 0,
+					Relation: &descope.FGARelation{Resource: fmt.Sprintf("sdk-r-%d", i), Target: fmt.Sprintf("sdk-t-%d", i), Relation: "viewer", ResourceType: "doc"},
+					Info:     &descope.FGACheckInfo{Direct: true},
+				}
+			}
+			mockFGA := &mocksmgmt.MockFGA{
+				CheckResponse: sdkResponse,
+				CheckAssert: func(_ []*descope.FGARelation) {
+					time.Sleep(time.Millisecond) // simulate SDK latency
+				},
+			}
+			mockSDK := &mocksmgmt.MockManagement{
+				MockFGA:   mockFGA,
+				MockAuthz: &mocksmgmt.MockAuthz{},
+			}
+			mockRemoteClientCreator := func(_ string, _ logger.LoggerInterface) (sdk.Management, error) {
+				return mockSDK, nil
+			}
+			mockCacheCreator := func(_ context.Context, _ caches.RemoteChangesChecker) (caches.ProjectAuthzCache, error) {
+				return projectCache, nil
+			}
+			ac, err := New(ctx, mockCacheCreator, mockRemoteClientCreator)
+			if err != nil {
+				b.Fatal(err)
+			}
+			// warm up: trigger project cache creation
+			warmupResp := mockFGA.CheckResponse
+			mockFGA.CheckResponse = []*descope.FGACheck{{Allowed: true, Relation: fixedRelations[0], Info: &descope.FGACheckInfo{Direct: true}}}
+			mockFGA.CheckAssert = nil
+			_, _ = ac.Check(ctx, fixedRelations[:1])
+			mockFGA.CheckResponse = warmupResp
+			mockFGA.CheckAssert = func(_ []*descope.FGARelation) {
+				time.Sleep(time.Millisecond)
+			}
+
+			var counter atomic.Int64
+			b.ResetTimer()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					id := counter.Add(1)
+					// first half: fixed relations (cache hits), second half: unique (always misses)
+					rels := make([]*descope.FGARelation, numRelations)
+					copy(rels[:halfIdx], fixedRelations)
+					for j := halfIdx; j < numRelations; j++ {
+						rels[j] = &descope.FGARelation{
+							Resource:     fmt.Sprintf("r-%d-%d", id, j),
+							Target:       fmt.Sprintf("t-%d-%d", id, j),
+							Relation:     "viewer",
+							ResourceType: "doc",
+						}
+					}
+					_, _ = ac.Check(ctx, rels)
+				}
+			})
+		})
+	}
 }
