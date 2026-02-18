@@ -169,3 +169,84 @@ func TestCheckError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, resp)
 }
+
+func TestWhoCanAccess(t *testing.T) {
+	controller, mockAuthzCache := setup()
+	var authzCalled bool
+	mockAuthzCache.WhoCanAccessFunc = func(_ context.Context, resource, relationDefinition, namespace string) ([]string, error) {
+		require.Equal(t, "doc1", resource)
+		require.Equal(t, "viewer", relationDefinition)
+		require.Equal(t, "docs", namespace)
+		authzCalled = true
+		return []string{"user1", "user2"}, nil
+	}
+
+	req := &authzv1.WhoCanAccessRequest{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs"}
+	resp, err := controller.WhoCanAccess(context.Background(), req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.True(t, authzCalled)
+	require.Equal(t, []string{"user1", "user2"}, resp.Targets)
+}
+
+func TestWhoCanAccessError(t *testing.T) {
+	controller, mockAuthzCache := setup()
+	mockAuthzCache.WhoCanAccessFunc = func(_ context.Context, _, _, _ string) ([]string, error) {
+		return nil, assert.AnError
+	}
+
+	req := &authzv1.WhoCanAccessRequest{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs"}
+	resp, err := controller.WhoCanAccess(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+}
+
+func TestWhatCanTargetAccess(t *testing.T) {
+	controller, mockAuthzCache := setup()
+	var authzCalled bool
+	mockAuthzCache.WhatCanTargetAccessFunc = func(_ context.Context, target string) ([]*descope.AuthzRelation, error) {
+		require.Equal(t, "user1", target)
+		authzCalled = true
+		return []*descope.AuthzRelation{
+			{
+				Resource:                             "doc1",
+				RelationDefinition:                   "viewer",
+				Namespace:                            "docs",
+				Target:                               "user1",
+				TargetSetResource:                    "group1",
+				TargetSetRelationDefinition:          "member",
+				TargetSetRelationDefinitionNamespace: "groups",
+			},
+		}, nil
+	}
+
+	req := &authzv1.WhatCanTargetAccessRequest{Target: "user1"}
+	resp, err := controller.WhatCanTargetAccess(context.Background(), req)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.True(t, authzCalled)
+	require.Equal(t, 1, len(resp.Relations))
+	require.Equal(t, "doc1", resp.Relations[0].Resource)
+	require.Equal(t, "viewer", resp.Relations[0].RelationDefinition)
+	require.Equal(t, "docs", resp.Relations[0].Namespace)
+	require.Equal(t, "user1", resp.Relations[0].Target)
+	require.Equal(t, "group1", resp.Relations[0].TargetSetResource)
+	require.Equal(t, "member", resp.Relations[0].TargetSetRelationDefinition)
+	require.Equal(t, "groups", resp.Relations[0].TargetSetRelationDefinitionNamespace)
+}
+
+func TestWhatCanTargetAccessError(t *testing.T) {
+	controller, mockAuthzCache := setup()
+	mockAuthzCache.WhatCanTargetAccessFunc = func(_ context.Context, _ string) ([]*descope.AuthzRelation, error) {
+		return nil, assert.AnError
+	}
+
+	req := &authzv1.WhatCanTargetAccessRequest{Target: "user1"}
+	resp, err := controller.WhatCanTargetAccess(context.Background(), req)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+}

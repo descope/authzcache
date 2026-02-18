@@ -20,10 +20,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AuthzCache_CreateFGASchema_FullMethodName    = "/authzcv1.AuthzCache/CreateFGASchema"
-	AuthzCache_CreateFGARelations_FullMethodName = "/authzcv1.AuthzCache/CreateFGARelations"
-	AuthzCache_DeleteFGARelations_FullMethodName = "/authzcv1.AuthzCache/DeleteFGARelations"
-	AuthzCache_Check_FullMethodName              = "/authzcv1.AuthzCache/Check"
+	AuthzCache_CreateFGASchema_FullMethodName     = "/authzcv1.AuthzCache/CreateFGASchema"
+	AuthzCache_CreateFGARelations_FullMethodName  = "/authzcv1.AuthzCache/CreateFGARelations"
+	AuthzCache_DeleteFGARelations_FullMethodName  = "/authzcv1.AuthzCache/DeleteFGARelations"
+	AuthzCache_Check_FullMethodName               = "/authzcv1.AuthzCache/Check"
+	AuthzCache_WhoCanAccess_FullMethodName        = "/authzcv1.AuthzCache/WhoCanAccess"
+	AuthzCache_WhatCanTargetAccess_FullMethodName = "/authzcv1.AuthzCache/WhatCanTargetAccess"
 )
 
 // AuthzCacheClient is the client API for AuthzCache service.
@@ -34,6 +36,8 @@ type AuthzCacheClient interface {
 	CreateFGARelations(ctx context.Context, in *v1.CreateTuplesRequest, opts ...grpc.CallOption) (*v1.CreateTuplesResponse, error)
 	DeleteFGARelations(ctx context.Context, in *v1.DeleteTuplesRequest, opts ...grpc.CallOption) (*v1.DeleteTuplesResponse, error)
 	Check(ctx context.Context, in *v1.CheckRequest, opts ...grpc.CallOption) (*v1.CheckResponse, error)
+	WhoCanAccess(ctx context.Context, in *v1.WhoCanAccessRequest, opts ...grpc.CallOption) (*v1.WhoCanAccessResponse, error)
+	WhatCanTargetAccess(ctx context.Context, in *v1.WhatCanTargetAccessRequest, opts ...grpc.CallOption) (*v1.WhatCanTargetAccessResponse, error)
 }
 
 type authzCacheClient struct {
@@ -84,6 +88,26 @@ func (c *authzCacheClient) Check(ctx context.Context, in *v1.CheckRequest, opts 
 	return out, nil
 }
 
+func (c *authzCacheClient) WhoCanAccess(ctx context.Context, in *v1.WhoCanAccessRequest, opts ...grpc.CallOption) (*v1.WhoCanAccessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.WhoCanAccessResponse)
+	err := c.cc.Invoke(ctx, AuthzCache_WhoCanAccess_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authzCacheClient) WhatCanTargetAccess(ctx context.Context, in *v1.WhatCanTargetAccessRequest, opts ...grpc.CallOption) (*v1.WhatCanTargetAccessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.WhatCanTargetAccessResponse)
+	err := c.cc.Invoke(ctx, AuthzCache_WhatCanTargetAccess_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthzCacheServer is the server API for AuthzCache service.
 // All implementations must embed UnimplementedAuthzCacheServer
 // for forward compatibility.
@@ -92,6 +116,8 @@ type AuthzCacheServer interface {
 	CreateFGARelations(context.Context, *v1.CreateTuplesRequest) (*v1.CreateTuplesResponse, error)
 	DeleteFGARelations(context.Context, *v1.DeleteTuplesRequest) (*v1.DeleteTuplesResponse, error)
 	Check(context.Context, *v1.CheckRequest) (*v1.CheckResponse, error)
+	WhoCanAccess(context.Context, *v1.WhoCanAccessRequest) (*v1.WhoCanAccessResponse, error)
+	WhatCanTargetAccess(context.Context, *v1.WhatCanTargetAccessRequest) (*v1.WhatCanTargetAccessResponse, error)
 	mustEmbedUnimplementedAuthzCacheServer()
 }
 
@@ -113,6 +139,12 @@ func (UnimplementedAuthzCacheServer) DeleteFGARelations(context.Context, *v1.Del
 }
 func (UnimplementedAuthzCacheServer) Check(context.Context, *v1.CheckRequest) (*v1.CheckResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Check not implemented")
+}
+func (UnimplementedAuthzCacheServer) WhoCanAccess(context.Context, *v1.WhoCanAccessRequest) (*v1.WhoCanAccessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method WhoCanAccess not implemented")
+}
+func (UnimplementedAuthzCacheServer) WhatCanTargetAccess(context.Context, *v1.WhatCanTargetAccessRequest) (*v1.WhatCanTargetAccessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method WhatCanTargetAccess not implemented")
 }
 func (UnimplementedAuthzCacheServer) mustEmbedUnimplementedAuthzCacheServer() {}
 func (UnimplementedAuthzCacheServer) testEmbeddedByValue()                    {}
@@ -207,6 +239,42 @@ func _AuthzCache_Check_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthzCache_WhoCanAccess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.WhoCanAccessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthzCacheServer).WhoCanAccess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthzCache_WhoCanAccess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthzCacheServer).WhoCanAccess(ctx, req.(*v1.WhoCanAccessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthzCache_WhatCanTargetAccess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(v1.WhatCanTargetAccessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthzCacheServer).WhatCanTargetAccess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthzCache_WhatCanTargetAccess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthzCacheServer).WhatCanTargetAccess(ctx, req.(*v1.WhatCanTargetAccessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthzCache_ServiceDesc is the grpc.ServiceDesc for AuthzCache service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -229,6 +297,14 @@ var AuthzCache_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Check",
 			Handler:    _AuthzCache_Check_Handler,
+		},
+		{
+			MethodName: "WhoCanAccess",
+			Handler:    _AuthzCache_WhoCanAccess_Handler,
+		},
+		{
+			MethodName: "WhatCanTargetAccess",
+			Handler:    _AuthzCache_WhatCanTargetAccess_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
