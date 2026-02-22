@@ -11,6 +11,7 @@ var _ ProjectAuthzCache = &ProjectAuthzCacheMock{} // ensure ProjectAuthzCacheMo
 type ProjectAuthzCacheMock struct {
 	GetSchemaFunc                       func() *descope.FGASchema
 	CheckRelationFunc                   func(ctx context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool)
+	CheckRelationsFunc                  func(ctx context.Context, relations []*descope.FGARelation) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck)
 	UpdateCacheWithSchemaFunc           func(ctx context.Context, schema *descope.FGASchema)
 	UpdateCacheWithAddedRelationsFunc   func(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithDeletedRelationsFunc func(ctx context.Context, relations []*descope.FGARelation)
@@ -27,8 +28,24 @@ func (m *ProjectAuthzCacheMock) GetSchema() *descope.FGASchema {
 	return m.GetSchemaFunc() // notest
 }
 
-func (m *ProjectAuthzCacheMock) CheckRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
-	return m.CheckRelationFunc(ctx, r)
+func (m *ProjectAuthzCacheMock) CheckRelations(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, []*descope.FGARelation, map[int]*descope.FGACheck) {
+	if m.CheckRelationsFunc != nil {
+		return m.CheckRelationsFunc(ctx, relations)
+	}
+	// default: delegate to CheckRelationFunc for backwards compatibility
+	indexToCheck := make(map[int]*descope.FGACheck, len(relations))
+	var checks []*descope.FGACheck
+	var unchecked []*descope.FGARelation
+	for i, r := range relations {
+		if allowed, direct, ok := m.CheckRelationFunc(ctx, r); ok {
+			check := &descope.FGACheck{Allowed: allowed, Relation: r, Info: &descope.FGACheckInfo{Direct: direct}}
+			checks = append(checks, check)
+			indexToCheck[i] = check
+		} else {
+			unchecked = append(unchecked, r)
+		}
+	}
+	return checks, unchecked, indexToCheck
 }
 
 func (m *ProjectAuthzCacheMock) UpdateCacheWithSchema(ctx context.Context, schema *descope.FGASchema) {

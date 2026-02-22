@@ -63,7 +63,7 @@ type projectAuthzCache struct {
 
 type ProjectAuthzCache interface {
 	GetSchema() *descope.FGASchema
-	CheckRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool)
+	CheckRelations(ctx context.Context, relations []*descope.FGARelation) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck)
 	UpdateCacheWithSchema(ctx context.Context, schema *descope.FGASchema)
 	UpdateCacheWithAddedRelations(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithDeletedRelations(ctx context.Context, relations []*descope.FGARelation)
@@ -133,16 +133,24 @@ func (pc *projectAuthzCache) GetSchema() *descope.FGASchema {
 	return pc.schemaCache
 }
 
-func (pc *projectAuthzCache) CheckRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
+func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*descope.FGARelation) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck) {
+	indexToCheck = make(map[int]*descope.FGACheck, len(relations))
 	pc.mutex.RLock()
 	defer pc.mutex.RUnlock()
-	if allowed, ok := pc.checkDirectRelation(ctx, r); ok {
-		return allowed, true, true
+	for i, r := range relations {
+		if allowed, ok := pc.checkDirectRelation(ctx, r); ok {
+			check := &descope.FGACheck{Allowed: allowed, Relation: r, Info: &descope.FGACheckInfo{Direct: true}}
+			checks = append(checks, check)
+			indexToCheck[i] = check
+		} else if allowed, ok := pc.checkIndirectRelation(ctx, r); ok {
+			check := &descope.FGACheck{Allowed: allowed, Relation: r, Info: &descope.FGACheckInfo{Direct: false}}
+			checks = append(checks, check)
+			indexToCheck[i] = check
+		} else {
+			unchecked = append(unchecked, r)
+		}
 	}
-	if allowed, ok := pc.checkIndirectRelation(ctx, r); ok {
-		return allowed, false, true
-	}
-	return false, false, false
+	return
 }
 
 func (pc *projectAuthzCache) UpdateCacheWithSchema(ctx context.Context, schema *descope.FGASchema) {

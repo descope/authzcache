@@ -104,19 +104,8 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	if err != nil {
 		return nil, err // notest
 	}
-	// iterate over relations and check cache, if not found, check later in sdk
-	var cachedChecks []*descope.FGACheck
-	var toCheckViaSDK []*descope.FGARelation
-	var indexToCachedChecks map[int]*descope.FGACheck = make(map[int]*descope.FGACheck, len(relations)) // map "relations index" -> check, used to retain same order of relations in checks response
-	for i, r := range relations {
-		if allowed, direct, ok := projectCache.CheckRelation(ctx, r); ok {
-			check := &descope.FGACheck{Allowed: allowed, Relation: r, Info: &descope.FGACheckInfo{Direct: direct}}
-			cachedChecks = append(cachedChecks, check)
-			indexToCachedChecks[i] = check
-		} else {
-			toCheckViaSDK = append(toCheckViaSDK, r)
-		}
-	}
+	// check all relations against cache in a single read-lock acquisition
+	cachedChecks, toCheckViaSDK, indexToCachedChecks := projectCache.CheckRelations(ctx, relations)
 	// if all relations were found in cache, return
 	if len(toCheckViaSDK) == 0 {
 		return cachedChecks, nil
