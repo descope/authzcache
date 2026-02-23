@@ -34,6 +34,11 @@ type resource string
 type target string
 type lookupKey string
 
+type keyComponents struct {
+	r resource
+	t target
+}
+
 // LookupCacheEntry holds a cached lookup result with TTL tracking
 type LookupCacheEntry struct {
 	Results   []string
@@ -46,6 +51,7 @@ type projectAuthzCache struct {
 	directRelationCache   *lru.MonitoredLRUCache[resourceTargetRelation, bool] // resource:target:relation -> bool, e.g. file1:user2:owner -> false
 	directResourcesIndex  map[resource]map[target][]resourceTargetRelation
 	directTargetsIndex    map[target]map[resource][]resourceTargetRelation
+	directKeyComponents   map[resourceTargetRelation]keyComponents
 	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, bool] // resource:target:relation -> bool, e.g. file1:user2:owner -> false
 	lookupCache           *lru.MonitoredLRUCache[lookupKey, *LookupCacheEntry] // lookup cache for WhoCanAccess/WhatCanTargetAccess
 	lookupCacheEnabled    bool
@@ -89,6 +95,7 @@ func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChange
 	pc := &projectAuthzCache{
 		directResourcesIndex:  make(map[resource]map[target][]resourceTargetRelation),
 		directTargetsIndex:    make(map[target]map[resource][]resourceTargetRelation),
+		directKeyComponents:   make(map[resourceTargetRelation]keyComponents),
 		indirectRelationCache: indirectRelationCache,
 		lookupCache:           lookupCache,
 		lookupCacheEnabled:    lookupCacheEnabled,
@@ -271,6 +278,7 @@ func (pc *projectAuthzCache) addDirectRelation(ctx context.Context, r *descope.F
 	pc.directRelationCache.Add(ctx, key, isAllowed)
 	resource := resource(r.Resource)
 	target := target(r.Target)
+	pc.directKeyComponents[key] = keyComponents{r: resource, t: target}
 	pc.addKeyToDirectResourceIndex(key, resource, target)
 	pc.addKeyToDirectTargetIndex(key, resource, target)
 }
@@ -303,6 +311,7 @@ func (pc *projectAuthzCache) removeDirectRelation(ctx context.Context, r *descop
 	target := target(r.Target)
 	pc.removeKeyFromResourceIndex(resource, target, key)
 	pc.removeKeyFromTargetIndex(resource, target, key)
+	delete(pc.directKeyComponents, key)
 }
 
 func (pc *projectAuthzCache) removeDirectRelationByResource(ctx context.Context, r resource) {
@@ -387,10 +396,13 @@ func key(r *descope.FGARelation) resourceTargetRelation {
 
 func (pc *projectAuthzCache) removeIndexOnCacheEviction(key resourceTargetRelation, _ bool) {
 	// on eviction, we need to remove the keys from the indexes as well
-	splitKey := strings.Split(string(key), ":")
-	resource, target := resource(splitKey[0]), target(splitKey[1])
-	pc.removeKeyFromResourceIndex(resource, target, key)
-	pc.removeKeyFromTargetIndex(resource, target, key)
+	components, ok := pc.directKeyComponents[key]
+	if !ok {
+		return
+	}
+	pc.removeKeyFromResourceIndex(components.r, components.t, key)
+	pc.removeKeyFromTargetIndex(components.r, components.t, key)
+	delete(pc.directKeyComponents, key)
 }
 
 // must be called while holding the mutex
@@ -404,6 +416,7 @@ func (pc *projectAuthzCache) purgeAllCaches(ctx context.Context) {
 func (pc *projectAuthzCache) purgeRelationCaches(ctx context.Context) {
 	pc.directResourcesIndex = make(map[resource]map[target][]resourceTargetRelation)
 	pc.directTargetsIndex = make(map[target]map[resource][]resourceTargetRelation)
+	pc.directKeyComponents = make(map[resourceTargetRelation]keyComponents)
 	pc.directRelationCache.Purge(ctx)
 	pc.indirectRelationCache.Purge(ctx)
 	if pc.lookupCache != nil {
