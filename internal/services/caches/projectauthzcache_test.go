@@ -881,7 +881,7 @@ func TestRemoveIndexOnEviction_ColonInIDs(t *testing.T) {
 	// add 3rd relation (triggers eviction of r1)
 	cache.addDirectRelation(ctx, r3, true)
 	// assert that r1 was evicted from the cache and indices (no orphaned entries)
-	_, _, ok := cache.CheckRelation(ctx, r1)
+	_, _, ok := checkRelation(ctx, cache, r1)
 	assert.False(t, ok)
 	_, ok = cache.directResourcesIndex["org:r1"]["user:t1"]
 	assert.False(t, ok, "evicted key should be removed from resource index")
