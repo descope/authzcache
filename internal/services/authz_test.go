@@ -629,6 +629,38 @@ func TestWhatCanTargetAccess_MetricsRecorded_CacheMiss(t *testing.T) {
 	require.Equal(t, int64(1), agg.SumResultSize)
 }
 
+func TestWhatCanTargetAccess_MetricsRecorded_CacheHit(t *testing.T) {
+	ac, _, mockCache, collector := injectAuthzMocksWithCollector(t)
+	ctx := cctx.AddProjectID(context.TODO(), "proj1")
+	candidates := []*descope.AuthzRelation{
+		{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs", Target: "u1"},
+		{Resource: "doc2", RelationDefinition: "editor", Namespace: "docs", Target: "u1"},
+		{Resource: "doc3", RelationDefinition: "viewer", Namespace: "docs", Target: "u1"},
+	}
+	mockCache.GetWhatCanTargetAccessCachedFunc = func(_ context.Context, _ string) ([]*descope.AuthzRelation, bool) {
+		return candidates, true
+	}
+	mockCache.SetWhatCanTargetAccessCachedFunc = func(_ context.Context, _ string, _ []*descope.AuthzRelation) {
+		require.Fail(t, "should not update cache on hit")
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (bool, bool, bool) {
+		return r.Resource != "doc2", true, true // doc2 filtered out
+	}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
+	_, err := ac.WhatCanTargetAccess(ctx, "u1")
+	require.NoError(t, err)
+	snapshot := collector.SnapshotAndReset()
+	require.Contains(t, snapshot, "proj1")
+	agg := snapshot["proj1"][metrics.APIWhatCanTargetAccess]
+	require.NotNil(t, agg)
+	require.Equal(t, int64(1), agg.TotalCalls)
+	require.Equal(t, int64(1), agg.HitCount)
+	require.Equal(t, int64(0), agg.MissCount)
+	require.Equal(t, int64(3), agg.SumCandidates)
+	require.Equal(t, int64(1), agg.SumFiltered) // doc2 filtered out
+	require.Equal(t, int64(2), agg.SumResultSize)
+}
+
 func BenchmarkCheck(b *testing.B) {
 	for _, numRelations := range []int{500, 1000, 5000} {
 		name := fmt.Sprintf("relations=%d", numRelations)
