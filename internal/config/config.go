@@ -17,6 +17,10 @@ const (
 	ConfigKeyLookupCacheSizePerProject = "AUTHZCACHE_LOOKUP_CACHE_SIZE_PER_PROJECT" // max entries per project
 	ConfigKeyLookupCacheTTLInSeconds   = "AUTHZCACHE_LOOKUP_CACHE_TTL_IN_SECONDS"   // TTL for lookup cache entries
 	ConfigKeyLookupCacheMaxResultSize  = "AUTHZCACHE_LOOKUP_CACHE_MAX_RESULT_SIZE"  // max result size to cache (skip caching large results)
+
+	// Metrics reporting configuration
+	ConfigKeyMetricsReportEnabled           = "AUTHZCACHE_METRICS_REPORT_ENABLED"             // TRUE/FALSE, default is TRUE
+	ConfigKeyMetricsReportIntervalInSeconds = "AUTHZCACHE_METRICS_REPORT_INTERVAL_IN_SECONDS" // interval in seconds, default is 60, min is 10
 )
 
 func GetDirectRelationCacheSizePerProject() int {
@@ -53,4 +57,12 @@ func GetLookupCacheTTLInSeconds() int {
 
 func GetLookupCacheMaxResultSize() int {
 	return cconfig.GetIntOrProvidedLocal(ConfigKeyLookupCacheMaxResultSize, 1000)
+}
+
+func GetMetricsReportEnabled() bool {
+	return cconfig.GetBoolOrProvidedLocal(ConfigKeyMetricsReportEnabled, true)
+}
+
+func GetMetricsReportIntervalInSeconds() int {
+	return max(10, cconfig.GetIntOrProvidedLocal(ConfigKeyMetricsReportIntervalInSeconds, 60))
 }

@@ -34,6 +34,14 @@ func NewDescopeClientWithProjectID(projectID string, loggerInstance logger.Logge
 	return descopeClient.Management, nil
 }
 
+func BaseURL() string {
+	return baseURL
+}
+
+func ManagementKey() string {
+	return managementKey
+}
+
 func getLogLevel() logger.LogLevel {
 	if config.GetSDKDebugLog() {
 		return logger.LogDebugLevel // notest
