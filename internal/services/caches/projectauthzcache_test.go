@@ -409,6 +409,89 @@ func TestHandleRemotePollingTick_SubsequentErrorsDuringCooldown(t *testing.T) {
 	assert.Greater(t, cache.directRelationCache.Len(ctx), 0)
 }
 
+func TestHandleRemotePollingTick_TooManyModifiedRelations_PurgesImmediately(t *testing.T) {
+	// Test that E173012 error purges caches immediately even with non-zero cooldown
+	ctx := context.TODO()
+	cache, remoteChecker := setup(t)
+	// set cooldown window to 5 minutes (should be bypassed)
+	cache.remoteChanges.purgeCooldownWindow = 5 * time.Minute
+	// simulate E173012 error
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		return nil, &descope.Error{Code: "E173012", Description: "Requested too many modified relations"}
+	}
+	// populate the cache
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
+	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
+	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
+	require.Greater(t, cache.indirectRelationCache.Len(ctx), 0)
+	// call the tick handler
+	cache.updateCacheWithRemotePolling(ctx)
+	// verify that all caches were purged immediately
+	for _, cr := range cachedRelations {
+		_, _, ok := checkRelation(ctx, cache, cr.r)
+		assert.False(t, ok, "cache should be purged")
+	}
+	assert.Nil(t, cache.GetSchema(), "schema should be purged")
+	assert.Nil(t, cache.remoteChanges.purgeCooldownTimer, "no timer should be active")
+}
+
+func TestHandleRemotePollingTick_TooManyModifiedRelations_CancelsPendingCooldown(t *testing.T) {
+	// Test that E173012 cancels any pending cooldown timer from a prior different error
+	ctx := context.TODO()
+	cache, remoteChecker := setup(t)
+	// set cooldown window to 5 minutes
+	cache.remoteChanges.purgeCooldownWindow = 5 * time.Minute
+	// first: simulate a regular error to start cooldown
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		return nil, assert.AnError
+	}
+	// populate the cache
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
+	updateBothCachesWithChecks(ctx, t, cache)
+	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
+	// trigger first error to start cooldown
+	cache.updateCacheWithRemotePolling(ctx)
+	require.NotNil(t, cache.remoteChanges.purgeCooldownTimer, "timer should be active after first error")
+	// cache should still be valid during cooldown
+	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
+	// now simulate E173012 error
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		return nil, &descope.Error{Code: "E173012", Description: "Requested too many modified relations"}
+	}
+	cache.updateCacheWithRemotePolling(ctx)
+	// verify cooldown was cancelled and caches were purged
+	assert.Nil(t, cache.remoteChanges.purgeCooldownTimer, "timer should be cancelled")
+	assert.Nil(t, cache.GetSchema(), "schema should be purged")
+	assert.Equal(t, 0, cache.directRelationCache.Len(ctx), "direct cache should be purged")
+	assert.Equal(t, 0, cache.indirectRelationCache.Len(ctx), "indirect cache should be purged")
+}
+
+func TestHandleRemotePollingTick_TooManyModifiedRelations_WithZeroCooldown(t *testing.T) {
+	// Test that E173012 with zero cooldown also purges immediately
+	ctx := context.TODO()
+	cache, remoteChecker := setup(t)
+	// explicitly set cooldown window to 0
+	cache.remoteChanges.purgeCooldownWindow = 0
+	// simulate E173012 error
+	remoteChecker.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		return nil, &descope.Error{Code: "E173012", Description: "Requested too many modified relations"}
+	}
+	// populate the cache
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "schema"})
+	cachedRelations := updateBothCachesWithChecks(ctx, t, cache)
+	require.Greater(t, cache.directRelationCache.Len(ctx), 0)
+	require.Greater(t, cache.indirectRelationCache.Len(ctx), 0)
+	// call the tick handler
+	cache.updateCacheWithRemotePolling(ctx)
+	// verify that all caches were purged immediately
+	for _, cr := range cachedRelations {
+		_, _, ok := checkRelation(ctx, cache, cr.r)
+		assert.False(t, ok, "cache should be purged")
+	}
+	assert.Nil(t, cache.GetSchema(), "schema should be purged")
+	assert.Nil(t, cache.remoteChanges.purgeCooldownTimer, "no timer should be active")
+}
+
 func TestHandleRemotePollingTick_RemoteSchemaChange(t *testing.T) {
 	ctx := context.TODO()
 	cache, remoteChecker := setup(t)
