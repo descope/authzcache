@@ -61,7 +61,7 @@ func (r *Reporter) Start(ctx context.Context) {
 	if !r.enabled {
 		return
 	}
-	go r.run(ctx)
+	cctx.Go(ctx, r.run)
 }
 
 func (r *Reporter) run(ctx context.Context) {
@@ -93,7 +93,9 @@ func (r *Reporter) report(ctx context.Context) {
 		if len(payloads) == 0 {
 			continue
 		}
-		r.post(ctx, projectID, payloads)
+		if err := r.post(ctx, projectID, payloads); err != nil {
+			cctx.Logger(ctx).Error().Err(err).Str("project_id", projectID).Msg("Failed to report FGA cache metrics; metrics for this window are lost")
+		}
 	}
 }
 
@@ -143,30 +145,28 @@ func buildPayload(api APIName, agg *AggregatedMetrics) APIMetricsPayload {
 	return p
 }
 
-func (r *Reporter) post(ctx context.Context, projectID string, payloads []APIMetricsPayload) {
+func (r *Reporter) post(ctx context.Context, projectID string, payloads []APIMetricsPayload) error {
 	body, err := utils.Marshal(metricsRequest{Metrics: payloads})
 	if err != nil {
-		cctx.Logger(ctx).Error().Err(err).Str("project_id", projectID).Msg("Failed to marshal FGA cache metrics")
-		return
+		return err
 	}
 
 	url := r.baseURL + "/v1/mgmt/fga/cache/metrics"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		cctx.Logger(ctx).Error().Err(err).Str("project_id", projectID).Msg("Failed to create FGA cache metrics request")
-		return
+		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+projectID+":"+r.managementKey)
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		cctx.Logger(ctx).Error().Err(err).Str("project_id", projectID).Msg("Failed to post FGA cache metrics")
-		return
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		cctx.Logger(ctx).Error().Int("status_code", resp.StatusCode).Str("project_id", projectID).Msg("Unexpected status posting FGA cache metrics")
 	}
+	return nil
 }

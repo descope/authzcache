@@ -113,8 +113,8 @@ func (c *Collector) SnapshotAndReset() map[string]map[APIName]*AggregatedMetrics
 		projectSnapshot := make(map[APIName]*AggregatedMetrics, len(pm.byAPI))
 		for api, agg := range pm.byAPI {
 			// deep copy
-			copy := *agg
-			projectSnapshot[api] = &copy
+			apiCopy := *agg
+			projectSnapshot[api] = &apiCopy
 		}
 		snapshot[projectID] = projectSnapshot
 
