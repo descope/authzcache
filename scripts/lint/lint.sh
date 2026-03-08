@@ -78,12 +78,12 @@ lint_go_build() {
 lint_run_golangci() {
 	echo "- Running golangci-lint"
 	# renovate: datasource=github-releases depName=golangci/golangci-lint
-	GOLANG_CI_SUPPORTED_VERSION="1.64.6"
-	INSTALLED_GOLANG_CLI_VERSION="$(golangci-lint --version)"
+	GOLANG_CI_SUPPORTED_VERSION="1.64.8"
+	INSTALLED_GOLANG_CLI_VERSION="$(golangci-lint --version 2>/dev/null)"
 	if [[ $INSTALLED_GOLANG_CLI_VERSION != *"$GOLANG_CI_SUPPORTED_VERSION"* ]]; then
-		echo "Installing golangci-lint for the first time..."
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v${GOLANG_CI_SUPPORTED_VERSION}
-		echo "Done downloading golangci-lint"
+		echo "Installing golangci-lint from source (to match current Go version)..."
+		go install github.com/golangci/golangci-lint/cmd/golangci-lint@v${GOLANG_CI_SUPPORTED_VERSION}
+		echo "Done installing golangci-lint"
 	fi
 
 	local golang_cli_config="${1:-"${CURRENT_DIR}/.golangci.yml"}" # get first argument and set "cmd" to be default
