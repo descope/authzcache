@@ -26,17 +26,11 @@ runs:
       shell: bash
 
     - name: Run golangci-lint
-      uses: reviewdog/action-golangci-lint@f9bba13753278f6a73b27a56a3ffb1bfda90ed71 # v2.8.0
-      env:
-        TAR_OPTIONS: --skip-old-files
-        GOPRIVATE: github.com/descope/*
+      uses: golangci/golangci-lint-action@8564da7cb3c6866ed1da648ca8f00a258ef0c802 # v6.5.2
       with:
-        github_token: ${{ github.token }}
-        fail_level: any
-        golangci_lint_flags: "--config=./scripts/lint/.golangci.yml"
-        filter_mode: nofilter
-        reporter: github-check
-        golangci_lint_version: v1.64.8
+        version: v1.64.8
+        install-mode: goinstall
+        args: --config=./scripts/lint/.golangci.yml
 
     - name: Run go vet
       env:
