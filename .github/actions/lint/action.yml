@@ -1,0 +1,55 @@
+name: Lint
+description: "Run Go linting and security checks"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Auth Setup
+      id: auth
+      uses: ./.github/actions/auth-setup
+      env:
+        RELEASE_APP_ID: ${{ env.RELEASE_APP_ID }}
+        RELEASE_APP_PEM: ${{ env.RELEASE_APP_PEM }}
+
+    - name: Setup Go
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      with:
+        go-version-file: go.mod
+        cache: true
+
+    - name: Download dependencies
+      env:
+        GOPRIVATE: github.com/descope/*
+      run: |
+        go mod download
+        go mod verify
+      shell: bash
+
+    - name: Install golangci-lint
+      env:
+        GOPRIVATE: github.com/descope/*
+      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+      shell: bash
+
+    - name: Run golangci-lint
+      env:
+        GOPRIVATE: github.com/descope/*
+      run: golangci-lint --config=./scripts/lint/.golangci.yml run
+      shell: bash
+
+    - name: Run go vet
+      env:
+        GOPRIVATE: github.com/descope/*
+      run: go vet ./...
+      shell: bash
+
+    - name: Check formatting
+      env:
+        GOPRIVATE: github.com/descope/*
+      run: |
+        if [ "$(gofmt -l . | wc -l)" -gt 0 ]; then
+          echo "Files not formatted properly:"
+          gofmt -l .
+          exit 1
+        fi
+      shell: bash
