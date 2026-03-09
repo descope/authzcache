@@ -3,8 +3,6 @@ name: CI
 on: push
 
 env:
-  GO_VERSION: ${{ vars.GO_VERSION }}
-  SCRIPTS_DIR: ./vendor/github.com/descope/common
   DATABASE_PASSWORD: passwordless
 
 jobs:
@@ -24,18 +22,21 @@ jobs:
           RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
 
   lint:
-    name: Lint and more checks
+    name: Lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Lint and more checks
-        uses: descope/common/.github/actions/lint@main
-        with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ${{ env.SCRIPTS_DIR }}
-          APP_PEM: ${{ secrets.APP_PEM }}
-          APP_ID: ${{ secrets.APP_ID }}
+
+      - name: Lint
+        uses: ./.github/actions/lint
+        env:
+          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
+          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
 
   test:
     name: Test
