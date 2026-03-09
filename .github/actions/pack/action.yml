@@ -159,13 +159,13 @@ runs:
         cache-to: type=gha,mode=max
 
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@0.35.0
+      uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
       with:
         image-ref: ghcr.io/descope/${{steps.setup_build_args.outputs.repo_name}}@${{steps.push.outputs.digest}}
         format: "table"
         exit-code: ${{ inputs.fail_on_vulnerabilities == 'true' && '1' || '0' }}
     - name: Attest
-      uses: actions/attest@v4
+      uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
       id: attest
       with:
         subject-name: ghcr.io/descope/${{steps.setup_build_args.outputs.repo_name}}
