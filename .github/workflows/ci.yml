@@ -87,6 +87,10 @@ jobs:
 
       - name: Pack and Upload
         uses: ./.github/actions/pack
+        with:
+          enable_dockerhub: "true"
+          dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
         env:
           RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
           RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
