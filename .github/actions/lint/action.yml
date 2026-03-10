@@ -12,7 +12,7 @@ runs:
         RELEASE_APP_PEM: ${{ env.RELEASE_APP_PEM }}
 
     - name: Setup Go
-      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
       with:
         go-version-file: go.mod
         cache: true
@@ -25,17 +25,12 @@ runs:
         go mod verify
       shell: bash
 
-    - name: Install golangci-lint
-      env:
-        GOPRIVATE: github.com/descope/*
-      run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
-      shell: bash
-
     - name: Run golangci-lint
-      env:
-        GOPRIVATE: github.com/descope/*
-      run: golangci-lint --config=./scripts/lint/.golangci.yml run
-      shell: bash
+      uses: golangci/golangci-lint-action@8564da7cb3c6866ed1da648ca8f00a258ef0c802 # v6.5.2
+      with:
+        version: v1.64.8
+        install-mode: goinstall
+        args: --config=./scripts/lint/.golangci.yml
 
     - name: Run go vet
       env:

@@ -14,6 +14,12 @@ import (
 	"github.com/descope/go-sdk/descope"
 )
 
+const getModifiedLimitReachedErrorCode = "E173012"
+
+func isTooManyModifiedRelationsError(err error) bool {
+	return descope.IsError(err, getModifiedLimitReachedErrorCode)
+}
+
 type RemoteChangesChecker interface {
 	GetModified(ctx context.Context, since time.Time) (*descope.AuthzModified, error)
 }
@@ -232,6 +238,12 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	remoteChanges, err := pc.fetchRemoteChanges(ctx)
 	// if there was an error, purge all caches after cooldown (if configured) or immediately
 	if err != nil {
+		if isTooManyModifiedRelationsError(err) {
+			cctx.Logger(ctx).Warn().Err(err).Msg("Too many modified relations, purging all caches immediately")
+			pc.cancelPurgeCooldown(ctx)
+			pc.purgeAllCaches(ctx)
+			return
+		}
 		pc.purgeAfterCooldown(ctx, err)
 		return
 	}
