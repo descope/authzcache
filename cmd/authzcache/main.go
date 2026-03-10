@@ -9,6 +9,7 @@ import (
 	"github.com/descope/authzcache/internal/middlewares"
 	"github.com/descope/authzcache/internal/services"
 	"github.com/descope/authzcache/internal/services/caches"
+	"github.com/descope/authzcache/internal/services/metrics"
 	"github.com/descope/authzcache/internal/services/remote"
 	authzcv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
 	cconfig "github.com/descope/common/pkg/common/config"
@@ -27,11 +28,21 @@ func main() {
 func serve() {
 	server.InitServiceName(defaultServiceName)
 
+	collector := metrics.NewCollector()
+	reporter := metrics.NewReporter(
+		collector,
+		remote.BaseURL(),
+		remote.ManagementKey(),
+		config.GetMetricsReportIntervalInSeconds(),
+		config.GetMetricsReportEnabled(),
+	)
+
 	ctx, err := server.StartServerWithGatewayAndOptions(
 		[]server.RegisterGRPCFunc{
 			func(ctx context.Context, s *grpc.Server) error {
+				reporter.Start(ctx)
 				//authz cache service init
-				as, err := services.New(ctx, caches.NewProjectAuthzCache, remote.NewDescopeClientWithProjectID)
+				as, err := services.New(ctx, caches.NewProjectAuthzCache, remote.NewDescopeClientWithProjectID, collector)
 				if err != nil {
 					cctx.Logger(ctx).Err(err).Msg("Failed creating authz cache")
 					return err

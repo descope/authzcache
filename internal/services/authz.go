@@ -3,8 +3,10 @@ package services
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/descope/authzcache/internal/services/caches"
+	"github.com/descope/authzcache/internal/services/metrics"
 	cctx "github.com/descope/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
 	"github.com/descope/go-sdk/descope/logger"
@@ -32,13 +34,14 @@ type authzCache struct {
 	projects            sync.Map //[projectIDKey]project
 	projectCacheCreator ProjectAuthzCacheCreator
 	remoteClientCreator RemoteClientCreator
+	metricsCollector    *metrics.Collector
 }
 
 var _ AuthzCache = &authzCache{} // validate interface implementation
 
-func New(ctx context.Context, projectCacheCreator ProjectAuthzCacheCreator, remoteClientCreator RemoteClientCreator) (AuthzCache, error) {
+func New(ctx context.Context, projectCacheCreator ProjectAuthzCacheCreator, remoteClientCreator RemoteClientCreator, collector *metrics.Collector) (AuthzCache, error) {
 	cctx.Logger(ctx).Info().Msg("Starting new authz cache")
-	ac := &authzCache{projectCacheCreator: projectCacheCreator, remoteClientCreator: remoteClientCreator}
+	ac := &authzCache{projectCacheCreator: projectCacheCreator, remoteClientCreator: remoteClientCreator, metricsCollector: collector}
 	return ac, nil
 }
 
@@ -131,7 +134,21 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	return result, nil
 }
 
+func (a *authzCache) recordMetric(ctx context.Context, api metrics.APIName, cacheHit bool, candidatesCount, filteredCount, resultSize int, start time.Time) {
+	if a.metricsCollector == nil {
+		return
+	}
+	a.metricsCollector.Record(cctx.ProjectID(ctx), api, metrics.CallMetrics{
+		CacheHit:        cacheHit,
+		CandidatesCount: candidatesCount,
+		FilteredCount:   filteredCount,
+		ResultSize:      resultSize,
+		DurationMs:      time.Since(start).Milliseconds(),
+	})
+}
+
 func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string) ([]string, error) {
+	start := time.Now()
 	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
 		return nil, err // notest
@@ -147,6 +164,7 @@ func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinit
 			Int("candidates", len(candidates)).
 			Int("verified", len(verified)).
 			Msg("WhoCanAccess cache hit with candidate filtering")
+		a.recordMetric(ctx, metrics.APIWhoCanAccess, true, len(candidates), len(candidates)-len(verified), len(verified), start)
 		return verified, nil
 	}
 	targets, err := mgmtSDK.Authz().WhoCanAccess(ctx, resource, relationDefinition, namespace)
@@ -154,6 +172,7 @@ func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinit
 		return nil, err // notest
 	}
 	projectCache.SetWhoCanAccessCached(ctx, resource, relationDefinition, namespace, targets)
+	a.recordMetric(ctx, metrics.APIWhoCanAccess, false, 0, 0, len(targets), start)
 	return targets, nil
 }
 
@@ -181,6 +200,7 @@ func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource,
 }
 
 func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string) ([]*descope.AuthzRelation, error) {
+	start := time.Now()
 	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
 		return nil, err // notest
@@ -196,6 +216,7 @@ func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string) ([]
 			Int("candidates", len(candidates)).
 			Int("verified", len(verified)).
 			Msg("WhatCanTargetAccess cache hit with candidate filtering")
+		a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, true, len(candidates), len(candidates)-len(verified), len(verified), start)
 		return verified, nil
 	}
 	relations, err := mgmtSDK.Authz().WhatCanTargetAccess(ctx, target)
@@ -203,6 +224,7 @@ func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string) ([]
 		return nil, err // notest
 	}
 	projectCache.SetWhatCanTargetAccessCached(ctx, target, relations)
+	a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, false, 0, 0, len(relations), start)
 	return relations, nil
 }
 
