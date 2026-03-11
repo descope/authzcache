@@ -1,6 +1,8 @@
 name: CI
 
-on: push
+on:
+  push:
+  workflow_dispatch:
 
 env:
   DATABASE_PASSWORD: passwordless
@@ -87,6 +89,11 @@ jobs:
 
       - name: Pack and Upload
         uses: ./.github/actions/pack
+        with:
+          push_image: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
+          enable_dockerhub: "true"
+          dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub_token: ${{ secrets.DOCKERHUB_TOKEN }}
         env:
           RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
           RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}

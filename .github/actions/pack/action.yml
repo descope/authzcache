@@ -47,6 +47,10 @@ inputs:
     description: "Enable DockerHub publishing"
     required: false
     default: "false"
+  push_image:
+    description: "Push the built image to registries (set to false for build-only validation)"
+    required: false
+    default: "true"
 
 runs:
   using: "composite"
@@ -71,6 +75,7 @@ runs:
         echo dockerfile=${DOCKERFILE_PATH} >> ${GITHUB_OUTPUT}
 
     - name: Login to GHCR
+      if: ${{ inputs.push_image == 'true' }}
       uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
       with:
         registry: ghcr.io
@@ -78,6 +83,7 @@ runs:
         password: ${{ inputs.action_token}}
 
     - name: Configure AWS Credentials
+      if: ${{ inputs.push_image == 'true' }}
       uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
       with:
         aws-region: us-east-1
@@ -86,10 +92,11 @@ runs:
 
     - name: Login to Amazon ECR
       id: login-ecr
+      if: ${{ inputs.push_image == 'true' }}
       uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
 
     - name: Login to Docker Hub
-      if: ${{ inputs.enable_dockerhub == 'true' && inputs.dockerhub_username && inputs.dockerhub_token }}
+      if: ${{ inputs.push_image == 'true' && inputs.enable_dockerhub == 'true' && inputs.dockerhub_username && inputs.dockerhub_token }}
       uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
       with:
         registry: docker.io
@@ -107,7 +114,7 @@ runs:
 
     - name: Extract metadata for DockerHub
       id: meta-dockerhub
-      if: ${{ inputs.enable_dockerhub == 'true' }}
+      if: ${{ inputs.push_image == 'true' && inputs.enable_dockerhub == 'true' }}
       uses: ./.github/actions/docker-metadata
       with:
         cache: "false"
@@ -118,12 +125,13 @@ runs:
       with:
         version: latest
         cache-binary: false
+
     - name: Combine tags for all registries
       id: combine-tags
       shell: bash
       run: |
         TAGS="${{ steps.meta.outputs.tags }}"
-        if [[ "${{ inputs.enable_dockerhub }}" == "true" ]]; then
+        if [[ "${{ inputs.push_image }}" == "true" && "${{ inputs.enable_dockerhub }}" == "true" ]]; then
           DOCKERHUB_TAGS="${{ steps.meta-dockerhub.outputs.tags }}"
           if [[ -n "$DOCKERHUB_TAGS" ]]; then
             TAGS="$TAGS"$'\n'"$DOCKERHUB_TAGS"
@@ -139,7 +147,7 @@ runs:
       with:
         platforms: ${{ inputs.platforms }}
         context: .
-        push: true
+        push: ${{ inputs.push_image == 'true' }}
         sbom: true
         provenance: mode=max
         file: ${{ steps.setup_build_args.outputs.dockerfile }}
@@ -159,12 +167,15 @@ runs:
         cache-to: type=gha,mode=max
 
     - name: Run Trivy vulnerability scanner
+      if: ${{ inputs.push_image == 'true' }}
       uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
       with:
         image-ref: ghcr.io/descope/${{steps.setup_build_args.outputs.repo_name}}@${{steps.push.outputs.digest}}
         format: "table"
         exit-code: ${{ inputs.fail_on_vulnerabilities == 'true' && '1' || '0' }}
+
     - name: Attest
+      if: ${{ inputs.push_image == 'true' }}
       uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
       id: attest
       with:
