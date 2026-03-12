@@ -3,8 +3,8 @@ module github.com/descope/authzcache
 go 1.26.1
 
 require (
-	github.com/descope/common v0.0.9-0.20260309225614-990afc2c954f
-	github.com/descope/go-sdk v1.12.0
+	github.com/descope/common v0.0.9-0.20260312100206-99b0b49086c7
+	github.com/descope/go-sdk v1.13.0
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20260302164158-29367255bbbc
 	github.com/descope/protoc-gen-validate v1.6.6-0.20260302172205-b550a52d5a8b
@@ -44,7 +44,7 @@ require (
 	github.com/dariubs/percent v0.0.0-20190521174708-8153fcbd48ae // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
-	github.com/descope/authzservice v0.0.0-20260311200602-d49fdac32997
+	github.com/descope/authzservice v0.0.0-20260312101444-21592bed5558
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/ggwhite/go-masker/v2 v2.2.0 // indirect
