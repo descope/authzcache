@@ -661,6 +661,98 @@ func TestWhatCanTargetAccess_MetricsRecorded_CacheHit(t *testing.T) {
 	require.Equal(t, int64(2), agg.SumResultSize)
 }
 
+func TestCheck_MetricsRecorded_FullCacheHit(t *testing.T) {
+	ac, mockSDK, mockCache, collector := injectAuthzMocksWithCollector(t)
+	ctx := cctx.AddProjectID(context.TODO(), "proj1")
+	relations := []*descope.FGARelation{
+		{Resource: "mario", Target: "luigi", Relation: "bigBro"},
+		{Resource: "luigi", Target: "mario", Relation: "bigBro"},
+	}
+	mockSDK.MockFGA.CheckAssert = func(_ []*descope.FGARelation) {
+		require.Fail(t, "should not be called on full cache hit")
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (bool, bool, bool) {
+		return true, true, true
+	}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {
+		require.Fail(t, "should not be called on full cache hit")
+	}
+	_, err := ac.Check(ctx, relations)
+	require.NoError(t, err)
+	snapshot := collector.SnapshotAndReset()
+	require.Contains(t, snapshot, "proj1")
+	agg := snapshot["proj1"][metrics.APICheck]
+	require.NotNil(t, agg)
+	require.Equal(t, int64(1), agg.TotalCalls)
+	require.Equal(t, int64(1), agg.HitCount)
+	require.Equal(t, int64(0), agg.MissCount)
+	require.Equal(t, int64(0), agg.SumCandidates) // full hit: nothing sent to SDK
+	require.Equal(t, int64(2), agg.SumResultSize)
+}
+
+func TestCheck_MetricsRecorded_FullCacheMiss(t *testing.T) {
+	ac, mockSDK, mockCache, collector := injectAuthzMocksWithCollector(t)
+	ctx := cctx.AddProjectID(context.TODO(), "proj1")
+	relations := []*descope.FGARelation{
+		{Resource: "mario", Target: "luigi", Relation: "bigBro"},
+		{Resource: "luigi", Target: "mario", Relation: "bigBro"},
+	}
+	sdkResponse := []*descope.FGACheck{
+		{Allowed: true, Relation: relations[0], Info: &descope.FGACheckInfo{Direct: true}},
+		{Allowed: false, Relation: relations[1], Info: &descope.FGACheckInfo{Direct: true}},
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (bool, bool, bool) {
+		return false, false, false
+	}
+	mockSDK.MockFGA.CheckResponse = sdkResponse
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
+	_, err := ac.Check(ctx, relations)
+	require.NoError(t, err)
+	snapshot := collector.SnapshotAndReset()
+	require.Contains(t, snapshot, "proj1")
+	agg := snapshot["proj1"][metrics.APICheck]
+	require.NotNil(t, agg)
+	require.Equal(t, int64(1), agg.TotalCalls)
+	require.Equal(t, int64(0), agg.HitCount)
+	require.Equal(t, int64(1), agg.MissCount)
+	require.Equal(t, int64(2), agg.SumCandidates) // full miss: all 2 relations sent to SDK
+	require.Equal(t, int64(2), agg.SumResultSize)
+}
+
+func TestCheck_MetricsRecorded_PartialHit(t *testing.T) {
+	ac, mockSDK, mockCache, collector := injectAuthzMocksWithCollector(t)
+	ctx := cctx.AddProjectID(context.TODO(), "proj1")
+	relations := []*descope.FGARelation{
+		{Resource: "mario", Target: "luigi", Relation: "bigBro"},
+		{Resource: "luigi", Target: "mario", Relation: "bigBro"}, // only this one in cache
+		{Resource: "mario", Target: "bowser", Relation: "enemy"},
+	}
+	sdkResponse := []*descope.FGACheck{
+		{Allowed: true, Relation: relations[0], Info: &descope.FGACheckInfo{Direct: true}},
+		{Allowed: true, Relation: relations[2], Info: &descope.FGACheckInfo{Direct: true}},
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (bool, bool, bool) {
+		if r.Resource == "luigi" && r.Target == "mario" {
+			return false, true, true // cached
+		}
+		return false, false, false // not cached
+	}
+	mockSDK.MockFGA.CheckResponse = sdkResponse
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
+	_, err := ac.Check(ctx, relations)
+	require.NoError(t, err)
+	snapshot := collector.SnapshotAndReset()
+	require.Contains(t, snapshot, "proj1")
+	agg := snapshot["proj1"][metrics.APICheck]
+	require.NotNil(t, agg)
+	require.Equal(t, int64(1), agg.TotalCalls)
+	require.Equal(t, int64(0), agg.HitCount)
+	require.Equal(t, int64(1), agg.MissCount)
+	require.Equal(t, int64(2), agg.SumCandidates) // 2 relations sent to SDK (1 was cached)
+	require.Equal(t, int64(0), agg.SumFiltered)
+	require.Equal(t, int64(3), agg.SumResultSize)
+}
+
 func BenchmarkCheck(b *testing.B) {
 	for _, numRelations := range []int{500, 1000, 5000} {
 		name := fmt.Sprintf("relations=%d", numRelations)

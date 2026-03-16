@@ -102,6 +102,7 @@ func (a *authzCache) DeleteFGARelations(ctx context.Context, relations []*descop
 }
 
 func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
+	start := time.Now()
 	// get cache and mgmt sdk
 	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
@@ -111,6 +112,8 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	cachedChecks, toCheckViaSDK, indexToCachedChecks := projectCache.CheckRelations(ctx, relations)
 	// if all relations were found in cache, return
 	if len(toCheckViaSDK) == 0 {
+		// candidatesCount = 0 (nothing sent to SDK); filteredCount = 0 (Check doesn't filter, every relation gets an answer)
+		a.recordMetric(ctx, metrics.APICheck, true, 0, 0, len(cachedChecks), start)
 		return cachedChecks, nil
 	}
 	// fetch missing relations from sdk
@@ -131,6 +134,8 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 			j++
 		}
 	}
+	// candidatesCount = relations sent to SDK (not in cache); filteredCount = 0 (Check doesn't filter, every relation gets an answer)
+	a.recordMetric(ctx, metrics.APICheck, false, len(toCheckViaSDK), 0, len(result), start)
 	return result, nil
 }
 
