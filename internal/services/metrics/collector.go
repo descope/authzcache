@@ -8,6 +8,7 @@ import (
 type APIName string
 
 const (
+	APICheck               APIName = "Check"
 	APIWhoCanAccess        APIName = "WhoCanAccess"
 	APIWhatCanTargetAccess APIName = "WhatCanTargetAccess"
 )
