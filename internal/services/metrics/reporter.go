@@ -20,7 +20,7 @@ const (
 
 func baseURLForProject(projectID, customBaseURL string) string {
 	if trimmed := strings.TrimSpace(customBaseURL); trimmed != "" {
-		return trimmed
+		return strings.TrimRight(trimmed, "/")
 	}
 	if len(projectID) >= 32 {
 		region := projectID[1:5]
