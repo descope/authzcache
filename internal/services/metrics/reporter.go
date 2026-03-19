@@ -5,13 +5,11 @@ import (
 	"context"
 	"math"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	cctx "github.com/descope/common/pkg/common/context"
 	"github.com/descope/common/pkg/common/utils"
-	"github.com/descope/go-sdk/descope"
 )
 
 const (
@@ -20,9 +18,9 @@ const (
 	defaultBaseURL    = defaultAPIPrefix + "." + defaultDomainName
 )
 
-func baseURLForProject(projectID string) string {
-	if override := os.Getenv(descope.EnvironmentVariableBaseURL); override != "" {
-		return override
+func baseURLForProject(projectID, customBaseURL string) string {
+	if customBaseURL != "" {
+		return customBaseURL
 	}
 	if len(projectID) >= 32 {
 		region := projectID[1:5]
@@ -58,7 +56,7 @@ type metricsRequest struct {
 // Reporter is a background goroutine that periodically snapshots metrics and POSTs them.
 type Reporter struct {
 	collector     *Collector
-	baseURL       string
+	customBaseURL string
 	managementKey string
 	interval      time.Duration
 	enabled       bool
@@ -68,7 +66,7 @@ type Reporter struct {
 func NewReporter(collector *Collector, baseURL, managementKey string, intervalSeconds int, enabled bool) *Reporter {
 	return &Reporter{
 		collector:     collector,
-		baseURL:       baseURL,
+		customBaseURL: baseURL,
 		managementKey: managementKey,
 		interval:      time.Duration(intervalSeconds) * time.Second,
 		enabled:       enabled,
@@ -171,11 +169,7 @@ func (r *Reporter) post(ctx context.Context, projectID string, payloads []APIMet
 		return err
 	}
 
-	base := r.baseURL
-	if strings.TrimSpace(base) == "" {
-		base = baseURLForProject(projectID)
-	}
-	url := base + "/v1/mgmt/fga/cache/metrics"
+	url := baseURLForProject(projectID, r.customBaseURL) + "/v1/mgmt/fga/cache/metrics"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return err

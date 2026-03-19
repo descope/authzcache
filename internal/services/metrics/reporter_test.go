@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/descope/common/pkg/common/utils"
-	"github.com/descope/go-sdk/descope"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -148,17 +147,15 @@ func TestReporterSkipsEmptySnapshot(t *testing.T) {
 func TestBaseURLForProject(t *testing.T) {
 	useURL := fmt.Sprintf("%s.use1.%s", defaultAPIPrefix, defaultDomainName)
 
-	// Without DESCOPE_BASE_URL set — derive from project ID
-	t.Setenv(descope.EnvironmentVariableBaseURL, "")
-	assert.EqualValues(t, defaultBaseURL, baseURLForProject("P2aAc4T2V93bddihGEx2Ryhc8e5Z"))
-	assert.EqualValues(t, defaultBaseURL, baseURLForProject(""))
-	assert.EqualValues(t, defaultBaseURL, baseURLForProject("Puse"))
-	assert.EqualValues(t, defaultBaseURL, baseURLForProject("Puse1ar"))
-	assert.EqualValues(t, useURL, baseURLForProject("Puse12aAc4T2V93bddihGEx2Ryhc8e5Zfoobar"))
-	assert.EqualValues(t, useURL, baseURLForProject("Puse12aAc4T2V93bddihGEx2Ryhc8e5Z"))
+	// No custom base URL — derive from project ID
+	assert.EqualValues(t, defaultBaseURL, baseURLForProject("P2aAc4T2V93bddihGEx2Ryhc8e5Z", ""))
+	assert.EqualValues(t, defaultBaseURL, baseURLForProject("", ""))
+	assert.EqualValues(t, defaultBaseURL, baseURLForProject("Puse", ""))
+	assert.EqualValues(t, defaultBaseURL, baseURLForProject("Puse1ar", ""))
+	assert.EqualValues(t, useURL, baseURLForProject("Puse12aAc4T2V93bddihGEx2Ryhc8e5Zfoobar", ""))
+	assert.EqualValues(t, useURL, baseURLForProject("Puse12aAc4T2V93bddihGEx2Ryhc8e5Z", ""))
 
-	// With DESCOPE_BASE_URL set — always returns that override
-	t.Setenv(descope.EnvironmentVariableBaseURL, "https://custom.example.com")
-	assert.EqualValues(t, "https://custom.example.com", baseURLForProject("Puse12aAc4T2V93bddihGEx2Ryhc8e5Z"))
-	assert.EqualValues(t, "https://custom.example.com", baseURLForProject(""))
+	// Custom base URL always wins
+	assert.EqualValues(t, "https://custom.example.com", baseURLForProject("Puse12aAc4T2V93bddihGEx2Ryhc8e5Z", "https://custom.example.com"))
+	assert.EqualValues(t, "https://custom.example.com", baseURLForProject("", "https://custom.example.com"))
 }
