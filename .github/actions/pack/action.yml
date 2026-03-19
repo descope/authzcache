@@ -167,7 +167,7 @@ runs:
         ignore-unfixed: true
 
     - name: Attest
-      uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
+      uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
       id: attest
       with:
         subject-name: ghcr.io/descope/${{steps.setup_build_args.outputs.repo_name}}
