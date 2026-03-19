@@ -37,22 +37,22 @@ type metricsRequest struct {
 
 // Reporter is a background goroutine that periodically snapshots metrics and POSTs them.
 type Reporter struct {
-	collector     *Collector
-	baseURL       string
-	managementKey string
-	interval      time.Duration
-	enabled       bool
-	httpClient    *http.Client
+	collector       *Collector
+	baseURLResolver func(projectID string) string
+	managementKey   string
+	interval        time.Duration
+	enabled         bool
+	httpClient      *http.Client
 }
 
-func NewReporter(collector *Collector, baseURL, managementKey string, intervalSeconds int, enabled bool) *Reporter {
+func NewReporter(collector *Collector, baseURLResolver func(projectID string) string, managementKey string, intervalSeconds int, enabled bool) *Reporter {
 	return &Reporter{
-		collector:     collector,
-		baseURL:       baseURL,
-		managementKey: managementKey,
-		interval:      time.Duration(intervalSeconds) * time.Second,
-		enabled:       enabled,
-		httpClient:    &http.Client{Timeout: 10 * time.Second},
+		collector:       collector,
+		baseURLResolver: baseURLResolver,
+		managementKey:   managementKey,
+		interval:        time.Duration(intervalSeconds) * time.Second,
+		enabled:         enabled,
+		httpClient:      &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -151,7 +151,7 @@ func (r *Reporter) post(ctx context.Context, projectID string, payloads []APIMet
 		return err
 	}
 
-	url := r.baseURL + "/v1/mgmt/fga/cache/metrics"
+	url := r.baseURLResolver(projectID) + "/v1/mgmt/fga/cache/metrics"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return err

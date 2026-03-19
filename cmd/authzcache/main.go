@@ -31,7 +31,7 @@ func serve() {
 	collector := metrics.NewCollector()
 	reporter := metrics.NewReporter(
 		collector,
-		remote.BaseURL(),
+		remote.BaseURLForProject,
 		remote.ManagementKey(),
 		config.GetMetricsReportIntervalInSeconds(),
 		config.GetMetricsReportEnabled(),
