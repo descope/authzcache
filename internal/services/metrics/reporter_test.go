@@ -27,13 +27,12 @@ func TestReporterPostsMetrics(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
-	t.Setenv(descope.EnvironmentVariableBaseURL, srv.URL)
 
 	collector := NewCollector()
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, CandidatesCount: 10, FilteredCount: 2, ResultSize: 8, DurationMs: 5})
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: false, CandidatesCount: 0, FilteredCount: 0, ResultSize: 3, DurationMs: 30})
 
-	reporter := NewReporter(collector, "mgmt-key", 1, true)
+	reporter := NewReporter(collector, srv.URL, "mgmt-key", 1, true)
 	reporter.report(context.Background())
 
 	require.Equal(t, "Bearer proj1:mgmt-key", receivedAuth)
@@ -66,7 +65,7 @@ func TestReporterDisabled(t *testing.T) {
 	collector := NewCollector()
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
 
-	reporter := NewReporter(collector, "key", 1, false)
+	reporter := NewReporter(collector, srv.URL, "key", 1, false)
 	ctx, cancel := context.WithCancel(context.Background())
 	reporter.Start(ctx)
 	cancel()
@@ -82,12 +81,11 @@ func TestReporterHandlesHTTPError(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	t.Setenv(descope.EnvironmentVariableBaseURL, srv.URL)
 
 	collector := NewCollector()
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
 
-	reporter := NewReporter(collector, "key", 1, true)
+	reporter := NewReporter(collector, srv.URL, "key", 1, true)
 	// should not panic on 500
 	reporter.report(context.Background())
 	require.Equal(t, 1, callCount)
@@ -101,7 +99,6 @@ func TestReporterComputesAverages(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
-	t.Setenv(descope.EnvironmentVariableBaseURL, srv.URL)
 
 	collector := NewCollector()
 	// 3 cache hits with durations 10, 20, 30; candidates 5, 10, 15; filtered 1, 2, 3; results 4, 8, 12
@@ -115,7 +112,7 @@ func TestReporterComputesAverages(t *testing.T) {
 		})
 	}
 
-	reporter := NewReporter(collector, "key", 1, true)
+	reporter := NewReporter(collector, srv.URL, "key", 1, true)
 	reporter.report(context.Background())
 
 	require.Len(t, receivedBody.Metrics, 1)
@@ -140,10 +137,9 @@ func TestReporterSkipsEmptySnapshot(t *testing.T) {
 		called = true
 	}))
 	defer srv.Close()
-	t.Setenv(descope.EnvironmentVariableBaseURL, srv.URL)
 
 	collector := NewCollector()
-	reporter := NewReporter(collector, "key", 1, true)
+	reporter := NewReporter(collector, srv.URL, "key", 1, true)
 	reporter.report(context.Background())
 
 	require.False(t, called, "no metrics to report, should not post")
