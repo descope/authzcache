@@ -13,12 +13,6 @@ import (
 	"github.com/descope/go-sdk/descope/sdk"
 )
 
-const (
-	defaultAPIPrefix  = "https://api"
-	defaultDomainName = "descope.com"
-	defaultBaseURL    = defaultAPIPrefix + "." + defaultDomainName
-)
-
 var baseURL = os.Getenv(descope.EnvironmentVariableBaseURL)
 var managementKey = strings.Trim(os.Getenv(descope.EnvironmentVariableManagementKey), "\"")
 
@@ -42,21 +36,6 @@ func NewDescopeClientWithProjectID(projectID string, loggerInstance logger.Logge
 
 func BaseURL() string {
 	return baseURL
-}
-
-// BaseURLForProject returns the base URL for the given project.
-// If DESCOPE_BASE_URL is set, it is returned as-is.
-// Otherwise the URL is derived from the project ID's region prefix,
-// matching the Descope SDK's default behavior.
-func BaseURLForProject(projectID string) string {
-	if baseURL != "" {
-		return baseURL
-	}
-	if len(projectID) >= 32 {
-		region := projectID[1:5]
-		return strings.Join([]string{defaultAPIPrefix, region, defaultDomainName}, ".")
-	}
-	return defaultBaseURL
 }
 
 func ManagementKey() string {

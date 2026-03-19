@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/descope/common/pkg/common/utils"
+	"github.com/descope/go-sdk/descope"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,12 +27,13 @@ func TestReporterPostsMetrics(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
+	t.Setenv(descope.EnvironmentVariableBaseURL, srv.URL)
 
 	collector := NewCollector()
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, CandidatesCount: 10, FilteredCount: 2, ResultSize: 8, DurationMs: 5})
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: false, CandidatesCount: 0, FilteredCount: 0, ResultSize: 3, DurationMs: 30})
 
-	reporter := NewReporter(collector, func(_ string) string { return srv.URL }, "mgmt-key", 1, true)
+	reporter := NewReporter(collector, "mgmt-key", 1, true)
 	reporter.report(context.Background())
 
 	require.Equal(t, "Bearer proj1:mgmt-key", receivedAuth)
@@ -62,7 +66,7 @@ func TestReporterDisabled(t *testing.T) {
 	collector := NewCollector()
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
 
-	reporter := NewReporter(collector, func(_ string) string { return srv.URL }, "key", 1, false)
+	reporter := NewReporter(collector, "key", 1, false)
 	ctx, cancel := context.WithCancel(context.Background())
 	reporter.Start(ctx)
 	cancel()
@@ -78,11 +82,12 @@ func TestReporterHandlesHTTPError(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
+	t.Setenv(descope.EnvironmentVariableBaseURL, srv.URL)
 
 	collector := NewCollector()
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
 
-	reporter := NewReporter(collector, func(_ string) string { return srv.URL }, "key", 1, true)
+	reporter := NewReporter(collector, "key", 1, true)
 	// should not panic on 500
 	reporter.report(context.Background())
 	require.Equal(t, 1, callCount)
@@ -96,6 +101,7 @@ func TestReporterComputesAverages(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
+	t.Setenv(descope.EnvironmentVariableBaseURL, srv.URL)
 
 	collector := NewCollector()
 	// 3 cache hits with durations 10, 20, 30; candidates 5, 10, 15; filtered 1, 2, 3; results 4, 8, 12
@@ -109,7 +115,7 @@ func TestReporterComputesAverages(t *testing.T) {
 		})
 	}
 
-	reporter := NewReporter(collector, func(_ string) string { return srv.URL }, "key", 1, true)
+	reporter := NewReporter(collector, "key", 1, true)
 	reporter.report(context.Background())
 
 	require.Len(t, receivedBody.Metrics, 1)
@@ -134,10 +140,29 @@ func TestReporterSkipsEmptySnapshot(t *testing.T) {
 		called = true
 	}))
 	defer srv.Close()
+	t.Setenv(descope.EnvironmentVariableBaseURL, srv.URL)
 
 	collector := NewCollector()
-	reporter := NewReporter(collector, func(_ string) string { return srv.URL }, "key", 1, true)
+	reporter := NewReporter(collector, "key", 1, true)
 	reporter.report(context.Background())
 
 	require.False(t, called, "no metrics to report, should not post")
+}
+
+func TestBaseURLForProject(t *testing.T) {
+	useURL := fmt.Sprintf("%s.use1.%s", defaultAPIPrefix, defaultDomainName)
+
+	// Without DESCOPE_BASE_URL set — derive from project ID
+	t.Setenv(descope.EnvironmentVariableBaseURL, "")
+	assert.EqualValues(t, defaultBaseURL, baseURLForProject("P2aAc4T2V93bddihGEx2Ryhc8e5Z"))
+	assert.EqualValues(t, defaultBaseURL, baseURLForProject(""))
+	assert.EqualValues(t, defaultBaseURL, baseURLForProject("Puse"))
+	assert.EqualValues(t, defaultBaseURL, baseURLForProject("Puse1ar"))
+	assert.EqualValues(t, useURL, baseURLForProject("Puse12aAc4T2V93bddihGEx2Ryhc8e5Zfoobar"))
+	assert.EqualValues(t, useURL, baseURLForProject("Puse12aAc4T2V93bddihGEx2Ryhc8e5Z"))
+
+	// With DESCOPE_BASE_URL set — always returns that override
+	t.Setenv(descope.EnvironmentVariableBaseURL, "https://custom.example.com")
+	assert.EqualValues(t, "https://custom.example.com", baseURLForProject("Puse12aAc4T2V93bddihGEx2Ryhc8e5Z"))
+	assert.EqualValues(t, "https://custom.example.com", baseURLForProject(""))
 }

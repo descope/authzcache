@@ -5,11 +5,31 @@ import (
 	"context"
 	"math"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	cctx "github.com/descope/common/pkg/common/context"
 	"github.com/descope/common/pkg/common/utils"
+	"github.com/descope/go-sdk/descope"
 )
+
+const (
+	defaultAPIPrefix  = "https://api"
+	defaultDomainName = "descope.com"
+	defaultBaseURL    = defaultAPIPrefix + "." + defaultDomainName
+)
+
+func baseURLForProject(projectID string) string {
+	if override := os.Getenv(descope.EnvironmentVariableBaseURL); override != "" {
+		return override
+	}
+	if len(projectID) >= 32 {
+		region := projectID[1:5]
+		return strings.Join([]string{defaultAPIPrefix, region, defaultDomainName}, ".")
+	}
+	return defaultBaseURL
+}
 
 // APIMetricsPayload is the JSON payload for a single API's metrics.
 type APIMetricsPayload struct {
@@ -37,22 +57,20 @@ type metricsRequest struct {
 
 // Reporter is a background goroutine that periodically snapshots metrics and POSTs them.
 type Reporter struct {
-	collector       *Collector
-	baseURLResolver func(projectID string) string
-	managementKey   string
-	interval        time.Duration
-	enabled         bool
-	httpClient      *http.Client
+	collector     *Collector
+	managementKey string
+	interval      time.Duration
+	enabled       bool
+	httpClient    *http.Client
 }
 
-func NewReporter(collector *Collector, baseURLResolver func(projectID string) string, managementKey string, intervalSeconds int, enabled bool) *Reporter {
+func NewReporter(collector *Collector, managementKey string, intervalSeconds int, enabled bool) *Reporter {
 	return &Reporter{
-		collector:       collector,
-		baseURLResolver: baseURLResolver,
-		managementKey:   managementKey,
-		interval:        time.Duration(intervalSeconds) * time.Second,
-		enabled:         enabled,
-		httpClient:      &http.Client{Timeout: 10 * time.Second},
+		collector:     collector,
+		managementKey: managementKey,
+		interval:      time.Duration(intervalSeconds) * time.Second,
+		enabled:       enabled,
+		httpClient:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -151,7 +169,7 @@ func (r *Reporter) post(ctx context.Context, projectID string, payloads []APIMet
 		return err
 	}
 
-	url := r.baseURLResolver(projectID) + "/v1/mgmt/fga/cache/metrics"
+	url := baseURLForProject(projectID) + "/v1/mgmt/fga/cache/metrics"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return err
