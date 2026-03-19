@@ -12,6 +12,8 @@ import (
 )
 
 func TestBaseURLForProject(t *testing.T) {
+	t.Cleanup(func() { baseURL = "" })
+
 	// Without DESCOPE_BASE_URL set — derive from project ID
 	t.Setenv(descope.EnvironmentVariableBaseURL, "")
 	baseURL = ""
@@ -28,7 +30,6 @@ func TestBaseURLForProject(t *testing.T) {
 	baseURL = "https://custom.example.com"
 	assert.EqualValues(t, "https://custom.example.com", BaseURLForProject("Puse12aAc4T2V93bddihGEx2Ryhc8e5Z"))
 	assert.EqualValues(t, "https://custom.example.com", BaseURLForProject(""))
-	baseURL = "" // cleanup
 }
 
 func TestNewDescopeClientWithProjectID(t *testing.T) {
