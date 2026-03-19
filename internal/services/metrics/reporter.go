@@ -5,11 +5,29 @@ import (
 	"context"
 	"math"
 	"net/http"
+	"strings"
 	"time"
 
 	cctx "github.com/descope/common/pkg/common/context"
 	"github.com/descope/common/pkg/common/utils"
 )
+
+const (
+	defaultAPIPrefix  = "https://api"
+	defaultDomainName = "descope.com"
+	defaultBaseURL    = defaultAPIPrefix + "." + defaultDomainName
+)
+
+func baseURLForProject(projectID, customBaseURL string) string {
+	if trimmed := strings.TrimSpace(customBaseURL); trimmed != "" {
+		return strings.TrimRight(trimmed, "/")
+	}
+	if len(projectID) >= 32 {
+		region := projectID[1:5]
+		return strings.Join([]string{defaultAPIPrefix, region, defaultDomainName}, ".")
+	}
+	return defaultBaseURL
+}
 
 // APIMetricsPayload is the JSON payload for a single API's metrics.
 type APIMetricsPayload struct {
@@ -38,7 +56,7 @@ type metricsRequest struct {
 // Reporter is a background goroutine that periodically snapshots metrics and POSTs them.
 type Reporter struct {
 	collector     *Collector
-	baseURL       string
+	customBaseURL string
 	managementKey string
 	interval      time.Duration
 	enabled       bool
@@ -48,7 +66,7 @@ type Reporter struct {
 func NewReporter(collector *Collector, baseURL, managementKey string, intervalSeconds int, enabled bool) *Reporter {
 	return &Reporter{
 		collector:     collector,
-		baseURL:       baseURL,
+		customBaseURL: baseURL,
 		managementKey: managementKey,
 		interval:      time.Duration(intervalSeconds) * time.Second,
 		enabled:       enabled,
@@ -151,7 +169,7 @@ func (r *Reporter) post(ctx context.Context, projectID string, payloads []APIMet
 		return err
 	}
 
-	url := r.baseURL + "/v1/mgmt/fga/cache/metrics"
+	url := baseURLForProject(projectID, r.customBaseURL) + "/v1/mgmt/fga/cache/metrics"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return err

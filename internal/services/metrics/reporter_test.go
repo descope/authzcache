@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/descope/common/pkg/common/utils"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -140,4 +142,20 @@ func TestReporterSkipsEmptySnapshot(t *testing.T) {
 	reporter.report(context.Background())
 
 	require.False(t, called, "no metrics to report, should not post")
+}
+
+func TestBaseURLForProject(t *testing.T) {
+	useURL := fmt.Sprintf("%s.use1.%s", defaultAPIPrefix, defaultDomainName)
+
+	// No custom base URL — derive from project ID
+	assert.EqualValues(t, defaultBaseURL, baseURLForProject("P2aAc4T2V93bddihGEx2Ryhc8e5Z", ""))
+	assert.EqualValues(t, defaultBaseURL, baseURLForProject("", ""))
+	assert.EqualValues(t, defaultBaseURL, baseURLForProject("Puse", ""))
+	assert.EqualValues(t, defaultBaseURL, baseURLForProject("Puse1ar", ""))
+	assert.EqualValues(t, useURL, baseURLForProject("Puse12aAc4T2V93bddihGEx2Ryhc8e5Zfoobar", ""))
+	assert.EqualValues(t, useURL, baseURLForProject("Puse12aAc4T2V93bddihGEx2Ryhc8e5Z", ""))
+
+	// Custom base URL always wins
+	assert.EqualValues(t, "https://custom.example.com", baseURLForProject("Puse12aAc4T2V93bddihGEx2Ryhc8e5Z", "https://custom.example.com"))
+	assert.EqualValues(t, "https://custom.example.com", baseURLForProject("", "https://custom.example.com"))
 }
