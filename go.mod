@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/descope/common v0.0.9-0.20260313223916-39a93bb37c9b
-	github.com/descope/go-sdk v1.13.0
+	github.com/descope/go-sdk v1.14.0
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20260318194710-3c35271806cc
 	github.com/descope/protoc-gen-validate v1.6.6-0.20260302172205-b550a52d5a8b
