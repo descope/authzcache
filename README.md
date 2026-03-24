@@ -1,6 +1,9 @@
 # Descope AuthZ Cache
 A high-performance authorization cache service that accelerates Fine-Grained Authorization (FGA) checks by caching authorization data locally within your cluster.
 
+## Docker Image
+The latest image from the main branch is available on [Docker Hub](https://hub.docker.com/r/descope/authzcache).
+
 ## Quick Start
 Run the service with Docker:
 ```bash
