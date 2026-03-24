@@ -3,97 +3,68 @@ name: CI
 on: push
 
 env:
-  GO_VERSION: ${{ vars.GO_VERSION }}
-  SCRIPTS_DIR: ./vendor/github.com/descope/common
   DATABASE_PASSWORD: passwordless
 
 jobs:
-  preflight-common-access:
-    name: Preflight Common Action Access
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Verify access to descope/common
-        shell: bash
-        run: |
-          if ! git ls-remote "https://x-access-token:${{ github.token }}@github.com/descope/common.git" HEAD >/dev/null 2>&1; then
-            echo "::error::This repository cannot access descope/common. Grant access in descope/common -> Settings -> Actions -> General -> Access, and allow this repository."
-            echo "::error::If org Actions policy is restricted, also allow this repository to use descope/common."
-            exit 1
-          fi
-
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: preflight-common-access
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Build
-        uses: descope/common/.github/actions/build@main
-        with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ${{ env.SCRIPTS_DIR }}
-          APP_PEM: ${{ secrets.APP_PEM }}
-          APP_ID: ${{ secrets.APP_ID }}
+        uses: ./.github/actions/build
+        env:
+          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
+          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
 
   lint:
     name: Lint and more checks
     runs-on: ubuntu-latest
-    needs: preflight-common-access
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Lint and more checks
-        uses: descope/common/.github/actions/lint@main
-        with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ${{ env.SCRIPTS_DIR }}
-          APP_PEM: ${{ secrets.APP_PEM }}
-          APP_ID: ${{ secrets.APP_ID }}
+        uses: ./.github/actions/lint
+        env:
+          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
+          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
 
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    needs: preflight-common-access
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Run Tests
-        uses: descope/common/.github/actions/tests@main
+        uses: ./.github/actions/test
         env:
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
+          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
+          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
         with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ${{ env.SCRIPTS_DIR }}
-          APP_PEM: ${{ secrets.APP_PEM }}
-          APP_ID: ${{ secrets.APP_ID }}
-          min_coverage: 80
+          min_coverage: "80"
 
   security:
     name: Run Security checks
     runs-on: ubuntu-latest
-    needs: preflight-common-access
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Run Security checks
-        uses: descope/common/.github/actions/security@main
-        with:
-          go_version: ${{ env.GO_VERSION }}
-          scripts_folder: ${{ env.SCRIPTS_DIR }}
-          APP_PEM: ${{ secrets.APP_PEM }}
-          APP_ID: ${{ secrets.APP_ID }}
+        uses: ./.github/actions/security
+        env:
+          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
+          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
 
   pack:
     name: Pack and Upload
     runs-on: ubuntu-latest
-    needs: [preflight-common-access, build]
+    needs: build
     permissions:
       contents: read
       packages: write
@@ -104,17 +75,17 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Pack and Upload
-        uses: descope/common/.github/actions/pack@main
+        uses: ./.github/actions/pack
         with:
-          go_version: ${{ env.GO_VERSION }}
           action_token: ${{ secrets.GITHUB_TOKEN }}
-          APP_PEM: ${{ secrets.APP_PEM }}
-          APP_ID: ${{ secrets.APP_ID }}
+        env:
+          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
+          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
 
   publish-dockerhub:
     name: Publish to Docker Hub
     runs-on: ubuntu-latest
-    needs: [preflight-common-access, build, lint, test, security]
+    needs: [build, lint, test, security]
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
@@ -142,7 +113,7 @@ jobs:
 
       - name: Extract metadata for Docker Hub
         id: meta-dockerhub
-        uses: descope/common/.github/actions/docker-metadata@main
+        uses: ./.github/actions/docker-metadata
         with:
           images: docker.io/descope/${{ steps.setup-build-args.outputs.repo_name }}
 
