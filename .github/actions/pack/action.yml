@@ -227,5 +227,5 @@ runs:
     - name: Sign the image with Cosign (keyless)
       shell: bash
       run: |
-        cosign sign ghcr.io/descope/${{steps.setup_build_args.outputs.repo_name}}@${{steps.push.outputs.digest}}
-        cosign sign ${{ steps.login-ecr.outputs.registry }}/descope/${{steps.setup_build_args.outputs.repo_name}}@${{steps.push.outputs.digest}}
+        cosign sign --yes ghcr.io/descope/${{steps.setup_build_args.outputs.repo_name}}@${{steps.push.outputs.digest}}
+        cosign sign --yes ${{ steps.login-ecr.outputs.registry }}/descope/${{steps.setup_build_args.outputs.repo_name}}@${{steps.push.outputs.digest}}
