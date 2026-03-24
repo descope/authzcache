@@ -94,6 +94,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup repository dependencies
+        id: setup
         uses: ./.github/actions/setup
         env:
           RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
@@ -138,6 +139,8 @@ jobs:
           tags: ${{ steps.meta-dockerhub.outputs.tags }}
           labels: ${{ steps.meta-dockerhub.outputs.labels }}
           annotations: ${{ steps.meta-dockerhub.outputs.annotations }}
+          secrets: |
+            "github_token=${{ steps.setup.outputs.token }}"
           build-args: |
             build_dir=${{ steps.setup-build-args.outputs.build_dir }}
             port=${{ steps.setup-build-args.outputs.port }}
