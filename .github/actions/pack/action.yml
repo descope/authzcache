@@ -88,6 +88,53 @@ runs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
 
+    - name: Create ECR repository and set permissions if needed
+      shell: bash
+      env:
+        REPO_NAME: "descope/${{steps.setup_build_args.outputs.repo_name}}"
+      run: |
+        if ! aws ecr describe-repositories --repository-names "$REPO_NAME" >/dev/null 2>&1; then
+          echo "Creating ECR repository: $REPO_NAME"
+          aws ecr create-repository --repository-name "$REPO_NAME" \
+            --image-scanning-configuration scanOnPush=true \
+            --encryption-configuration encryptionType=AES256
+        else
+          echo "ECR repository $REPO_NAME already exists."
+        fi
+
+        if ! aws ecr get-repository-policy --repository-name "$REPO_NAME" >/dev/null 2>&1; then
+          echo "Setting ECR repository policy for $REPO_NAME"
+          aws ecr set-repository-policy --repository-name "$REPO_NAME" --policy-text '{
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "cross-account-pull",
+                "Effect": "Allow",
+                "Principal": {
+                  "AWS": [
+                    "arn:aws:iam::808694526875:root",
+                    "arn:aws:iam::265102686009:root",
+                    "arn:aws:iam::882548883321:root"
+                  ]
+                },
+                "Action": [
+                  "ecr:BatchCheckLayerAvailability",
+                  "ecr:BatchGetImage",
+                  "ecr:DescribeImageScanFindings",
+                  "ecr:DescribeImages",
+                  "ecr:DescribeRepositories",
+                  "ecr:GetAuthorizationToken",
+                  "ecr:GetDownloadUrlForLayer",
+                  "ecr:GetRepositoryPolicy",
+                  "ecr:ListImages"
+                ]
+              }
+            ]
+          }'
+        else
+          echo "ECR repository policy already exists for $REPO_NAME"
+        fi
+
     - name: Login to Docker Hub
       if: ${{ inputs.enable_dockerhub == 'true' && inputs.dockerhub_username && inputs.dockerhub_token }}
       uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
@@ -173,3 +220,12 @@ runs:
         subject-name: ghcr.io/descope/${{steps.setup_build_args.outputs.repo_name}}
         subject-digest: ${{ steps.push.outputs.digest }}
         push-to-registry: true
+
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+
+    - name: Sign the image with Cosign (keyless)
+      shell: bash
+      run: |
+        cosign sign ghcr.io/descope/${{steps.setup_build_args.outputs.repo_name}}@${{steps.push.outputs.digest}}
+        cosign sign ${{ steps.login-ecr.outputs.registry }}/descope/${{steps.setup_build_args.outputs.repo_name}}@${{steps.push.outputs.digest}}
