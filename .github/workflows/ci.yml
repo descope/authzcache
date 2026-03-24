@@ -3,79 +3,78 @@ name: CI
 on: push
 
 env:
+  GO_VERSION: ${{ vars.GO_VERSION }}
+  SCRIPTS_DIR: ./vendor/github.com/descope/common
   DATABASE_PASSWORD: passwordless
 
 jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Build
-        uses: ./.github/actions/build
-        env:
-          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+        uses: descope/common/.github/actions/build@main
+        with:
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: ${{ env.SCRIPTS_DIR }}
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
 
   lint:
-    name: Lint
+    name: Lint and more checks
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      checks: write
-      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Lint
-        uses: ./.github/actions/lint
-        env:
-          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+      - name: Lint and more checks
+        uses: descope/common/.github/actions/lint@main
+        with:
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: ${{ env.SCRIPTS_DIR }}
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
 
   test:
-    name: Test
+    name: Run Tests
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      checks: write
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Test
-        uses: ./.github/actions/test
-        with:
-          min_coverage: "80"
+      - name: Run Tests
+        uses: descope/common/.github/actions/tests@main
         env:
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
-          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+        with:
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: ${{ env.SCRIPTS_DIR }}
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
+          min_coverage: 80
 
   security:
-    name: Security
+    name: Run Security checks
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Security
-        uses: ./.github/actions/security
-        env:
-          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+      - name: Run Security checks
+        uses: descope/common/.github/actions/security@main
+        with:
+          go_version: ${{ env.GO_VERSION }}
+          scripts_folder: ${{ env.SCRIPTS_DIR }}
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
 
   pack:
     name: Pack and Upload
     runs-on: ubuntu-latest
-    needs: [build, lint, test, security]
+    needs: build
     permissions:
       contents: read
       packages: write
@@ -86,7 +85,66 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Pack and Upload
-        uses: ./.github/actions/pack
-        env:
-          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+        uses: descope/common/.github/actions/pack@main
+        with:
+          go_version: ${{ env.GO_VERSION }}
+          action_token: ${{ secrets.GITHUB_TOKEN }}
+          APP_PEM: ${{ secrets.APP_PEM }}
+          APP_ID: ${{ secrets.APP_ID }}
+
+  publish-dockerhub:
+    name: Publish to Docker Hub
+    runs-on: ubuntu-latest
+    needs: [build, lint, test, security]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup build args
+        id: setup-build-args
+        shell: bash
+        run: |
+          source configs/dev/deploy.env || true
+          source configs/dev/config.env || true
+          echo "build_dir=${BUILD_DIR}" >> "${GITHUB_OUTPUT}"
+          echo "port=${PORT}" >> "${GITHUB_OUTPUT}"
+          echo "repo_name=${REPO_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "dockerfile=vendor/github.com/descope/common/build/docker/service/Dockerfile" >> "${GITHUB_OUTPUT}"
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata for Docker Hub
+        id: meta-dockerhub
+        uses: descope/common/.github/actions/docker-metadata@main
+        with:
+          images: docker.io/descope/${{ steps.setup-build-args.outputs.repo_name }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        with:
+          version: latest
+          cache-binary: false
+
+      - name: Build and push to Docker Hub
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: ${{ steps.setup-build-args.outputs.dockerfile }}
+          push: true
+          tags: ${{ steps.meta-dockerhub.outputs.tags }}
+          labels: ${{ steps.meta-dockerhub.outputs.labels }}
+          annotations: ${{ steps.meta-dockerhub.outputs.annotations }}
+          build-args: |
+            build_dir=${{ steps.setup-build-args.outputs.build_dir }}
+            port=${{ steps.setup-build-args.outputs.port }}
+            repo_name=${{ steps.setup-build-args.outputs.repo_name }}
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
