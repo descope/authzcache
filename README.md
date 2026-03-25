@@ -1,11 +1,15 @@
 # Descope AuthZ Cache
+
 A high-performance authorization cache service that accelerates Fine-Grained Authorization (FGA) checks by caching authorization data locally within your cluster.
 
 ## Docker Image
+
 The latest image from the main branch is available on [Docker Hub](https://hub.docker.com/r/descope/authzcache).
 
 ## Quick Start
+
 Run the service with Docker:
+
 ```bash
 docker run -d \
   --name authzcache \
@@ -16,10 +20,13 @@ docker run -d \
 ```
 
 ## Configuration
+
 ### Required Environment Variables
+
 - `DESCOPE_MANAGEMENT_KEY` - Your Descope management key for authentication
 
 ### Optional Environment Variables
+
 - `DESCOPE_BASE_URL` - Custom Descope base URL (default: production Descope service)
 - `CONTAINER_HTTP_PORT` - HTTP gateway port (default: 8189)
 - `AUTHZCACHE_SDK_DEBUG_LOG` - Enable debug logging of the internally used Descope SDK (TRUE/FALSE, default: FALSE)
@@ -27,23 +34,27 @@ docker run -d \
 - `AUTHZCACHE_INDIRECT_RELATION_CACHE_SIZE_PER_PROJECT` - Indirect relation cache size per project (default: 1,000,000)
 - `AUTHZCACHE_REMOTE_POLLING_INTERVAL_IN_MILLIS` - Remote polling interval in milliseconds (default: 15,000)
 - `AUTHZCACHE_PURGE_COOLDOWN_WINDOW_IN_MINUTES` - Cooldown window in minutes before purging cache on refresh error (default: 0, meaning immediate purge). When set to a positive value, the cache will wait for the specified duration after the first error before purging. If a successful response is received during the cooldown window, the purge is cancelled. This provides a balance between data freshness and availability during temporary service disruptions. During this window, the cache continues serving stale and potentially invalid authorization data, which may not reflect current permissions.
-- `AUTHZCACHE_METRICS_REPORT_ENABLED` - Whether to periodically report cache performance metrics (hit/miss rates, latency) to Descope (TRUE/FALSE, default: TRUE)
+- `AUTHZCACHE_METRICS_REPORT_ENABLED` - Whether to periodically report aggregated cache performance metrics (hit/miss rates, latency) to Descope (TRUE/FALSE, default: TRUE)
 - `AUTHZCACHE_METRICS_REPORT_INTERVAL_IN_SECONDS` - How often to report metrics, in seconds (default: 60, minimum: 10)
 
 ## Ports
+
 - **8189** - HTTP REST API endpoint
 
 ## Health Check
+
 The service exposes health check endpoints for container orchestration:
+
 - HTTP: `GET http://localhost:8189/healthz`
 
-
 ## Using From Your Application (Go Example)
+
 To have the Descope SDK use this cache container for accelerating FGA checks, pass its URL via the `FGACacheURL` configuration field when initializing your Descope SDK client. Point the URL to the running container/service inside your local environment or cluster.
 
 For a locally run Docker container (as shown above) the URL will typically be `http://localhost:8189` (or the mapped host/port you selected). In Kubernetes or another orchestrator, use the internal service DNS name, e.g. `http://authzcache.default.svc.cluster.local:8189`.
 
 Example code snippet:
+
 ```go
 // Package declaration and imports would go here
 
@@ -69,10 +80,12 @@ Example code snippet:
 ```
 
 Notes:
+
 - Ensure the container is reachable from where your code runs (network policy / firewall / service mesh settings).
 - The cache automatically syncs with remote authorization data based on the polling interval environment variable.
 
 ## License
+
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 Alternatively, this project is also available under the Apache License 2.0 - see the [LICENSE-APACHE](LICENSE-APACHE) file for details.
@@ -80,4 +93,5 @@ Alternatively, this project is also available under the Apache License 2.0 - see
 You may choose either license for your use of this software.
 
 ## Support
+
 For technical support and questions, please contact your Descope representative.
