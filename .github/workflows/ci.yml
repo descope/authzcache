@@ -20,26 +20,26 @@ jobs:
           RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
 
   lint:
-    name: Lint and more checks
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Lint and more checks
+      - name: Lint
         uses: ./.github/actions/lint
         env:
           RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
           RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
 
   test:
-    name: Run Tests
+    name: Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Run Tests
+      - name: Tests
         uses: ./.github/actions/test
         env:
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
@@ -49,13 +49,13 @@ jobs:
           min_coverage: "80"
 
   security:
-    name: Run Security checks
+    name: Security
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Run Security checks
+      - name: Security
         uses: ./.github/actions/security
         env:
           RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
