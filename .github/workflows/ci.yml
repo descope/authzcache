@@ -9,8 +9,6 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -24,10 +22,6 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      checks: write
-      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -41,27 +35,22 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      checks: write
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Test
         uses: ./.github/actions/test
-        with:
-          min_coverage: "80"
         env:
           DATABASE_PASSWORD: ${{ env.DATABASE_PASSWORD }}
           RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
           RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+        with:
+          min_coverage: "80"
 
   security:
     name: Security
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -87,6 +76,75 @@ jobs:
 
       - name: Pack and Upload
         uses: ./.github/actions/pack
+        with:
+          action_token: ${{ secrets.GITHUB_TOKEN }}
         env:
           RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
           RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+
+  publish-dockerhub:
+    name: Publish to Docker Hub
+    runs-on: ubuntu-latest
+    needs: [build, lint, test, security]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup repository dependencies
+        id: setup
+        uses: ./.github/actions/setup
+        env:
+          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
+          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
+
+      - name: Setup build args
+        id: setup-build-args
+        shell: bash
+        run: |
+          source configs/dev/deploy.env || true
+          source configs/dev/config.env || true
+          echo "build_dir=${BUILD_DIR}" >> "${GITHUB_OUTPUT}"
+          echo "port=${PORT}" >> "${GITHUB_OUTPUT}"
+          echo "repo_name=${REPO_NAME}" >> "${GITHUB_OUTPUT}"
+          echo "dockerfile=vendor/github.com/descope/common/build/docker/service/Dockerfile" >> "${GITHUB_OUTPUT}"
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata for Docker Hub
+        id: meta-dockerhub
+        uses: ./.github/actions/docker-metadata
+        with:
+          images: docker.io/descope/${{ steps.setup-build-args.outputs.repo_name }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        with:
+          version: latest
+          cache-binary: false
+
+      - name: Build and push to Docker Hub
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: ${{ steps.setup-build-args.outputs.dockerfile }}
+          push: true
+          tags: ${{ steps.meta-dockerhub.outputs.tags }}
+          labels: ${{ steps.meta-dockerhub.outputs.labels }}
+          annotations: ${{ steps.meta-dockerhub.outputs.annotations }}
+          secrets: |
+            "github_token=${{ steps.setup.outputs.token }}"
+          build-args: |
+            build_dir=${{ steps.setup-build-args.outputs.build_dir }}
+            port=${{ steps.setup-build-args.outputs.port }}
+            repo_name=${{ steps.setup-build-args.outputs.repo_name }}
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
