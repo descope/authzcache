@@ -23,7 +23,7 @@ docker run -d \
 
 ### Required Environment Variables
 
-- `DESCOPE_MANAGEMENT_KEY` - Your Descope management key for authentication
+- `DESCOPE_MANAGEMENT_KEY` - Your Descope management key for authentication, required (and recommended) scope is "FGA read/write" permissions.
 
 ### Optional Environment Variables
 
