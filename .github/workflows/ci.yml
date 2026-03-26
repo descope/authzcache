@@ -136,6 +136,7 @@ jobs:
           context: .
           file: ${{ steps.setup-build-args.outputs.dockerfile }}
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta-dockerhub.outputs.tags }}
           labels: ${{ steps.meta-dockerhub.outputs.labels }}
           annotations: ${{ steps.meta-dockerhub.outputs.annotations }}
