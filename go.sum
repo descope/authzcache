@@ -99,8 +99,8 @@ github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZD
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14/go.mod h1:NXzSaAKXU0dil+cxwRcnqgNPdZR0U571aLLqJaRibBw=
 github.com/descope/protoc-gen-mocker v1.0.1-0.20260331024316-4699e3715868 h1:L2blEQYR4GNjIvz3mi1WwmE+Jy1EtAoSI79IecF2ODg=
 github.com/descope/protoc-gen-mocker v1.0.1-0.20260331024316-4699e3715868/go.mod h1:nfvMg+jP4fGX5FYm+4DX4dIkBgu+ziMQItvZ+2/VPZw=
-github.com/descope/protoc-gen-validate v1.6.6-0.20260331020626-5ba82bae1f35 h1:a/R6XUD7hfrEBhrXEY8NdR2aUE1WjEoMYa0rHn8UGz4=
-github.com/descope/protoc-gen-validate v1.6.6-0.20260331020626-5ba82bae1f35/go.mod h1:Q8vdMSPfjG+LLeKVOCF6lzYcyHrzZ6AZzyZexE7F4kM=
+github.com/descope/protoc-gen-validate v1.6.6 h1:0iSOzAxkTrN5XPJ6ytgCk3YAUOE8HT5URLSwkoMXTKI=
+github.com/descope/protoc-gen-validate v1.6.6/go.mod h1:Q8vdMSPfjG+LLeKVOCF6lzYcyHrzZ6AZzyZexE7F4kM=
 github.com/descope/redismock/v9 v9.0.0-20260211170354-02987e071265 h1:JMFNEPlFaMpEm0D+Md6dxUEowM3heEWaid5dyFA2Vmg=
 github.com/descope/redismock/v9 v9.0.0-20260211170354-02987e071265/go.mod h1:Ez/s/KwtXhyBr14i+D66mYm77rBK9OIPL42ypCWkwoI=
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f h1:lO4WD4F/rVNCu3HqELle0jiPLLBs70cWOduZpkS1E78=
