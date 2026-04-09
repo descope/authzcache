@@ -1,11 +1,53 @@
 name: CI
 
-on: push
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
 
 env:
   DATABASE_PASSWORD: passwordless
 
 jobs:
+  semantic-pr:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" found in the pull request title "{title}"
+            didn't match the configured pattern. Please ensure that the subject
+            doesn't start with an uppercase character.
+          validateSingleCommit: false
+          ignoreLabels: |
+            bot
+            ignore-semantic-pr
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -65,6 +107,7 @@ jobs:
     name: Pack and Upload
     runs-on: ubuntu-latest
     needs: [build, lint, test, security]
+    if: github.event_name == 'push'
     permissions:
       contents: read
       packages: write
@@ -81,79 +124,3 @@ jobs:
         env:
           RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
           RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
-
-  publish-dockerhub:
-    name: Publish to Docker Hub
-    runs-on: ubuntu-latest
-    needs: [build, lint, test, security]
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-
-      - name: Setup repository dependencies
-        id: setup
-        uses: ./.github/actions/setup
-        env:
-          RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-          RELEASE_APP_PEM: ${{ secrets.RELEASE_APP_PEM }}
-
-      - name: Setup build args
-        id: setup-build-args
-        shell: bash
-        run: |
-          source configs/dev/deploy.env || true
-          source configs/dev/config.env || true
-          echo "build_dir=${BUILD_DIR}" >> "${GITHUB_OUTPUT}"
-          echo "port=${PORT}" >> "${GITHUB_OUTPUT}"
-          echo "repo_name=${REPO_NAME}" >> "${GITHUB_OUTPUT}"
-          echo "dockerfile=vendor/github.com/descope/common/build/docker/service/Dockerfile" >> "${GITHUB_OUTPUT}"
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Extract metadata for Docker Hub
-        id: meta-dockerhub
-        uses: ./.github/actions/docker-metadata
-        with:
-          images: docker.io/descope/${{ steps.setup-build-args.outputs.repo_name }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
-        with:
-          version: latest
-          cache-binary: false
-
-      - name: Build and push to Docker Hub
-        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
-        with:
-          context: .
-          file: ${{ steps.setup-build-args.outputs.dockerfile }}
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta-dockerhub.outputs.tags }}
-          labels: ${{ steps.meta-dockerhub.outputs.labels }}
-          annotations: ${{ steps.meta-dockerhub.outputs.annotations }}
-          secrets: |
-            "github_token=${{ steps.setup.outputs.token }}"
-          build-args: |
-            build_dir=${{ steps.setup-build-args.outputs.build_dir }}
-            port=${{ steps.setup-build-args.outputs.port }}
-            repo_name=${{ steps.setup-build-args.outputs.repo_name }}
-            GIT_SHA=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Update Docker Hub README
-        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: descope/${{ steps.setup-build-args.outputs.repo_name }}
-          readme-filepath: ./README.md
