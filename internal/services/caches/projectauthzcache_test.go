@@ -96,6 +96,19 @@ func TestUpdateCacheWithChecks(t *testing.T) {
 	assert.Equal(t, indirectSize, cache.indirectRelationCache.Len(ctx))
 }
 
+func TestUpdateCacheWithChecks_SkipsConditionalResults(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, Direct: true}},
+	})
+	// Conditional result must NOT be stored — the relation should be unchecked (cache miss).
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel})
+	assert.Empty(t, checks, "conditional result should not be served from cache")
+	assert.Len(t, unchecked, 1, "conditional relation should be forwarded for re-evaluation")
+}
+
 func TestUpdateCacheWithAddedRelations(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)

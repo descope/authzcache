@@ -18,6 +18,7 @@ type AuthzCache interface {
 	CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error
 	DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error
 	Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error)
+	CheckWithContext(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error)
 	WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string) ([]string, error)
 	WhatCanTargetAccess(ctx context.Context, target string) ([]*descope.AuthzRelation, error)
 }
@@ -102,28 +103,25 @@ func (a *authzCache) DeleteFGARelations(ctx context.Context, relations []*descop
 }
 
 func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
+	return a.CheckWithContext(ctx, relations, nil)
+}
+
+func (a *authzCache) CheckWithContext(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error) {
 	start := time.Now()
-	// get cache and mgmt sdk
 	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
 		return nil, err // notest
 	}
-	// check all relations against cache in a single read-lock acquisition
 	cachedChecks, toCheckViaSDK, indexToCachedChecks := projectCache.CheckRelations(ctx, relations)
-	// if all relations were found in cache, return
 	if len(toCheckViaSDK) == 0 {
-		// candidatesCount = 0 (nothing sent to SDK); filteredCount = 0 (Check doesn't filter, every relation gets an answer)
 		a.recordMetric(ctx, metrics.APICheck, true, 0, 0, len(cachedChecks), start)
 		return cachedChecks, nil
 	}
-	// fetch missing relations from sdk
-	sdkChecks, err := mgmtSDK.FGA().Check(ctx, toCheckViaSDK)
+	sdkChecks, err := mgmtSDK.FGA().CheckWithContext(ctx, toCheckViaSDK, extraContext)
 	if err != nil {
 		return nil, err // notest
 	}
-	// update cache
 	projectCache.UpdateCacheWithChecks(ctx, sdkChecks)
-	// merge cached and sdk checks in the same order as input relations and return them
 	var result []*descope.FGACheck
 	var j int
 	for i := range relations {
@@ -134,7 +132,6 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 			j++
 		}
 	}
-	// candidatesCount = relations sent to SDK (not in cache); filteredCount = 0 (Check doesn't filter, every relation gets an answer)
 	a.recordMetric(ctx, metrics.APICheck, false, len(toCheckViaSDK), 0, len(result), start)
 	return result, nil
 }
