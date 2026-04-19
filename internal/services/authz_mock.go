@@ -11,6 +11,7 @@ var _ AuthzCache = &AuthzCacheMock{} // ensure AuthzMock implements Authz
 type AuthzCacheMock struct {
 	GetSchemaFunc           func() *descope.FGASchema
 	CheckFunc               func(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error)
+	CheckWithContextFunc    func(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error)
 	CreateFGARelationsFunc  func(ctx context.Context, relations []*descope.FGARelation) error
 	CreateFGASchemaFunc     func(ctx context.Context, dsl string) error
 	DeleteFGARelationsFunc  func(ctx context.Context, relations []*descope.FGARelation) error
@@ -19,6 +20,13 @@ type AuthzCacheMock struct {
 }
 
 func (a *AuthzCacheMock) Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
+	return a.CheckFunc(ctx, relations)
+}
+
+func (a *AuthzCacheMock) CheckWithContext(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error) {
+	if a.CheckWithContextFunc != nil {
+		return a.CheckWithContextFunc(ctx, relations, extraContext)
+	}
 	return a.CheckFunc(ctx, relations)
 }
 
