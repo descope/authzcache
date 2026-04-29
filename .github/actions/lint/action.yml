@@ -28,7 +28,7 @@ runs:
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@8564da7cb3c6866ed1da648ca8f00a258ef0c802 # v6.5.2
       with:
-        version: v1.64.8
+        version: v2.11.4
         install-mode: goinstall
         args: --config=./scripts/lint/.golangci.yml
 
