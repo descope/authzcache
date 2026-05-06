@@ -71,14 +71,14 @@ runs:
         echo dockerfile=${DOCKERFILE_PATH} >> ${GITHUB_OUTPUT}
 
     - name: Login to GHCR
-      uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+      uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ inputs.action_token}}
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7 # v6.0.0
+      uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0
       with:
         aws-region: us-east-1
         role-to-assume: arn:aws:iam::${{ inputs.ecr_aws_account }}:role/GitHubActionsECR
@@ -86,11 +86,11 @@ runs:
 
     - name: Login to Amazon ECR
       id: login-ecr
-      uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+      uses: aws-actions/amazon-ecr-login@376925c9d111252e87ae59691e5a442dd100ef6a # v2.1.3
 
     - name: Login to Docker Hub
       if: ${{ inputs.enable_dockerhub == 'true' && inputs.dockerhub_username && inputs.dockerhub_token }}
-      uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+      uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
       with:
         registry: docker.io
         username: ${{ inputs.dockerhub_username }}
@@ -134,7 +134,7 @@ runs:
         echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Build and push
-      uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+      uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
       id: push
       with:
         platforms: ${{ inputs.platforms }}
