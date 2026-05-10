@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/descope/common v0.0.9-0.20260313223916-39a93bb37c9b
-	github.com/descope/go-sdk v1.17.0
+	github.com/descope/go-sdk v1.18.0
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20260430121358-2e4cf152470c
 	github.com/descope/protoc-gen-validate v1.6.6
@@ -92,12 +92,12 @@ require (
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/thomaspoignant/go-feature-flag v1.45.1 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.49.0 // indirect
+	golang.org/x/crypto v0.50.0 // indirect
 	golang.org/x/exp v0.0.0-20250606033433-dcc06ee1d476 // indirect
 	golang.org/x/mod v0.34.0 // indirect
-	golang.org/x/net v0.52.0 // indirect
+	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/tools v0.43.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
