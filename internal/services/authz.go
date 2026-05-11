@@ -7,7 +7,7 @@ import (
 
 	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/authzcache/internal/services/metrics"
-	cctx "github.com/descope/common/pkg/common/context"
+	cctx "github.com/descope/backend/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
 	"github.com/descope/go-sdk/descope/logger"
 	"github.com/descope/go-sdk/descope/sdk"

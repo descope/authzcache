@@ -7,15 +7,16 @@
 package v1
 
 import (
-	v1 "github.com/descope/authzservice/pkg/authzservice/proto/v1"
+	reflect "reflect"
+	unsafe "unsafe"
+
+	v1 "github.com/descope/backend/authzservice/pkg/authzservice/proto/v1"
 	_ "github.com/descope/protoc-gen-mocker/mocker"
 	_ "github.com/descope/protoc-gen-validate/proto"
 	_ "github.com/google/gnostic/openapiv3"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	reflect "reflect"
-	unsafe "unsafe"
 )
 
 const (

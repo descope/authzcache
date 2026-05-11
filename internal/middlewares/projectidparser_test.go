@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	cctx "github.com/descope/common/pkg/common/context"
-	"github.com/descope/common/pkg/common/utils"
+	cctx "github.com/descope/backend/common/pkg/common/context"
+	"github.com/descope/backend/common/pkg/common/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
