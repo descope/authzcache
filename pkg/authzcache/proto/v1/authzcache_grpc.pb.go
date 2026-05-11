@@ -8,7 +8,6 @@ package v1
 
 import (
 	context "context"
-
 	v1 "github.com/descope/backend/authzservice/pkg/authzservice/proto/v1"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
