@@ -196,8 +196,6 @@ func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource,
 			Target:       target,
 		}
 	}
-	// nil context is safe here: UpdateCacheWithChecks never caches conditional results,
-	// so any cached candidate is unconditional and re-validates correctly without context.
 	checks, err := a.Check(ctx, relations)
 	if err != nil {
 		return nil, err
