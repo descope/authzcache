@@ -4,9 +4,9 @@ import (
 	"context"
 
 	grpcauthzcv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
-	"github.com/descope/common/pkg/common/config"
-	cctx "github.com/descope/common/pkg/common/context"
-	"github.com/descope/common/pkg/common/grpc/grpcclient"
+	"github.com/descope/backend/common/pkg/common/config"
+	cctx "github.com/descope/backend/common/pkg/common/context"
+	"github.com/descope/backend/common/pkg/common/grpc/grpcclient"
 )
 
 type AuthzClient struct {

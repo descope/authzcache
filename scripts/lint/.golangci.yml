@@ -14,7 +14,7 @@ linters-settings:
           - "!**/masker/masker.go"
         deny:
           - pkg: "github.com/ggwhite/go-masker"
-            desc: "masking is allowed only by github.com/descope/common/pkg/common/masker"
+            desc: "masking is allowed only by github.com/descope/backend/common/pkg/common/masker"
           - pkg: "github.com/sirupsen/logrus"
             desc: "logging is allowed only with zerolog"
           - pkg: "log"

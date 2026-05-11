@@ -19,9 +19,9 @@ inputs:
     description: "Port (defaults to .env file)"
     required: false
   common_repo_path:
-    description: "Relative path to common repo (defaults to vendor/github.com/descope/common)"
+    description: "Relative path to common repo (defaults to vendor/github.com/descope/backend/common)"
   dockerfile:
-    description: "Relative path to Dockerfile (defaults to vendor/github.com/descope/common/build/docker/service/Dockerfile)"
+    description: "Relative path to Dockerfile (defaults to vendor/github.com/descope/backend/common/build/docker/service/Dockerfile)"
   action_token:
     default: ${{ github.token }}
     description: Github actions token
@@ -58,8 +58,8 @@ runs:
     - name: Setup build args
       id: setup_build_args
       env:
-        COMMON_REPO_PATH: ${{ inputs.common_repo_path && inputs.common_repo_path || 'vendor/github.com/descope/common' }}
-        DOCKERFILE_PATH: ${{ inputs.dockerfile && inputs.dockerfile || 'vendor/github.com/descope/common/build/docker/service/Dockerfile' }}
+        COMMON_REPO_PATH: ${{ inputs.common_repo_path && inputs.common_repo_path || 'vendor/github.com/descope/backend/common' }}
+        DOCKERFILE_PATH: ${{ inputs.dockerfile && inputs.dockerfile || 'vendor/github.com/descope/backend/common/build/docker/service/Dockerfile' }}
       shell: bash
       run: |
         source configs/dev/deploy.env || true
