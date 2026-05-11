@@ -200,6 +200,9 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
 	for _, c := range sdkChecks {
+		if c.Info.Conditional {
+			continue
+		}
 		if c.Info.Direct {
 			pc.addDirectRelation(ctx, c.Relation, c.Allowed)
 		} else {

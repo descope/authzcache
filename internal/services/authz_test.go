@@ -164,7 +164,7 @@ func TestCheckEmptyRelations(t *testing.T) {
 	// setup mocks
 	ac, mockSDK, mockCache := injectAuthzMocks(t)
 	// setup test data
-	mockSDK.MockFGA.CheckAssert = func(_ []*descope.FGARelation) {
+	mockSDK.MockFGA.CheckWithContextAssert = func(_ []*descope.FGARelation, _ map[string]any) {
 		require.Fail(t, "should not be called")
 	}
 	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (allowed bool, direct bool, ok bool) {
@@ -202,7 +202,7 @@ func TestCheckAllInCache(t *testing.T) {
 			Info:     &descope.FGACheckInfo{Direct: true},
 		},
 	}
-	mockSDK.MockFGA.CheckAssert = func(_ []*descope.FGARelation) {
+	mockSDK.MockFGA.CheckWithContextAssert = func(_ []*descope.FGARelation, _ map[string]any) {
 		require.Fail(t, "should not be called")
 	}
 	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
@@ -238,13 +238,13 @@ func TestCheckAllInSDK(t *testing.T) {
 			Info:     &descope.FGACheckInfo{Direct: true},
 		},
 	}
-	mockSDK.MockFGA.CheckAssert = func(rels []*descope.FGARelation) {
+	mockSDK.MockFGA.CheckWithContextAssert = func(rels []*descope.FGARelation, _ map[string]any) {
 		require.Equal(t, relations, rels)
 	}
 	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (allowed bool, direct bool, ok bool) {
 		return false, false, false
 	}
-	mockSDK.MockFGA.CheckResponse = expected
+	mockSDK.MockFGA.CheckWithContextResponse = expected
 	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, checks []*descope.FGACheck) {
 		require.Equal(t, expected, checks)
 	}
@@ -253,6 +253,27 @@ func TestCheckAllInSDK(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, expected, result)
 	require.True(t, mockCache.pollingStarted)
+}
+
+func TestCheckWithContextPassthrough(t *testing.T) {
+	ac, mockSDK, mockCache := injectAuthzMocks(t)
+	relations := []*descope.FGARelation{{Resource: "r", Target: "t", Relation: "viewer", ResourceType: "doc"}}
+	wantCtx := map[string]any{"env": "prod"}
+	var gotCtx map[string]any
+	mockSDK.MockFGA.CheckWithContextAssert = func(_ []*descope.FGARelation, extraContext map[string]any) {
+		gotCtx = extraContext
+	}
+	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (bool, bool, bool) {
+		return false, false, false
+	}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
+	mockSDK.MockFGA.CheckWithContextResponse = []*descope.FGACheck{
+		{Allowed: true, Relation: relations[0], Info: &descope.FGACheckInfo{Direct: true}},
+	}
+	result, err := ac.CheckWithContext(context.TODO(), relations, wantCtx)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	require.Equal(t, wantCtx, gotCtx)
 }
 
 func TestCheckMixed(t *testing.T) {
@@ -282,7 +303,7 @@ func TestCheckMixed(t *testing.T) {
 			Info:     &descope.FGACheckInfo{Direct: true},
 		},
 	}
-	mockSDK.MockFGA.CheckAssert = func(rels []*descope.FGARelation) {
+	mockSDK.MockFGA.CheckWithContextAssert = func(rels []*descope.FGARelation, _ map[string]any) {
 		require.Equal(t, expectedSdkRelations, rels)
 	}
 	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
@@ -292,7 +313,7 @@ func TestCheckMixed(t *testing.T) {
 		return false, false, false
 	}
 	sdkChecks := []*descope.FGACheck{expected[0], expected[2]}
-	mockSDK.MockFGA.CheckResponse = sdkChecks
+	mockSDK.MockFGA.CheckWithContextResponse = sdkChecks
 	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, checks []*descope.FGACheck) {
 		require.Equal(t, sdkChecks, checks) // only the checks returning from sdk should be updated in cache
 	}
@@ -668,7 +689,7 @@ func TestCheck_MetricsRecorded_FullCacheHit(t *testing.T) {
 		{Resource: "mario", Target: "luigi", Relation: "bigBro"},
 		{Resource: "luigi", Target: "mario", Relation: "bigBro"},
 	}
-	mockSDK.MockFGA.CheckAssert = func(_ []*descope.FGARelation) {
+	mockSDK.MockFGA.CheckWithContextAssert = func(_ []*descope.FGARelation, _ map[string]any) {
 		require.Fail(t, "should not be called on full cache hit")
 	}
 	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (bool, bool, bool) {
@@ -704,7 +725,7 @@ func TestCheck_MetricsRecorded_FullCacheMiss(t *testing.T) {
 	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (bool, bool, bool) {
 		return false, false, false
 	}
-	mockSDK.MockFGA.CheckResponse = sdkResponse
+	mockSDK.MockFGA.CheckWithContextResponse = sdkResponse
 	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	_, err := ac.Check(ctx, relations)
 	require.NoError(t, err)
@@ -737,7 +758,7 @@ func TestCheck_MetricsRecorded_PartialHit(t *testing.T) {
 		}
 		return false, false, false // not cached
 	}
-	mockSDK.MockFGA.CheckResponse = sdkResponse
+	mockSDK.MockFGA.CheckWithContextResponse = sdkResponse
 	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	_, err := ac.Check(ctx, relations)
 	require.NoError(t, err)
@@ -791,8 +812,8 @@ func BenchmarkCheck(b *testing.B) {
 				}
 			}
 			mockFGA := &mocksmgmt.MockFGA{
-				CheckResponse: sdkResponse,
-				CheckAssert: func(_ []*descope.FGARelation) {
+				CheckWithContextResponse: sdkResponse,
+				CheckWithContextAssert: func(_ []*descope.FGARelation, _ map[string]any) {
 					time.Sleep(time.Millisecond) // simulate SDK latency
 				},
 			}
@@ -811,12 +832,12 @@ func BenchmarkCheck(b *testing.B) {
 				b.Fatal(err)
 			}
 			// warm up: trigger project cache creation
-			warmupResp := mockFGA.CheckResponse
-			mockFGA.CheckResponse = []*descope.FGACheck{{Allowed: true, Relation: fixedRelations[0], Info: &descope.FGACheckInfo{Direct: true}}}
-			mockFGA.CheckAssert = nil
+			warmupResp := mockFGA.CheckWithContextResponse
+			mockFGA.CheckWithContextResponse = []*descope.FGACheck{{Allowed: true, Relation: fixedRelations[0], Info: &descope.FGACheckInfo{Direct: true}}}
+			mockFGA.CheckWithContextAssert = nil
 			_, _ = ac.Check(ctx, fixedRelations[:1])
-			mockFGA.CheckResponse = warmupResp
-			mockFGA.CheckAssert = func(_ []*descope.FGARelation) {
+			mockFGA.CheckWithContextResponse = warmupResp
+			mockFGA.CheckWithContextAssert = func(_ []*descope.FGARelation, _ map[string]any) {
 				time.Sleep(time.Millisecond)
 			}
 

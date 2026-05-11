@@ -18,6 +18,7 @@ type AuthzCache interface {
 	CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error
 	DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error
 	Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error)
+	CheckWithContext(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error)
 	WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string) ([]string, error)
 	WhatCanTargetAccess(ctx context.Context, target string) ([]*descope.AuthzRelation, error)
 }
@@ -102,6 +103,10 @@ func (a *authzCache) DeleteFGARelations(ctx context.Context, relations []*descop
 }
 
 func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
+	return a.CheckWithContext(ctx, relations, nil)
+}
+
+func (a *authzCache) CheckWithContext(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error) {
 	start := time.Now()
 	// get cache and mgmt sdk
 	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
@@ -117,7 +122,7 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 		return cachedChecks, nil
 	}
 	// fetch missing relations from sdk
-	sdkChecks, err := mgmtSDK.FGA().Check(ctx, toCheckViaSDK)
+	sdkChecks, err := mgmtSDK.FGA().CheckWithContext(ctx, toCheckViaSDK, extraContext)
 	if err != nil {
 		return nil, err // notest
 	}
@@ -191,6 +196,8 @@ func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource,
 			Target:       target,
 		}
 	}
+	// nil context is safe here: UpdateCacheWithChecks never caches conditional results,
+	// so any cached candidate is unconditional and re-validates correctly without context.
 	checks, err := a.Check(ctx, relations)
 	if err != nil {
 		return nil, err

@@ -58,8 +58,12 @@ func (ac *authzController) DeleteFGARelations(ctx context.Context, req *authzv1.
 func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest) (*authzv1.CheckResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Checking authz")
 	relations := relationsFromTuples(req.Tuples)
+	var extraContext map[string]any
+	if req.Context != nil {
+		extraContext = req.Context.AsMap()
+	}
 
-	checks, err := ac.authzCache.Check(ctx, relations)
+	checks, err := ac.authzCache.CheckWithContext(ctx, relations, extraContext)
 
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
@@ -77,7 +81,10 @@ func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest)
 			},
 			Allowed: check.Allowed,
 			Info: &authzv1.CheckResponseInfo{
-				Direct: check.Info.Direct,
+				Direct:         check.Info.Direct,
+				Conditional:    check.Info.Conditional,
+				MissingContext: check.Info.MissingContext,
+				ConditionalErr: check.Info.ConditionalErr,
 			},
 		}
 	}
