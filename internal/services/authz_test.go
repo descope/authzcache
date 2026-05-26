@@ -336,6 +336,10 @@ func TestWhoCanAccess_CacheHitWithCandidateFiltering(t *testing.T) {
 	checkCallCount := 0
 	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
 		checkCallCount++
+		// Candidates from WhoCanAccess cache are filtered with a wildcard target
+		// type — authzcache does not track per-candidate target types, and the
+		// backend skips schema validation when it sees "*".
+		require.Equal(t, "*", r.TargetType)
 		if r.Target == "user2" {
 			return false, true, true
 		}
@@ -404,6 +408,8 @@ func TestWhatCanTargetAccess_CacheHitWithCandidateFiltering(t *testing.T) {
 	checkCallCount := 0
 	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
 		checkCallCount++
+		// See filterWhoCanAccessCandidates: candidates are filtered with wildcard target type.
+		require.Equal(t, "*", r.TargetType)
 		if r.Resource == "doc2" {
 			return false, true, true
 		}
