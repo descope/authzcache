@@ -184,17 +184,12 @@ func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinit
 func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource, relationDefinition, namespace string, candidates []string) ([]string, error) {
 	relations := make([]*descope.FGARelation, len(candidates))
 	for i, target := range candidates {
-		// TargetType "*" tells authzservice to skip target-type schema validation.
-		// Candidates come from a prior verified WhoCanAccess result; their bindings
-		// are already known good in the cache, and we do not track per-candidate
-		// target types here. The schema DSL grammar excludes "*" as an identifier,
-		// so this cannot collide with a real type name.
 		relations[i] = &descope.FGARelation{
 			Resource:     resource,
 			ResourceType: namespace,
 			Relation:     relationDefinition,
 			Target:       target,
-			TargetType:   "*",
+			TargetType:   "*", // WhoCanAccess is TargetType-agnostic
 		}
 	}
 	checks, err := a.Check(ctx, relations)
@@ -242,13 +237,12 @@ func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string) ([]
 func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, target string, candidates []*descope.AuthzRelation) ([]*descope.AuthzRelation, error) {
 	relations := make([]*descope.FGARelation, len(candidates))
 	for i, r := range candidates {
-		// TargetType "*" — see filterWhoCanAccessCandidates for rationale.
 		relations[i] = &descope.FGARelation{
 			Resource:     r.Resource,
 			ResourceType: r.Namespace,
 			Relation:     r.RelationDefinition,
 			Target:       target,
-			TargetType:   "*",
+			TargetType:   "*", // WhatCanTargetAccess is TargetType-agnostic
 		}
 	}
 	checks, err := a.Check(ctx, relations)
