@@ -9,7 +9,7 @@ import (
 
 	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/authzcache/internal/services/metrics"
-	cctx "github.com/descope/common/pkg/common/context"
+	cctx "github.com/descope/backend/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
 	"github.com/descope/go-sdk/descope/logger"
 	"github.com/descope/go-sdk/descope/sdk"
@@ -336,6 +336,7 @@ func TestWhoCanAccess_CacheHitWithCandidateFiltering(t *testing.T) {
 	checkCallCount := 0
 	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
 		checkCallCount++
+		require.Equal(t, "*", r.TargetType)
 		if r.Target == "user2" {
 			return false, true, true
 		}
@@ -404,6 +405,7 @@ func TestWhatCanTargetAccess_CacheHitWithCandidateFiltering(t *testing.T) {
 	checkCallCount := 0
 	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
 		checkCallCount++
+		require.Equal(t, "*", r.TargetType)
 		if r.Resource == "doc2" {
 			return false, true, true
 		}

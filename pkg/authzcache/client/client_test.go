@@ -3,8 +3,8 @@ package client
 import (
 	"testing"
 
-	cctx "github.com/descope/common/pkg/common/context"
-	"github.com/descope/common/pkg/common/grpc/grpcclient"
+	cctx "github.com/descope/backend/common/pkg/common/context"
+	"github.com/descope/backend/common/pkg/common/grpc/grpcclient"
 	"github.com/stretchr/testify/require"
 )
 

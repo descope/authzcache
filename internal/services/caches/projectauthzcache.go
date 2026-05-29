@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/descope/authzcache/internal/config"
-	cctx "github.com/descope/common/pkg/common/context"
-	lru "github.com/descope/common/pkg/common/utils/monitoredlru"
+	cctx "github.com/descope/backend/common/pkg/common/context"
+	lru "github.com/descope/backend/common/pkg/common/utils/monitoredlru"
 	"github.com/descope/go-sdk/descope"
 )
 

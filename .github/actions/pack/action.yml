@@ -19,9 +19,9 @@ inputs:
     description: "Port (defaults to .env file)"
     required: false
   common_repo_path:
-    description: "Relative path to common repo (defaults to vendor/github.com/descope/common)"
+    description: "Relative path to common repo (defaults to vendor/github.com/descope/backend/common)"
   dockerfile:
-    description: "Relative path to Dockerfile (defaults to vendor/github.com/descope/common/build/docker/service/Dockerfile)"
+    description: "Relative path to Dockerfile (defaults to vendor/github.com/descope/backend/common/build/docker/service/Dockerfile)"
   action_token:
     default: ${{ github.token }}
     description: Github actions token
@@ -58,8 +58,8 @@ runs:
     - name: Setup build args
       id: setup_build_args
       env:
-        COMMON_REPO_PATH: ${{ inputs.common_repo_path && inputs.common_repo_path || 'vendor/github.com/descope/common' }}
-        DOCKERFILE_PATH: ${{ inputs.dockerfile && inputs.dockerfile || 'vendor/github.com/descope/common/build/docker/service/Dockerfile' }}
+        COMMON_REPO_PATH: ${{ inputs.common_repo_path && inputs.common_repo_path || 'vendor/github.com/descope/backend/common' }}
+        DOCKERFILE_PATH: ${{ inputs.dockerfile && inputs.dockerfile || 'vendor/github.com/descope/backend/common/build/docker/service/Dockerfile' }}
       shell: bash
       run: |
         source configs/dev/deploy.env || true
@@ -78,7 +78,7 @@ runs:
         password: ${{ inputs.action_token}}
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6.1.0
+      uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
       with:
         aws-region: us-east-1
         role-to-assume: arn:aws:iam::${{ inputs.ecr_aws_account }}:role/GitHubActionsECR
@@ -86,7 +86,7 @@ runs:
 
     - name: Login to Amazon ECR
       id: login-ecr
-      uses: aws-actions/amazon-ecr-login@376925c9d111252e87ae59691e5a442dd100ef6a # v2.1.3
+      uses: aws-actions/amazon-ecr-login@fa648b43de3d4d023bcb3f89ed6940096949c419 # v2.1.5
 
     - name: Login to Docker Hub
       if: ${{ inputs.enable_dockerhub == 'true' && inputs.dockerhub_username && inputs.dockerhub_token }}

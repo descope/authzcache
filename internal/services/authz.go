@@ -7,7 +7,7 @@ import (
 
 	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/authzcache/internal/services/metrics"
-	cctx "github.com/descope/common/pkg/common/context"
+	cctx "github.com/descope/backend/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
 	"github.com/descope/go-sdk/descope/logger"
 	"github.com/descope/go-sdk/descope/sdk"
@@ -189,6 +189,7 @@ func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource,
 			ResourceType: namespace,
 			Relation:     relationDefinition,
 			Target:       target,
+			TargetType:   "*", // WhoCanAccess is TargetType-agnostic
 		}
 	}
 	checks, err := a.Check(ctx, relations)
@@ -241,6 +242,7 @@ func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, ta
 			ResourceType: r.Namespace,
 			Relation:     r.RelationDefinition,
 			Target:       target,
+			TargetType:   "*", // WhatCanTargetAccess is TargetType-agnostic
 		}
 	}
 	checks, err := a.Check(ctx, relations)
