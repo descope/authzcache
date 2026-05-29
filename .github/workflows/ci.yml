@@ -5,7 +5,7 @@ on:
     branches:
       - main
     tags:
-      - "v*"
+      - 'v*'
   pull_request:
     types: [opened, synchronize, reopened, edited]
 
@@ -152,7 +152,7 @@ jobs:
           echo "build_dir=${BUILD_DIR}" >> "${GITHUB_OUTPUT}"
           echo "port=${PORT}" >> "${GITHUB_OUTPUT}"
           echo "repo_name=${REPO_NAME}" >> "${GITHUB_OUTPUT}"
-          echo "dockerfile=vendor/github.com/descope/backend/common/build/docker/service/Dockerfile" >> "${GITHUB_OUTPUT}"
+          echo "dockerfile=vendor/github.com/descope/common/build/docker/service/Dockerfile" >> "${GITHUB_OUTPUT}"
 
       - name: Login to Docker Hub
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0

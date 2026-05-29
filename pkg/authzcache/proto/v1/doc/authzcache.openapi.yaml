@@ -182,9 +182,6 @@ components:
                         $ref: '#/components/schemas/authzv1.Tuple'
                 computePaths:
                     type: boolean
-                context:
-                    type: object
-                    description: Optional flat key-value context map for evaluating ABAC conditions
         authzv1.CheckResponse:
             type: object
             properties:
@@ -204,19 +201,6 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/authzv1.CheckPath'
                     description: if the check succeeded, includes the full path of intermediate relations between the target and the resource
-                conditional:
-                    type: boolean
-                    description: true if the result was determined by evaluating a CEL condition
-                missingContext:
-                    type: array
-                    items:
-                        type: string
-                    description: when the condition could not be fully evaluated, lists the missing context variable names
-                conditionalErr:
-                    type: string
-                    description: |-
-                        when CEL condition evaluation failed (e.g. invalid context value type), contains the error message;
-                         the check still returns 200 with allowed=false
         authzv1.CheckResponseTuple:
             type: object
             properties:

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	cctx "github.com/descope/backend/common/pkg/common/context"
-	"github.com/descope/backend/common/pkg/common/utils"
+	cctx "github.com/descope/common/pkg/common/context"
+	"github.com/descope/common/pkg/common/utils"
 )
 
 const (

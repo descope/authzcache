@@ -1,7 +1,7 @@
 ifneq ("$(wildcard vendor)","")
-  include vendor/github.com/descope/backend/common/scripts/dev/Makefile
+  include vendor/github.com/descope/common/scripts/dev/Makefile
 else ifneq ("$(GOPATH)","")
-  include $(GOPATH)/src/github.com/descope/backend/common/scripts/dev/Makefile
+  include $(GOPATH)/src/github.com/descope/common/scripts/dev/Makefile
 else
   $(error The common Makefile could not be found)
 endif
