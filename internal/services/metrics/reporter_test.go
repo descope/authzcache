@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/descope/backend/common/pkg/common/utils"
+	"github.com/descope/common/pkg/common/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

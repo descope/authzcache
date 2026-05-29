@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/descope/authzcache/internal/services"
-	authzv1 "github.com/descope/backend/authzservice/pkg/authzservice/proto/v1"
+	authzv1 "github.com/descope/authzservice/pkg/authzservice/proto/v1"
 	"github.com/descope/go-sdk/descope"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -1,7 +1,7 @@
 package config
 
 import (
-	cconfig "github.com/descope/backend/common/pkg/common/config"
+	cconfig "github.com/descope/common/pkg/common/config"
 )
 
 const (

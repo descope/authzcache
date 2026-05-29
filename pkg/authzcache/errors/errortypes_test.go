@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	ce "github.com/descope/backend/common/pkg/common/errors"
+	ce "github.com/descope/common/pkg/common/errors"
 	"github.com/descope/go-sdk/descope"
 	"github.com/stretchr/testify/assert"
 )

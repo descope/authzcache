@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	cctx "github.com/descope/backend/common/pkg/common/context"
-	ce "github.com/descope/backend/common/pkg/common/errors"
+	cctx "github.com/descope/common/pkg/common/context"
+	ce "github.com/descope/common/pkg/common/errors"
 	"github.com/descope/go-sdk/descope"
 )
 
