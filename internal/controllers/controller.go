@@ -6,8 +6,8 @@ import (
 	"github.com/descope/authzcache/internal/services"
 	se "github.com/descope/authzcache/pkg/authzcache/errors"
 	authczv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
-	authzv1 "github.com/descope/authzservice/pkg/authzservice/proto/v1"
-	cctx "github.com/descope/common/pkg/common/context"
+	authzv1 "github.com/descope/backend/authzservice/pkg/authzservice/proto/v1"
+	cctx "github.com/descope/backend/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
 )
 

@@ -14,7 +14,7 @@ import (
 	"io"
 	"net/http"
 
-	v1_1 "github.com/descope/authzservice/pkg/authzservice/proto/v1"
+	v1_1 "github.com/descope/backend/authzservice/pkg/authzservice/proto/v1"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/utilities"
 	"google.golang.org/grpc"

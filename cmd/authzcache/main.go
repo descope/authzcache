@@ -12,9 +12,9 @@ import (
 	"github.com/descope/authzcache/internal/services/metrics"
 	"github.com/descope/authzcache/internal/services/remote"
 	authzcv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
-	cconfig "github.com/descope/common/pkg/common/config"
-	cctx "github.com/descope/common/pkg/common/context"
-	"github.com/descope/common/pkg/common/grpc/server"
+	cconfig "github.com/descope/backend/common/pkg/common/config"
+	cctx "github.com/descope/backend/common/pkg/common/context"
+	"github.com/descope/backend/common/pkg/common/grpc/server"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
 )
