@@ -14,6 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+      major: ${{ steps.release.outputs.major }}
+      minor: ${{ steps.release.outputs.minor }}
+      patch: ${{ steps.release.outputs.patch }}
     steps:
       - name: Generate GitHub App Token
         id: app-token
@@ -65,11 +70,23 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract metadata for Docker Hub
-        id: meta-dockerhub
-        uses: ./.github/actions/docker-metadata
-        with:
-          images: docker.io/descope/${{ steps.setup-build-args.outputs.repo_name }}
+      - name: Compose Docker Hub semver tags
+        id: dockerhub-tags
+        shell: bash
+        env:
+          IMAGE: docker.io/descope/${{ steps.setup-build-args.outputs.repo_name }}
+          VERSION: ${{ needs.release-please.outputs.version }}
+          MAJOR: ${{ needs.release-please.outputs.major }}
+          MINOR: ${{ needs.release-please.outputs.minor }}
+        run: |
+          {
+            echo "tags<<EOF"
+            echo "${IMAGE}:${VERSION}"
+            echo "${IMAGE}:${MAJOR}.${MINOR}"
+            echo "${IMAGE}:${MAJOR}"
+            echo "${IMAGE}:latest"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
@@ -84,9 +101,12 @@ jobs:
           file: ${{ steps.setup-build-args.outputs.dockerfile }}
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta-dockerhub.outputs.tags }}
-          labels: ${{ steps.meta-dockerhub.outputs.labels }}
-          annotations: ${{ steps.meta-dockerhub.outputs.annotations }}
+          tags: ${{ steps.dockerhub-tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.title=${{ steps.setup-build-args.outputs.repo_name }}
+            org.opencontainers.image.version=${{ needs.release-please.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           secrets: |
             "github_token=${{ steps.setup.outputs.token }}"
           build-args: |
