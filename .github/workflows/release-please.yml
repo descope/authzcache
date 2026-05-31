@@ -111,3 +111,5 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: descope/${{ steps.setup-build-args.outputs.repo_name }}
           readme-filepath: ./README.md
+          short-description: "High-performance authorization cache service that accelerates Descope FGA checks within your cluster."
+          enable-url-completion: true
