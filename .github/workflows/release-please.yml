@@ -40,13 +40,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Generate GitHub App Token
-        id: app-token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
-        with:
-          app-id: ${{ secrets.RELEASE_APP_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PEM }}
-
       - name: Setup repository dependencies
         id: setup
         uses: ./.github/actions/setup
@@ -95,7 +88,7 @@ jobs:
           labels: ${{ steps.meta-dockerhub.outputs.labels }}
           annotations: ${{ steps.meta-dockerhub.outputs.annotations }}
           secrets: |
-            "github_token=${{ steps.app-token.outputs.token }}"
+            "github_token=${{ steps.setup.outputs.token }}"
           build-args: |
             build_dir=${{ steps.setup-build-args.outputs.build_dir }}
             port=${{ steps.setup-build-args.outputs.port }}
