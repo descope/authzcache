@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/descope/authzcache/internal/config"
-	ae "github.com/descope/authzservice/pkg/authzservice/errors"
+	ae "github.com/descope/backend/authzservice/pkg/authzservice/errors"
 	"github.com/descope/go-sdk/descope"
 	"github.com/descope/go-sdk/descope/client"
 	"github.com/descope/go-sdk/descope/logger"

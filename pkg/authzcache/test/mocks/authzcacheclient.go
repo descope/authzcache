@@ -9,7 +9,7 @@ import (
 	"errors"
 
 	grpcauthzcv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
-	grpcauthzv1 "github.com/descope/authzservice/pkg/authzservice/proto/v1"
+	grpcauthzv1 "github.com/descope/backend/authzservice/pkg/authzservice/proto/v1"
 	grpc "google.golang.org/grpc"
 )
 

@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	cctx "github.com/descope/common/pkg/common/context"
-	"github.com/descope/common/pkg/common/grpc/httpgateway"
-	cm "github.com/descope/common/pkg/common/http/middlewares"
+	cctx "github.com/descope/backend/common/pkg/common/context"
+	"github.com/descope/backend/common/pkg/common/grpc/httpgateway"
+	cm "github.com/descope/backend/common/pkg/common/http/middlewares"
 )
 
 var mdProjectHeader = httpgateway.MetadataHeader(cctx.ContextKeyProjectIDHeader)

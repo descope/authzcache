@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	cctx "github.com/descope/common/pkg/common/context"
+	cctx "github.com/descope/backend/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
 	"github.com/stretchr/testify/require"
 )
