@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/descope/authzcache/compare/v1.0.1...v1.0.2) (2026-05-31)
+
+
+### Bug Fixes
+
+* dummy PR to trigger version release ([#591](https://github.com/descope/authzcache/issues/591)) ([2d8b231](https://github.com/descope/authzcache/commit/2d8b231e98f60f5743e8def806ad39179357457c))
+
 ## [1.0.1](https://github.com/descope/authzcache/compare/v1.0.0...v1.0.1) (2026-05-31)
 
 
