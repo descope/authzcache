@@ -21,7 +21,7 @@ inputs:
   common_repo_path:
     description: "Relative path to common repo (defaults to vendor/github.com/descope/backend/common)"
   dockerfile:
-    description: "Relative path to Dockerfile (defaults to vendor/github.com/descope/backend/common/build/docker/service/Dockerfile)"
+    description: "Relative path to Dockerfile (defaults to the repo-root standalone ./Dockerfile)"
   action_token:
     default: ${{ github.token }}
     description: Github actions token
@@ -59,7 +59,7 @@ runs:
       id: setup_build_args
       env:
         COMMON_REPO_PATH: ${{ inputs.common_repo_path && inputs.common_repo_path || 'vendor/github.com/descope/backend/common' }}
-        DOCKERFILE_PATH: ${{ inputs.dockerfile && inputs.dockerfile || 'vendor/github.com/descope/backend/common/build/docker/service/Dockerfile' }}
+        DOCKERFILE_PATH: ${{ inputs.dockerfile && inputs.dockerfile || './Dockerfile' }}
       shell: bash
       run: |
         source configs/dev/deploy.env || true
