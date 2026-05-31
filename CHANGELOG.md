@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/descope/authzcache/compare/v1.0.2...v1.0.3) (2026-05-31)
+
+
+### Bug Fixes
+
+* **deps:** update github.com/descope dependendies ([#593](https://github.com/descope/authzcache/issues/593)) ([eb250c3](https://github.com/descope/authzcache/commit/eb250c388e4911e1457f201b78d3c9c6be2ad0be))
+
 ## [1.0.2](https://github.com/descope/authzcache/compare/v1.0.1...v1.0.2) (2026-05-31)
 
 
