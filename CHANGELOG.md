@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.1](https://github.com/descope/authzcache/compare/v1.0.0...v1.0.1) (2026-05-31)
+
+
+### Bug Fixes
+
+* **deps:** update github.com/descope dependendies ([#583](https://github.com/descope/authzcache/issues/583)) ([c055a27](https://github.com/descope/authzcache/commit/c055a27b3e7770e5567848ff07ef5b482bf30382))
+* **deps:** update github.com/descope/protoc-gen-mocker digest to 788f40f ([#576](https://github.com/descope/authzcache/issues/576)) ([00dbde8](https://github.com/descope/authzcache/commit/00dbde8db1ab35f4aedd6e7e93733632e668e383))
+* trigger release with updated README ([#589](https://github.com/descope/authzcache/issues/589)) ([deea171](https://github.com/descope/authzcache/commit/deea17189295b3be54af4f6b411af60fb096cb43))
+
+
+### Reverts
+
+* roll back monorepo dependency migration ([#488](https://github.com/descope/authzcache/issues/488)) ([#579](https://github.com/descope/authzcache/issues/579)) ([d579cd4](https://github.com/descope/authzcache/commit/d579cd492a68e78c2b8d258179693b04c129f472))
+
 ## 1.0.0 (2026-05-28)
 
 
