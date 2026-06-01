@@ -3,7 +3,7 @@ module github.com/descope/authzcache
 go 1.26.1
 
 require (
-	github.com/descope/backend v0.0.0-20260601070908-c4e116c4be9a
+	github.com/descope/backend v0.0.0-20260601092052-f5c56b0b4abf
 	github.com/descope/go-sdk v1.20.0
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20260529153440-788f40f5959c
@@ -52,7 +52,6 @@ require (
 	github.com/dariubs/percent v0.0.0-20190521174708-8153fcbd48ae // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
-	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/ggwhite/go-masker/v2 v2.2.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
@@ -89,7 +88,7 @@ require (
 	github.com/prometheus/common v0.64.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
-	github.com/redis/go-redis/v9 v9.18.0 // indirect
+	github.com/redis/go-redis/v9 v9.19.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/rs/zerolog v1.35.1 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
