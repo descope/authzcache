@@ -99,8 +99,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvwDRwnI3hwNaAHRnc=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
-github.com/descope/backend v0.0.0-20260618153214-719b1677dec7 h1:D6D6qSQ53BWdPwe0kK+aYERUnf92dfCYibHuD9oSTmo=
-github.com/descope/backend v0.0.0-20260618153214-719b1677dec7/go.mod h1:Z9k/ilg1+IQ2/WG+aU0mILQZWaLNv7Vd4r1WZ0naB3Q=
+github.com/descope/backend v0.0.0-20260618193955-c3cd4f5597c1 h1:14cdvKE7QSt6S8ioW3hT39nK9quG4n38GN4LLPxPbJE=
+github.com/descope/backend v0.0.0-20260618193955-c3cd4f5597c1/go.mod h1:UuPrQAjlIrcO1eHWzuE3uh5QnvvjNYCiBEy1M+bdNkk=
 github.com/descope/go-sdk v1.21.0 h1:iChkzMdtyIzqzXoAGm5ZVySGBZwIiwlFchBDqI7W01g=
 github.com/descope/go-sdk v1.21.0/go.mod h1:JolBJhRva5VCfMrtbbK7HeVIDdmxe+WhdIZrxedfiGc=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
@@ -109,8 +109,8 @@ github.com/descope/protoc-gen-mocker v1.0.1-0.20260529153440-788f40f5959c h1:+Z7
 github.com/descope/protoc-gen-mocker v1.0.1-0.20260529153440-788f40f5959c/go.mod h1:qV0hMUyDhK93YJuL0zln8qsera955Wuo79wbPj9ZWYA=
 github.com/descope/protoc-gen-validate v1.6.6 h1:0iSOzAxkTrN5XPJ6ytgCk3YAUOE8HT5URLSwkoMXTKI=
 github.com/descope/protoc-gen-validate v1.6.6/go.mod h1:Q8vdMSPfjG+LLeKVOCF6lzYcyHrzZ6AZzyZexE7F4kM=
-github.com/descope/redismock/v9 v9.0.0-20260608000023-67b269c47700 h1:rwRKSeUgheTn+WJrt2doILjCT9/Gxz7xu6ODZkvfW/E=
-github.com/descope/redismock/v9 v9.0.0-20260608000023-67b269c47700/go.mod h1:19bHxf6q4DKKyejus1cq6YNsir3go3SN+4gA2bYyXoA=
+github.com/descope/redismock/v9 v9.0.0-20260618120305-e1bc003b2bee h1:bRMsI1HsQDpcZfZHrwgsz6n6G0ti6QYWmt/cI9M6QH0=
+github.com/descope/redismock/v9 v9.0.0-20260618120305-e1bc003b2bee/go.mod h1:p7qVC5gDR1/Uf9NJivDHW40PYN1z1fOVO2Y/tM1BkuE=
 github.com/diegoholiveira/jsonlogic/v3 v3.9.1 h1:BMZ4DxiZyIHVxoip29bc9alMg4cBvZ0lDzBC+/osOtQ=
 github.com/diegoholiveira/jsonlogic/v3 v3.9.1/go.mod h1:807lvTWhwOX6yHwkr42unn3VpC2eMLkvT/WsGGqWDfE=
 github.com/envoyproxy/go-control-plane v0.14.0 h1:hbG2kr4RuFj222B6+7T83thSPqLjwBIfQawTkC++2HA=
@@ -251,8 +251,8 @@ github.com/prometheus/procfs v0.20.1 h1:XwbrGOIplXW/AU3YhIhLODXMJYyC1isLFfYCsTEy
 github.com/prometheus/procfs v0.20.1/go.mod h1:o9EMBZGRyvDrSPH1RqdxhojkuXstoe4UlK79eF5TGGo=
 github.com/rabbitmq/amqp091-go v1.11.0 h1:HxIctVm9Gid/Vtn706necmZ7Wj6pgGI2eqplRbEY8O8=
 github.com/rabbitmq/amqp091-go v1.11.0/go.mod h1:Hy4jKW5kQART1u+JkDTF9YYOQUHXqMuhrgxOEeS7G4o=
-github.com/redis/go-redis/v9 v9.19.0 h1:XPVaaPSnG6RhYf7p+rmSa9zZfeVAnWsH5h3lxthOm/k=
-github.com/redis/go-redis/v9 v9.19.0/go.mod h1:v/M13XI1PVCDcm01VtPFOADfZtHf8YW3baQf57KlIkA=
+github.com/redis/go-redis/v9 v9.20.0 h1:WnQYxLkgO2xiXTCJY0ldIiI8dNqCDlQAG+AtaH7a2a0=
+github.com/redis/go-redis/v9 v9.20.0/go.mod h1:v/M13XI1PVCDcm01VtPFOADfZtHf8YW3baQf57KlIkA=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
 github.com/rs/zerolog v1.35.1 h1:m7xQeoiLIiV0BCEY4Hs+j2NG4Gp2o2KPKmhnnLiazKI=
