@@ -1158,13 +1158,13 @@ func abacSchema() *descope.FGASchema {
 func TestSchemaHasABAC(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)
-	assert.False(t, cache.SchemaHasABAC(ctx), "no schema loaded yet")
+	assert.False(t, cache.schemaHasABAC, "no schema loaded yet")
 
 	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "model AuthZ\n"})
-	assert.False(t, cache.SchemaHasABAC(ctx), "schema without conditions is not ABAC")
+	assert.False(t, cache.schemaHasABAC, "schema without conditions is not ABAC")
 
 	cache.UpdateCacheWithSchema(ctx, abacSchema())
-	assert.True(t, cache.SchemaHasABAC(ctx), "schema with a condition is ABAC")
+	assert.True(t, cache.schemaHasABAC, "schema with a condition is ABAC")
 }
 
 func TestConditionalRelationCaching_ReEvaluatesAtEdge(t *testing.T) {

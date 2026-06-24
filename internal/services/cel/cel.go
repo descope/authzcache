@@ -89,25 +89,16 @@ func (cc *CompiledCondition) Eval(ctx context.Context, requestContext map[string
 func coerce(dslType string, raw any) (any, bool) {
 	switch dslType {
 	case "int":
-		switch n := raw.(type) {
-		case float64:
-			return int64(n), true
-		case int64:
-			return n, true
-		case int:
-			return int64(n), true
-		default:
-			return nil, false
+		// JSON numbers decode to float64; cel-go's int type needs int64
+		if f, ok := raw.(float64); ok {
+			return int64(f), true
 		}
+		return nil, false
 	case "uint":
-		switch n := raw.(type) {
-		case float64:
-			return uint64(n), true
-		case uint64:
-			return n, true
-		default:
-			return nil, false
+		if f, ok := raw.(float64); ok {
+			return uint64(f), true
 		}
+		return nil, false
 	case celtypes.IPAddressTypeName:
 		s, isStr := raw.(string)
 		if !isStr {

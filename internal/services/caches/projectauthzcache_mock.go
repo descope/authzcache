@@ -10,7 +10,6 @@ var _ ProjectAuthzCache = &ProjectAuthzCacheMock{} // ensure ProjectAuthzCacheMo
 
 type ProjectAuthzCacheMock struct {
 	GetSchemaFunc                       func() *descope.FGASchema
-	SchemaHasABACFunc                   func(ctx context.Context) bool
 	CheckRelationFunc                   func(ctx context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool)
 	CheckRelationsFunc                  func(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck)
 	UpdateCacheWithSchemaFunc           func(ctx context.Context, schema *descope.FGASchema)
@@ -24,13 +23,6 @@ type ProjectAuthzCacheMock struct {
 	GetWhatCanTargetAccessCachedFunc    func(ctx context.Context, target string) ([]*descope.AuthzRelation, bool)
 	SetWhatCanTargetAccessCachedFunc    func(ctx context.Context, target string, relations []*descope.AuthzRelation)
 	InvalidateLookupCacheFunc           func(ctx context.Context)
-}
-
-func (m *ProjectAuthzCacheMock) SchemaHasABAC(ctx context.Context) bool {
-	if m.SchemaHasABACFunc != nil {
-		return m.SchemaHasABACFunc(ctx)
-	}
-	return false
 }
 
 func (m *ProjectAuthzCacheMock) EnsureSchemaLoaded(ctx context.Context, schema *descope.FGASchema) {

@@ -76,7 +76,6 @@ type projectAuthzCache struct {
 
 type ProjectAuthzCache interface {
 	GetSchema() *descope.FGASchema
-	SchemaHasABAC(ctx context.Context) bool
 	CheckRelations(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck)
 	UpdateCacheWithSchema(ctx context.Context, schema *descope.FGASchema)
 	EnsureSchemaLoaded(ctx context.Context, schema *descope.FGASchema)
@@ -153,12 +152,6 @@ func (pc *projectAuthzCache) GetSchema() *descope.FGASchema {
 	pc.mutex.RLock()
 	defer pc.mutex.RUnlock()
 	return pc.schemaCache
-}
-
-func (pc *projectAuthzCache) SchemaHasABAC(_ context.Context) bool {
-	pc.mutex.RLock()
-	defer pc.mutex.RUnlock()
-	return pc.schemaHasABAC
 }
 
 func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck) {
