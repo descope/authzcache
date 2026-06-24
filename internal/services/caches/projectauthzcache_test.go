@@ -1255,3 +1255,16 @@ func TestLookupCaching_AllowedForNonABAC(t *testing.T) {
 	require.True(t, ok, "non-ABAC lookups still cache")
 	assert.ElementsMatch(t, []string{"u1", "u2"}, targets)
 }
+
+func TestUpdateCacheWithAddedRelations_SkipsDirectUnderABAC(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	cache.UpdateCacheWithSchema(ctx, abacSchema())
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{rel})
+	// a created tuple on a conditional relation is NOT an unconditional grant; it must not be
+	// served from the direct cache, or it would shadow edge condition re-evaluation
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, map[string]any{"role": "admin"})
+	assert.Empty(t, checks, "created tuple under an ABAC schema must not be cached as a direct grant")
+	assert.Len(t, unchecked, 1)
+}

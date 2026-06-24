@@ -258,6 +258,12 @@ func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, 
 	defer pc.mutex.Unlock()
 	pc.indirectRelationCache.Purge(ctx)    // added (direct) relations can change the result of indirect checks, so we must purge all indirect relations
 	pc.conditionalRelationCache.Purge(ctx) // a relation change can also flip a conditional grant's resolution path
+	if pc.schemaHasABAC {
+		// under ABAC a created tuple may sit on a conditional relation, so it is NOT an
+		// unconditional grant — caching it as a direct allow would shadow condition re-evaluation.
+		// Leave it for the backend; checks resolve via the conditional cache instead.
+		return
+	}
 	for _, r := range relations {
 		pc.addDirectRelation(ctx, r, true)
 		pc.addToLookupCache(ctx, r)
