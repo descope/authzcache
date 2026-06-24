@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/descope/authzcache/internal/config"
+	edgecel "github.com/descope/authzcache/internal/services/cel"
 	cctx "github.com/descope/backend/common/pkg/common/context"
 	lru "github.com/descope/backend/common/pkg/common/utils/monitoredlru"
 	"github.com/descope/go-sdk/descope"
@@ -59,18 +60,26 @@ type projectAuthzCache struct {
 	directTargetsIndex    map[target]map[resource][]resourceTargetRelation
 	directKeyComponents   map[resourceTargetRelation]keyComponents
 	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, bool] // resource:target:relation -> bool, e.g. file1:user2:owner -> false
-	lookupCache           *lru.MonitoredLRUCache[lookupKey, *LookupCacheEntry] // lookup cache for WhoCanAccess/WhatCanTargetAccess
-	lookupCacheEnabled    bool
-	lookupCacheTTL        time.Duration
-	lookupCacheMaxResult  int
-	remoteChanges         *remoteChangesTracking
-	mutex                 sync.RWMutex
+	// conditionalRelationCache holds positive CEL-conditional grants: resource:target:relation -> involved condition names.
+	// On a hit the edge re-evaluates those conditions against the current request context; fact-involved grants are never stored here.
+	conditionalRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, []string]
+	compiledConditions       map[string]*edgecel.CompiledCondition                // condition name -> compiled CEL program, from the loaded schema
+	schemaHasABAC            bool                                                 // true when the loaded schema declares any condition
+	celEvalTimeout           time.Duration                                        // wall-clock backstop per condition evaluation
+	lookupCache              *lru.MonitoredLRUCache[lookupKey, *LookupCacheEntry] // lookup cache for WhoCanAccess/WhatCanTargetAccess
+	lookupCacheEnabled       bool
+	lookupCacheTTL           time.Duration
+	lookupCacheMaxResult     int
+	remoteChanges            *remoteChangesTracking
+	mutex                    sync.RWMutex
 }
 
 type ProjectAuthzCache interface {
 	GetSchema() *descope.FGASchema
-	CheckRelations(ctx context.Context, relations []*descope.FGARelation) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck)
+	SchemaHasABAC(ctx context.Context) bool
+	CheckRelations(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck)
 	UpdateCacheWithSchema(ctx context.Context, schema *descope.FGASchema)
+	EnsureSchemaLoaded(ctx context.Context, schema *descope.FGASchema)
 	UpdateCacheWithAddedRelations(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithDeletedRelations(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck)
@@ -90,6 +99,11 @@ func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChange
 	if err != nil {
 		return nil, err // notest
 	}
+	// conditional grants are re-evaluated at the edge; size them alongside indirect results
+	conditionalRelationCache, err := lru.New[resourceTargetRelation, []string](config.GetIndirectRelationCacheSizePerProject(), "authz-conditional-relations-"+cctx.ProjectID(ctx))
+	if err != nil {
+		return nil, err // notest
+	}
 	lookupCacheEnabled := config.GetLookupCacheEnabled()
 	var lookupCache *lru.MonitoredLRUCache[lookupKey, *LookupCacheEntry]
 	if lookupCacheEnabled {
@@ -99,14 +113,16 @@ func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChange
 		}
 	}
 	pc := &projectAuthzCache{
-		directResourcesIndex:  make(map[resource]map[target][]resourceTargetRelation),
-		directTargetsIndex:    make(map[target]map[resource][]resourceTargetRelation),
-		directKeyComponents:   make(map[resourceTargetRelation]keyComponents),
-		indirectRelationCache: indirectRelationCache,
-		lookupCache:           lookupCache,
-		lookupCacheEnabled:    lookupCacheEnabled,
-		lookupCacheTTL:        time.Second * time.Duration(config.GetLookupCacheTTLInSeconds()),
-		lookupCacheMaxResult:  config.GetLookupCacheMaxResultSize(),
+		directResourcesIndex:     make(map[resource]map[target][]resourceTargetRelation),
+		directTargetsIndex:       make(map[target]map[resource][]resourceTargetRelation),
+		directKeyComponents:      make(map[resourceTargetRelation]keyComponents),
+		indirectRelationCache:    indirectRelationCache,
+		conditionalRelationCache: conditionalRelationCache,
+		celEvalTimeout:           time.Millisecond * time.Duration(config.GetCELEvalTimeoutInMillis()),
+		lookupCache:              lookupCache,
+		lookupCacheEnabled:       lookupCacheEnabled,
+		lookupCacheTTL:           time.Second * time.Duration(config.GetLookupCacheTTLInSeconds()),
+		lookupCacheMaxResult:     config.GetLookupCacheMaxResultSize(),
 		remoteChanges: &remoteChangesTracking{
 			lastPollTime:          time.Now(),
 			remote:                remoteChangesChecker,
@@ -139,7 +155,13 @@ func (pc *projectAuthzCache) GetSchema() *descope.FGASchema {
 	return pc.schemaCache
 }
 
-func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*descope.FGARelation) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck) {
+func (pc *projectAuthzCache) SchemaHasABAC(_ context.Context) bool {
+	pc.mutex.RLock()
+	defer pc.mutex.RUnlock()
+	return pc.schemaHasABAC
+}
+
+func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck) {
 	indexToCheck = make(map[int]*descope.FGACheck, len(relations))
 	pc.mutex.RLock()
 	defer pc.mutex.RUnlock()
@@ -152,6 +174,11 @@ func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*de
 			check := &descope.FGACheck{Allowed: allowed, Relation: r, Info: &descope.FGACheckInfo{Direct: false}}
 			checks = append(checks, check)
 			indexToCheck[i] = check
+		} else if condNames, ok := pc.conditionalRelationCache.Get(ctx, key(r)); ok && pc.allConditionsPass(ctx, condNames, extraContext) {
+			// cached positive CEL grant whose conditions all still hold for this request's context
+			check := &descope.FGACheck{Allowed: true, Relation: r, Info: &descope.FGACheckInfo{Conditional: true, InvolvedConditions: condNames}}
+			checks = append(checks, check)
+			indexToCheck[i] = check
 		} else {
 			unchecked = append(unchecked, r)
 		}
@@ -159,12 +186,68 @@ func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*de
 	return
 }
 
+// allConditionsPass re-evaluates every involved condition against the request context.
+// It returns true only if all conditions are compiled, evaluate without error, and yield true;
+// anything else (missing condition, missing/invalid param, error, timeout, or a false result)
+// means the cached grant can't be confirmed at the edge, so the caller defers to the backend.
+func (pc *projectAuthzCache) allConditionsPass(ctx context.Context, condNames []string, extraContext map[string]any) bool {
+	if len(condNames) == 0 {
+		return false
+	}
+	for _, name := range condNames {
+		compiled, ok := pc.compiledConditions[name]
+		if !ok {
+			return false
+		}
+		pass, evaluated := compiled.Eval(ctx, extraContext, pc.celEvalTimeout)
+		if !evaluated || !pass {
+			return false
+		}
+	}
+	return true
+}
+
 func (pc *projectAuthzCache) UpdateCacheWithSchema(ctx context.Context, schema *descope.FGASchema) {
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
-	pc.schemaCache = schema
+	pc.setSchema(ctx, schema)
 	// on schema update, we need to purge all relations
 	pc.purgeRelationCaches(ctx)
+}
+
+// EnsureSchemaLoaded populates the schema (and its compiled conditions) only if absent, without
+// purging cached relations. Used to lazily load conditions the edge needs to re-evaluate
+// conditional grants when the schema is not yet (or no longer) cached.
+func (pc *projectAuthzCache) EnsureSchemaLoaded(ctx context.Context, schema *descope.FGASchema) {
+	pc.mutex.Lock()
+	defer pc.mutex.Unlock()
+	if pc.schemaCache != nil {
+		return
+	}
+	pc.setSchema(ctx, schema)
+}
+
+// setSchema stores the schema and compiles its conditions for edge evaluation. Must be called
+// while holding the write lock. A condition that fails to compile is skipped (logged), so a
+// grant gated by it simply won't be served from cache — never incorrectly allowed.
+func (pc *projectAuthzCache) setSchema(ctx context.Context, schema *descope.FGASchema) {
+	pc.schemaCache = schema
+	pc.compiledConditions = nil
+	pc.schemaHasABAC = false
+	if schema == nil {
+		return
+	}
+	pc.schemaHasABAC = len(schema.Conditions) > 0
+	compiled := make(map[string]*edgecel.CompiledCondition, len(schema.Conditions))
+	for _, c := range schema.Conditions {
+		program, err := edgecel.Compile(c)
+		if err != nil {
+			cctx.Logger(ctx).Warn().Str("condition", c.Name).Err(err).Msg("Failed to compile schema condition for edge evaluation, conditional grants gated by it won't be cached")
+			continue
+		}
+		compiled[c.Name] = program
+	}
+	pc.compiledConditions = compiled
 }
 
 func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, relations []*descope.FGARelation) {
@@ -173,7 +256,8 @@ func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, 
 	}
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
-	pc.indirectRelationCache.Purge(ctx) // added (direct) relations can change the result of indirect checks, so we must purge all indirect relations
+	pc.indirectRelationCache.Purge(ctx)    // added (direct) relations can change the result of indirect checks, so we must purge all indirect relations
+	pc.conditionalRelationCache.Purge(ctx) // a relation change can also flip a conditional grant's resolution path
 	for _, r := range relations {
 		pc.addDirectRelation(ctx, r, true)
 		pc.addToLookupCache(ctx, r)
@@ -186,7 +270,8 @@ func (pc *projectAuthzCache) UpdateCacheWithDeletedRelations(ctx context.Context
 	}
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
-	pc.indirectRelationCache.Purge(ctx) // deleted (direct) relations can change the result of indirect checks, so we must purge all indirect relations
+	pc.indirectRelationCache.Purge(ctx)    // deleted (direct) relations can change the result of indirect checks, so we must purge all indirect relations
+	pc.conditionalRelationCache.Purge(ctx) // a relation change can also flip a conditional grant's resolution path
 	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation
 	for _, r := range relations {
 		pc.removeDirectRelation(ctx, r)
@@ -200,15 +285,36 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
 	for _, c := range sdkChecks {
-		if c.Info.Conditional {
+		switch {
+		case c.Info.InvolvesFact:
+			// fact-involved results depend on mutable backend state the edge can't observe — never cache
 			continue
-		}
-		if c.Info.Direct {
+		case c.Info.Conditional:
+			// cache only positive, cleanly-evaluated CEL grants whose conditions the edge can re-evaluate;
+			// conditional denials and partial/errored evaluations are left for the backend to decide each time
+			if c.Allowed && len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" && pc.hasAllCompiledConditions(c.Info.InvolvedConditions) {
+				pc.conditionalRelationCache.Add(ctx, key(c.Relation), c.Info.InvolvedConditions)
+			}
+		case c.Info.Direct:
 			pc.addDirectRelation(ctx, c.Relation, c.Allowed)
-		} else {
+		default:
 			pc.addIndirectRelation(ctx, c.Relation, c.Allowed)
 		}
 	}
+}
+
+// hasAllCompiledConditions reports whether every involved condition has a compiled program ready
+// for edge re-evaluation. If any is missing (e.g. schema not loaded), the grant is not cached.
+func (pc *projectAuthzCache) hasAllCompiledConditions(condNames []string) bool {
+	if len(condNames) == 0 {
+		return false
+	}
+	for _, name := range condNames {
+		if _, ok := pc.compiledConditions[name]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func (pc *projectAuthzCache) StartRemoteChangesPolling(ctx context.Context) {
@@ -230,7 +336,7 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
 	// in case of no cached relations, we skip the server call but invalidate the schema cache to make sure we don't miss schema changes
-	if noRelations := pc.directRelationCache.Len(ctx) == 0 && pc.indirectRelationCache.Len(ctx) == 0; noRelations {
+	if noRelations := pc.directRelationCache.Len(ctx) == 0 && pc.indirectRelationCache.Len(ctx) == 0 && pc.conditionalRelationCache.Len(ctx) == 0; noRelations {
 		pc.remoteChanges.lastPollTime = time.Now()
 		pc.schemaCache = nil
 		cctx.Logger(ctx).Debug().Msg("No cached relations, skipping remote changes check")
@@ -265,6 +371,7 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	}
 	cctx.Logger(ctx).Debug().Msg(fmt.Sprintf("Remote changes found, Resources: %v, Targets: %v, updating caches", remoteChanges.Resources, remoteChanges.Targets))
 	pc.indirectRelationCache.Purge(ctx)
+	pc.conditionalRelationCache.Purge(ctx) // conditional grants depend on the (now-changed) relation graph, re-fetch them
 	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation
 	for _, r := range remoteChanges.Resources {
 		pc.removeDirectRelationByResource(ctx, resource(r))
@@ -434,6 +541,7 @@ func (pc *projectAuthzCache) purgeRelationCaches(ctx context.Context) {
 	pc.directKeyComponents = make(map[resourceTargetRelation]keyComponents)
 	pc.directRelationCache.Purge(ctx)
 	pc.indirectRelationCache.Purge(ctx)
+	pc.conditionalRelationCache.Purge(ctx)
 	if pc.lookupCache != nil {
 		pc.lookupCache.Purge(ctx)
 	}
@@ -520,6 +628,9 @@ func (pc *projectAuthzCache) SetWhoCanAccessCached(ctx context.Context, resource
 	}
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
+	if pc.schemaHasABAC {
+		return // ABAC schemas make lookup results context/fact-dependent — don't cache a potentially stale set
+	}
 	key := whoCanAccessKey(resource, relationDefinition, namespace)
 	now := time.Now()
 	pc.lookupCache.Add(ctx, key, &LookupCacheEntry{
@@ -567,6 +678,9 @@ func (pc *projectAuthzCache) SetWhatCanTargetAccessCached(ctx context.Context, t
 	}
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
+	if pc.schemaHasABAC {
+		return // ABAC schemas make lookup results context/fact-dependent — don't cache a potentially stale set
+	}
 	key := whatCanTargetAccessKey(target)
 	results := make([]string, len(relations))
 	for i, r := range relations {

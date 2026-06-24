@@ -28,7 +28,7 @@ var _ RemoteChangesChecker = &mockRemoteChangesChecker{} // ensure mockRemoteCha
 
 // checkRelation is a test helper that calls CheckRelations with a single relation
 func checkRelation(ctx context.Context, cache ProjectAuthzCache, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
-	_, _, indexToCheck := cache.CheckRelations(ctx, []*descope.FGARelation{r})
+	_, _, indexToCheck := cache.CheckRelations(ctx, []*descope.FGARelation{r}, nil)
 	check, ok := indexToCheck[0]
 	if !ok {
 		return false, false, false
@@ -103,8 +103,9 @@ func TestUpdateCacheWithChecks_SkipsConditionalResults(t *testing.T) {
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, Direct: true}},
 	})
-	// Conditional result must NOT be stored — the relation should be unchecked (cache miss).
-	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel})
+	// Conditional result with no involved conditions (nothing to re-evaluate at the edge) must
+	// NOT be stored — the relation should be unchecked (cache miss).
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, nil)
 	assert.Empty(t, checks, "conditional result should not be served from cache")
 	assert.Len(t, unchecked, 1, "conditional relation should be forwarded for re-evaluation")
 }
@@ -1138,4 +1139,119 @@ func updateBothCachesWithChecks(ctx context.Context, t *testing.T, cache *projec
 		{allowed: true, direct: true, r: extraDirectTrueRelation},
 		{allowed: true, direct: true, r: differentResourceAndTargetDirectTrueRelation},
 	}
+}
+
+// abacSchema returns a schema with a single CEL condition (role == "admin").
+func abacSchema() *descope.FGASchema {
+	return &descope.FGASchema{
+		Schema: "model AuthZ\n",
+		Conditions: []*descope.FGACondition{
+			{
+				Name:       "isAdmin",
+				Params:     []*descope.FGAConditionParam{{Name: "role", Type: "string"}},
+				Expression: `role == "admin"`,
+			},
+		},
+	}
+}
+
+func TestSchemaHasABAC(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	assert.False(t, cache.SchemaHasABAC(ctx), "no schema loaded yet")
+
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "model AuthZ\n"})
+	assert.False(t, cache.SchemaHasABAC(ctx), "schema without conditions is not ABAC")
+
+	cache.UpdateCacheWithSchema(ctx, abacSchema())
+	assert.True(t, cache.SchemaHasABAC(ctx), "schema with a condition is ABAC")
+}
+
+func TestConditionalRelationCaching_ReEvaluatesAtEdge(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	cache.UpdateCacheWithSchema(ctx, abacSchema())
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+
+	// backend returned a positive CEL grant gated by isAdmin under an admin context
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, InvolvedConditions: []string{"isAdmin"}}},
+	})
+
+	t.Run("context still satisfies the condition - served from cache", func(t *testing.T) {
+		checks, unchecked, idx := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, map[string]any{"role": "admin"})
+		require.Len(t, checks, 1)
+		assert.Empty(t, unchecked)
+		require.Contains(t, idx, 0)
+		assert.True(t, idx[0].Allowed)
+		assert.True(t, idx[0].Info.Conditional)
+	})
+
+	t.Run("context no longer satisfies the condition - deferred to backend", func(t *testing.T) {
+		checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, map[string]any{"role": "user"})
+		assert.Empty(t, checks, "stale positive grant must not be served when the condition now fails")
+		assert.Len(t, unchecked, 1)
+	})
+
+	t.Run("missing context var - deferred to backend", func(t *testing.T) {
+		checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, nil)
+		assert.Empty(t, checks)
+		assert.Len(t, unchecked, 1)
+	})
+}
+
+func TestConditionalRelationCaching_NeverCachesFactInvolved(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	cache.UpdateCacheWithSchema(ctx, abacSchema())
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, InvolvesFact: true, InvolvedConditions: []string{"isAdmin"}}},
+	})
+
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, map[string]any{"role": "admin"})
+	assert.Empty(t, checks, "fact-involved grants must never be cached")
+	assert.Len(t, unchecked, 1)
+}
+
+func TestConditionalRelationCaching_NeverCachesDenials(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	cache.UpdateCacheWithSchema(ctx, abacSchema())
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, InvolvedConditions: []string{"isAdmin"}}},
+	})
+
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, map[string]any{"role": "admin"})
+	assert.Empty(t, checks, "conditional denials are not cached")
+	assert.Len(t, unchecked, 1)
+}
+
+func TestLookupCaching_SkippedUnderABAC(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	cache.UpdateCacheWithSchema(ctx, abacSchema())
+
+	cache.SetWhoCanAccessCached(ctx, "doc1", "viewer", "doc", []string{"u1", "u2"})
+	_, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "doc")
+	assert.False(t, ok, "WhoCanAccess results must not be cached for ABAC schemas")
+
+	rels := []*descope.AuthzRelation{{Resource: "doc1", RelationDefinition: "viewer", Namespace: "doc", Target: "u1"}}
+	cache.SetWhatCanTargetAccessCached(ctx, "u1", rels)
+	_, ok = cache.GetWhatCanTargetAccessCached(ctx, "u1")
+	assert.False(t, ok, "WhatCanTargetAccess results must not be cached for ABAC schemas")
+}
+
+func TestLookupCaching_AllowedForNonABAC(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	cache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: "model AuthZ\n"})
+
+	cache.SetWhoCanAccessCached(ctx, "doc1", "viewer", "doc", []string{"u1", "u2"})
+	targets, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "doc")
+	require.True(t, ok, "non-ABAC lookups still cache")
+	assert.ElementsMatch(t, []string{"u1", "u2"}, targets)
 }

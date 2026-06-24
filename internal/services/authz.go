@@ -57,8 +57,16 @@ func (a *authzCache) CreateFGASchema(ctx context.Context, dsl string) error {
 	if err != nil {
 		return err // notest
 	}
+	// load the saved schema back to obtain its conditions (compiled for edge evaluation);
+	// fall back to the DSL-only schema if the load fails, in which case conditional grants
+	// simply won't be cached until a later successful load
+	schema, lerr := mgmtSDK.FGA().LoadSchema(ctx)
+	if lerr != nil || schema == nil {
+		cctx.Logger(ctx).Warn().Err(lerr).Msg("Failed to load FGA schema after save, conditional grants won't be cached until next load")
+		schema = &descope.FGASchema{Schema: dsl}
+	}
 	// update cache
-	projectCache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: dsl})
+	projectCache.UpdateCacheWithSchema(ctx, schema)
 	return nil
 }
 
@@ -113,8 +121,9 @@ func (a *authzCache) CheckWithContext(ctx context.Context, relations []*descope.
 	if err != nil {
 		return nil, err // notest
 	}
-	// check all relations against cache in a single read-lock acquisition
-	cachedChecks, toCheckViaSDK, indexToCachedChecks := projectCache.CheckRelations(ctx, relations)
+	// check all relations against cache in a single read-lock acquisition; cached conditional
+	// grants are re-evaluated against extraContext at the edge inside CheckRelations
+	cachedChecks, toCheckViaSDK, indexToCachedChecks := projectCache.CheckRelations(ctx, relations, extraContext)
 	// if all relations were found in cache, return
 	if len(toCheckViaSDK) == 0 {
 		// candidatesCount = 0 (nothing sent to SDK); filteredCount = 0 (Check doesn't filter, every relation gets an answer)
@@ -125,6 +134,11 @@ func (a *authzCache) CheckWithContext(ctx context.Context, relations []*descope.
 	sdkChecks, err := mgmtSDK.FGA().CheckWithContext(ctx, toCheckViaSDK, extraContext)
 	if err != nil {
 		return nil, err // notest
+	}
+	// before caching, make sure the schema's conditions are loaded so cacheable conditional
+	// grants can be re-evaluated at the edge on a later request
+	if hasCacheableConditional(sdkChecks) {
+		a.ensureSchemaLoaded(ctx, projectCache, mgmtSDK)
 	}
 	// update cache
 	projectCache.UpdateCacheWithChecks(ctx, sdkChecks)
@@ -163,6 +177,9 @@ func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinit
 	if err != nil {
 		return nil, err // notest
 	}
+	// ensure the schema is loaded so lookup caching can be skipped for ABAC schemas (whose
+	// lookup results are context/fact-dependent and must not be served from a cached set)
+	a.ensureSchemaLoaded(ctx, projectCache, mgmtSDK)
 	candidates, cacheHit := projectCache.GetWhoCanAccessCached(ctx, resource, relationDefinition, namespace)
 	if cacheHit && len(candidates) > 0 {
 		verified, err := a.filterWhoCanAccessCandidates(ctx, resource, relationDefinition, namespace, candidates)
@@ -215,6 +232,9 @@ func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string) ([]
 	if err != nil {
 		return nil, err // notest
 	}
+	// ensure the schema is loaded so lookup caching can be skipped for ABAC schemas (whose
+	// lookup results are context/fact-dependent and must not be served from a cached set)
+	a.ensureSchemaLoaded(ctx, projectCache, mgmtSDK)
 	candidates, cacheHit := projectCache.GetWhatCanTargetAccessCached(ctx, target)
 	if cacheHit && len(candidates) > 0 {
 		verified, err := a.filterWhatCanTargetAccessCandidates(ctx, target, candidates)
@@ -259,6 +279,34 @@ func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, ta
 		}
 	}
 	return verified, nil
+}
+
+// ensureSchemaLoaded lazily loads the schema (and its compiled conditions) into the project
+// cache when absent — on first use and after a remote schema change purged it. Best-effort: a
+// load failure is logged and leaves the cache without conditions, which is safe (conditional
+// grants won't be cached and lookups won't be ABAC-gated until the next successful load).
+func (a *authzCache) ensureSchemaLoaded(ctx context.Context, projectCache caches.ProjectAuthzCache, mgmtSDK sdk.Management) {
+	if projectCache.GetSchema() != nil {
+		return
+	}
+	schema, err := mgmtSDK.FGA().LoadSchema(ctx)
+	if err != nil {
+		cctx.Logger(ctx).Warn().Err(err).Msg("Failed to load FGA schema for edge condition handling")
+		return // notest
+	}
+	projectCache.EnsureSchemaLoaded(ctx, schema)
+}
+
+// hasCacheableConditional reports whether any check is a positive, cleanly-evaluated CEL grant
+// (no fact, no missing context, no eval error) — the only conditional results the edge caches,
+// and the signal that the schema's conditions need to be loaded for re-evaluation.
+func hasCacheableConditional(checks []*descope.FGACheck) bool {
+	for _, c := range checks {
+		if c.Info.Conditional && c.Allowed && !c.Info.InvolvesFact && len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *authzCache) getOrCreateProjectCache(ctx context.Context) (caches.ProjectAuthzCache, sdk.Management, error) {

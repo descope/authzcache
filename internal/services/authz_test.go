@@ -45,6 +45,11 @@ func injectAuthzMocks(t *testing.T) (AuthzCache, *mocksmgmt.MockManagement, *moc
 		return mockSDK, nil
 	}
 	mockCache := &mockCache{}
+	// default: schema already loaded (no conditions) so ensureSchemaLoaded is a no-op; tests
+	// exercising lazy load or ABAC gating override GetSchemaFunc/SchemaHasABACFunc as needed
+	mockCache.GetSchemaFunc = func() *descope.FGASchema {
+		return &descope.FGASchema{}
+	}
 	mockCache.StartRemoteChangesPollingFunc = func(_ context.Context) {
 		mockCache.pollingStarted = true
 	}
@@ -862,4 +867,45 @@ func BenchmarkCheck(b *testing.B) {
 			})
 		})
 	}
+}
+
+func TestCheckWithContext_LazyLoadsSchemaForCacheableConditional(t *testing.T) {
+	ac, mockSDK, mockCache := injectAuthzMocks(t)
+	mockCache.GetSchemaFunc = func() *descope.FGASchema { return nil } // schema not loaded yet
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	mockCache.CheckRelationsFunc = func(_ context.Context, rels []*descope.FGARelation, _ map[string]any) ([]*descope.FGACheck, []*descope.FGARelation, map[int]*descope.FGACheck) {
+		return nil, rels, map[int]*descope.FGACheck{}
+	}
+	mockSDK.MockFGA.CheckWithContextResponse = []*descope.FGACheck{
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, InvolvedConditions: []string{"isAdmin"}}},
+	}
+	loaded := &descope.FGASchema{Schema: "model AuthZ\n", Conditions: []*descope.FGACondition{{Name: "isAdmin"}}}
+	mockSDK.MockFGA.LoadSchemaResponse = loaded
+	var ensured *descope.FGASchema
+	mockCache.EnsureSchemaLoadedFunc = func(_ context.Context, s *descope.FGASchema) { ensured = s }
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
+
+	_, err := ac.CheckWithContext(context.TODO(), []*descope.FGARelation{rel}, map[string]any{"role": "admin"})
+	require.NoError(t, err)
+	require.NotNil(t, ensured, "a cacheable conditional result must trigger a lazy schema load")
+	require.Equal(t, loaded, ensured)
+}
+
+func TestCheckWithContext_NoLazyLoadForNonConditional(t *testing.T) {
+	ac, mockSDK, mockCache := injectAuthzMocks(t)
+	mockCache.GetSchemaFunc = func() *descope.FGASchema { return nil }
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	mockCache.CheckRelationsFunc = func(_ context.Context, rels []*descope.FGARelation, _ map[string]any) ([]*descope.FGACheck, []*descope.FGARelation, map[int]*descope.FGACheck) {
+		return nil, rels, map[int]*descope.FGACheck{}
+	}
+	mockSDK.MockFGA.CheckWithContextResponse = []*descope.FGACheck{
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Direct: true}},
+	}
+	ensureCalled := false
+	mockCache.EnsureSchemaLoadedFunc = func(_ context.Context, _ *descope.FGASchema) { ensureCalled = true }
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
+
+	_, err := ac.CheckWithContext(context.TODO(), []*descope.FGARelation{rel}, nil)
+	require.NoError(t, err)
+	require.False(t, ensureCalled, "non-conditional results must not trigger a schema load")
 }
