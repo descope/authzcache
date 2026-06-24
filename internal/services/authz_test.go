@@ -357,6 +357,7 @@ func TestWhoCanAccess_CacheHitWithCandidateFiltering(t *testing.T) {
 	checkCallCount := 0
 	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
 		checkCallCount++
+		require.Equal(t, "*", r.TargetType)
 		if r.Target == "user2" {
 			return false, true, true
 		}
@@ -425,6 +426,7 @@ func TestWhatCanTargetAccess_CacheHitWithCandidateFiltering(t *testing.T) {
 	checkCallCount := 0
 	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
 		checkCallCount++
+		require.Equal(t, "*", r.TargetType)
 		if r.Resource == "doc2" {
 			return false, true, true
 		}
