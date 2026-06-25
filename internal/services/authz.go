@@ -126,8 +126,7 @@ func (a *authzCache) CheckWithContext(ctx context.Context, relations []*descope.
 	if err != nil {
 		return nil, err // notest
 	}
-	// if any cacheable conditional appeared, load the schema's conditions so the edge can re-evaluate
-	// them on a later request; then cache (fact-gated never cached)
+	// if a cacheable conditional appeared, load the schema's conditions so the edge can re-evaluate them later
 	if hasCacheableConditional(sdkChecks) {
 		a.ensureSchemaLoaded(ctx, projectCache, mgmtSDK)
 	}
@@ -164,9 +163,7 @@ func (a *authzCache) ensureSchemaLoaded(ctx context.Context, projectCache caches
 	projectCache.EnsureSchemaLoaded(ctx, schema)
 }
 
-// hasCacheableConditional reports whether any check is a cleanly-evaluated CEL grant or denial (no fact,
-// no missing context, no eval error, with recorded conditions) — the only conditional results the edge
-// caches, and the signal that the schema's conditions need to be loaded for re-evaluation.
+// hasCacheableConditional reports whether any check is a cleanly-evaluated CEL grant/denial with recorded conditions — the only cacheable conditionals.
 func hasCacheableConditional(checks []*descope.FGACheck) bool {
 	for _, c := range checks {
 		if c.Info.Conditional && !c.Info.FactGated && len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" && len(c.Info.EvaluatedConditions) > 0 {

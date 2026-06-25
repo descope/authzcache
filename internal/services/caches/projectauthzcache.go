@@ -53,10 +53,7 @@ type LookupCacheEntry struct {
 	ExpiresAt time.Time
 }
 
-// conditionalCert is a cached conditional Check result together with the raw values of the conditions
-// that produced it. It stays valid for a new request only while every condition re-evaluates to its
-// recorded value — correct for any and/or/not/sub composition, since the result is a deterministic
-// function of those values. Never built from fact-gated results (the edge can't re-evaluate facts).
+// conditionalCert is a cached Check result plus the raw condition values that produced it; valid while each still re-evaluates the same. Never fact-gated.
 type conditionalCert struct {
 	allowed bool
 	conds   map[string]bool
@@ -69,9 +66,7 @@ type projectAuthzCache struct {
 	directTargetsIndex    map[target]map[resource][]resourceTargetRelation
 	directKeyComponents   map[resourceTargetRelation]keyComponents
 	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, bool] // resource:target:relation -> bool, e.g. file1:user2:owner -> false
-	// conditionalRelationCache: resource:target:relation -> certificate. A cached conditional result is
-	// served only while the conditions that produced it still re-evaluate to the same values at the edge
-	// (never fact-gated results).
+	// conditionalRelationCache: resource:target:relation -> certificate; served only while its conditions re-evaluate the same at the edge (never fact-gated).
 	conditionalRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, *conditionalCert]
 	compiledConditions       map[string]*edgecel.CompiledCondition                // condition name -> compiled CEL program, from the loaded schema
 	celEvalTimeout           time.Duration                                        // wall-clock backstop per condition evaluation
@@ -188,9 +183,7 @@ func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*de
 	return
 }
 
-// certMatches reports whether a cached conditional result is still valid for the given context: every
-// condition it recorded must re-evaluate at the edge to the same raw value. Any uncompiled condition,
-// eval failure, or changed value means the cached result can't be trusted — defer to the backend.
+// certMatches reports whether every recorded condition still re-evaluates to its cached raw value; any uncompiled/failed/changed condition → defer to backend.
 func (pc *projectAuthzCache) certMatches(ctx context.Context, cert *conditionalCert, extraContext map[string]any) bool {
 	if len(cert.conds) == 0 {
 		return false
@@ -291,9 +284,7 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 			// fact-involved results depend on mutable backend state the edge can't observe — never cache
 			continue
 		case c.Info.Conditional:
-			// cache the result (allow or deny) as a certificate of the conditions that produced it, so a later
-			// request can be served while those conditions still re-evaluate the same; skip incomplete or
-			// errored evaluations, and skip when any involved condition isn't compiled at the edge
+			// cache the result (allow or deny) as a certificate; skip incomplete/errored evals and any condition not compiled at the edge
 			if len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" && len(c.Info.EvaluatedConditions) > 0 && pc.hasAllCompiledConditions(c.Info.EvaluatedConditions) {
 				pc.conditionalRelationCache.Add(ctx, key(c.Relation), &conditionalCert{allowed: c.Allowed, conds: c.Info.EvaluatedConditions})
 			}
@@ -305,8 +296,7 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 	}
 }
 
-// hasAllCompiledConditions reports whether every named condition has a compiled program ready for edge
-// re-evaluation. If any is missing (e.g. schema not loaded), the grant is not cached.
+// hasAllCompiledConditions reports whether every named condition is compiled at the edge (else the grant isn't cached).
 func (pc *projectAuthzCache) hasAllCompiledConditions(conds map[string]bool) bool {
 	for name := range conds {
 		if _, ok := pc.compiledConditions[name]; !ok {
