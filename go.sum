@@ -99,10 +99,10 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvwDRwnI3hwNaAHRnc=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
-github.com/descope/backend v0.0.0-20260625094547-cc9ce7db4e72 h1:qrxA68VWzsLe1aEUzylmEXUle5KzAMNkX7EuW6r/Dn4=
-github.com/descope/backend v0.0.0-20260625094547-cc9ce7db4e72/go.mod h1:mSfe5I1DChENT/mUVVVBIkrou9zvdz+zMNvMdTcICk4=
-github.com/descope/go-sdk v1.24.1-0.20260625093442-fe45362da7e7 h1:9c9QjaAhze1cUxMRL7dn4ZB6NT+FC5Sww2C+zNx4PTw=
-github.com/descope/go-sdk v1.24.1-0.20260625093442-fe45362da7e7/go.mod h1:RCcsYK05DvtO4Li7Rm9iVbwopN1uoy8foj2ag8z3U3k=
+github.com/descope/backend v0.0.0-20260625120343-08ae884ca7c2 h1:TJfWjJyYWG/0NXdeBt6HCyn+acrZwwptTTVgPrLMTB4=
+github.com/descope/backend v0.0.0-20260625120343-08ae884ca7c2/go.mod h1:mSfe5I1DChENT/mUVVVBIkrou9zvdz+zMNvMdTcICk4=
+github.com/descope/go-sdk v1.24.1-0.20260625120654-6a5fd3818dc1 h1:gqFBH8Ugn40gr0gHixM0IhvJeFbZew38f4Cb7Q0POp4=
+github.com/descope/go-sdk v1.24.1-0.20260625120654-6a5fd3818dc1/go.mod h1:RCcsYK05DvtO4Li7Rm9iVbwopN1uoy8foj2ag8z3U3k=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14/go.mod h1:NXzSaAKXU0dil+cxwRcnqgNPdZR0U571aLLqJaRibBw=
 github.com/descope/protoc-gen-mocker v1.0.1-0.20260529153440-788f40f5959c h1:+Z7qMbN1Y7O9dGJM+5bMp5clHj4pjXTITTzJ6B/nWlI=
@@ -149,6 +149,8 @@ github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek
 github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
 github.com/golang/snappy v1.0.0 h1:Oy607GVXHs7RtbggtPBnr2RmDArIsAefDwvrdWvRhGs=
 github.com/golang/snappy v1.0.0/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
+github.com/google/cel-go v0.28.1 h1:YWIwi77J4xIsYUwAF/iIuS6haffzIHS8yWI8glSbLWM=
+github.com/google/cel-go v0.28.1/go.mod h1:X0bD6iVNR8pkROSOoHVdgTkzmRcosof7WQqCD6wcMc8=
 github.com/google/gnostic v0.7.1 h1:t5Kc7j/8kYr8t2u11rykRrPPovlEMG4+xdc/SpekATs=
 github.com/google/gnostic v0.7.1/go.mod h1:KSw6sxnxEBFM8jLPfJd46xZP+yQcfE8XkiqfZx5zR28=
 github.com/google/gnostic-models v0.7.1 h1:SisTfuFKJSKM5CPZkffwi6coztzzeYUhc3v4yxLWH8c=

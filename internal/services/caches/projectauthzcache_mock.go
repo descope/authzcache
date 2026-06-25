@@ -13,6 +13,7 @@ type ProjectAuthzCacheMock struct {
 	CheckRelationFunc                   func(ctx context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool)
 	CheckRelationsFunc                  func(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck)
 	UpdateCacheWithSchemaFunc           func(ctx context.Context, schema *descope.FGASchema)
+	EnsureSchemaLoadedFunc              func(ctx context.Context, schema *descope.FGASchema)
 	UpdateCacheWithAddedRelationsFunc   func(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithDeletedRelationsFunc func(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithChecksFunc           func(ctx context.Context, sdkChecks []*descope.FGACheck, extraContext map[string]any)
@@ -53,6 +54,12 @@ func (m *ProjectAuthzCacheMock) CheckRelations(ctx context.Context, relations []
 
 func (m *ProjectAuthzCacheMock) UpdateCacheWithSchema(ctx context.Context, schema *descope.FGASchema) {
 	m.UpdateCacheWithSchemaFunc(ctx, schema)
+}
+
+func (m *ProjectAuthzCacheMock) EnsureSchemaLoaded(ctx context.Context, schema *descope.FGASchema) {
+	if m.EnsureSchemaLoadedFunc != nil {
+		m.EnsureSchemaLoadedFunc(ctx, schema)
+	}
 }
 
 func (m *ProjectAuthzCacheMock) UpdateCacheWithAddedRelations(ctx context.Context, relations []*descope.FGARelation) {

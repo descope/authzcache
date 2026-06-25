@@ -1123,6 +1123,13 @@ func updateBothCachesWithChecks(ctx context.Context, t *testing.T, cache *projec
 	}
 }
 
+// isAdminSchema is a one-condition schema the edge can compile: IsAdmin(role) == "admin".
+func isAdminSchema() *descope.FGASchema {
+	return &descope.FGASchema{Conditions: []*descope.FGACondition{
+		{Name: "IsAdmin", Params: []*descope.FGAConditionParam{{Name: "role", Type: "string"}}, Expression: `role == "admin"`},
+	}}
+}
+
 func TestConditionalRelationCaching_PerContext(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)
@@ -1130,12 +1137,14 @@ func TestConditionalRelationCaching_PerContext(t *testing.T) {
 	adminCtx := map[string]any{"role": "admin"}
 	userCtx := map[string]any{"role": "user"}
 
-	// backend allowed this tuple under the admin context — cached keyed by that context's hash
+	// load the schema so the edge can compile + re-evaluate IsAdmin
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema())
+	// backend allowed this tuple; cache it as a certificate of the conditions that produced it
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true}},
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, EvaluatedConditions: map[string]bool{"IsAdmin": true}}},
 	}, adminCtx)
 
-	t.Run("same context - served from cache", func(t *testing.T) {
+	t.Run("same context - conditions still match, served from cache", func(t *testing.T) {
 		_, unchecked, idx := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
 		assert.Empty(t, unchecked)
 		require.Contains(t, idx, 0)
@@ -1143,9 +1152,18 @@ func TestConditionalRelationCaching_PerContext(t *testing.T) {
 		assert.True(t, idx[0].Info.Conditional)
 	})
 
-	t.Run("different context - cache miss, deferred to backend", func(t *testing.T) {
+	t.Run("different but irrelevant context field - still served", func(t *testing.T) {
+		// IsAdmin still evaluates true; the extra field isn't referenced by any condition.
+		noisyCtx := map[string]any{"role": "admin", "ip": "1.2.3.4"}
+		_, unchecked, idx := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, noisyCtx)
+		assert.Empty(t, unchecked, "irrelevant context fields don't bust the certificate")
+		require.Contains(t, idx, 0)
+		assert.True(t, idx[0].Allowed)
+	})
+
+	t.Run("condition flips - cache miss, deferred to backend", func(t *testing.T) {
 		checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, userCtx)
-		assert.Empty(t, checks, "a different context must not reuse the cached entry")
+		assert.Empty(t, checks, "IsAdmin now evaluates false, so the cached grant must not be reused")
 		assert.Len(t, unchecked, 1)
 	})
 }
@@ -1156,9 +1174,10 @@ func TestConditionalRelationCaching_CachesDenials(t *testing.T) {
 	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
 	userCtx := map[string]any{"role": "user"}
 
-	// a conditional denial is deterministic for this context, so it's cached too
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema())
+	// a conditional denial is cached with its certificate too (deterministic for these condition values)
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true}},
+		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, EvaluatedConditions: map[string]bool{"IsAdmin": false}}},
 	}, userCtx)
 
 	_, unchecked, idx := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, userCtx)
@@ -1173,8 +1192,10 @@ func TestConditionalRelationCaching_NeverCachesFactInvolved(t *testing.T) {
 	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
 	adminCtx := map[string]any{"role": "admin"}
 
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema())
+	// even though the condition is compiled and complete, a fact participated → never cached
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, FactGated: true}},
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, FactGated: true, EvaluatedConditions: map[string]bool{"IsAdmin": true}}},
 	}, adminCtx)
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
@@ -1187,6 +1208,7 @@ func TestConditionalRelationCaching_SkipsIncompleteEval(t *testing.T) {
 	cache, _ := setup(t)
 	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
 
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema())
 	// partial evaluation (missing context var) is not cached
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, MissingContext: []string{"role"}}},
@@ -1194,6 +1216,22 @@ func TestConditionalRelationCaching_SkipsIncompleteEval(t *testing.T) {
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, nil)
 	assert.Empty(t, checks)
+	assert.Len(t, unchecked, 1)
+}
+
+func TestConditionalRelationCaching_SkipsUncompiledCondition(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	adminCtx := map[string]any{"role": "admin"}
+
+	// no schema loaded → IsAdmin isn't compiled at the edge → can't be re-verified, so it isn't cached
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, EvaluatedConditions: map[string]bool{"IsAdmin": true}}},
+	}, adminCtx)
+
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
+	assert.Empty(t, checks, "without a compiled condition the grant can't be re-verified, so it isn't cached")
 	assert.Len(t, unchecked, 1)
 }
 

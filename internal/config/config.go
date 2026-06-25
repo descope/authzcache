@@ -9,7 +9,8 @@ const (
 	ConfigKeyIndirectRelationCacheSizePerProject = "AUTHZCACHE_INDIRECT_RELATION_CACHE_SIZE_PER_PROJECT"
 	ConfigKeyRemotePollingIntervalInMillis       = "AUTHZCACHE_REMOTE_POLLING_INTERVAL_IN_MILLIS"
 	ConfigKeyPurgeCooldownWindowInMinutes        = "AUTHZCACHE_PURGE_COOLDOWN_WINDOW_IN_MINUTES"
-	ConfigKeySDKDebugLog                         = "AUTHZCACHE_SDK_DEBUG_LOG" // TRUE/FALSE, default is FALSE
+	ConfigKeyCELEvalTimeoutInMillis              = "AUTHZCACHE_CEL_EVAL_TIMEOUT_IN_MILLIS" // wall-clock backstop per condition eval, default 1000ms
+	ConfigKeySDKDebugLog                         = "AUTHZCACHE_SDK_DEBUG_LOG"              // TRUE/FALSE, default is FALSE
 	MetricsKeyResourceServiceName                = "service_name"
 
 	// Lookup cache configuration
@@ -33,6 +34,10 @@ func GetIndirectRelationCacheSizePerProject() int {
 
 func GetRemotePollingIntervalInMillis() int {
 	return max(15_000, cconfig.GetIntOrProvidedLocal(ConfigKeyRemotePollingIntervalInMillis, 15_000))
+}
+
+func GetCELEvalTimeoutInMillis() int {
+	return max(1, cconfig.GetIntOrProvidedLocal(ConfigKeyCELEvalTimeoutInMillis, 1000))
 }
 
 func GetSDKDebugLog() bool {

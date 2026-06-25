@@ -3,11 +3,12 @@ module github.com/descope/authzcache
 go 1.26.1
 
 require (
-	github.com/descope/backend v0.0.0-20260625094547-cc9ce7db4e72
-	github.com/descope/go-sdk v1.24.1-0.20260625093442-fe45362da7e7
+	github.com/descope/backend v0.0.0-20260625120343-08ae884ca7c2
+	github.com/descope/go-sdk v1.24.1-0.20260625120654-6a5fd3818dc1
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20260529153440-788f40f5959c
 	github.com/descope/protoc-gen-validate v1.6.6
+	github.com/google/cel-go v0.28.1
 	github.com/google/gnostic v0.7.1
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0
@@ -18,6 +19,7 @@ require (
 )
 
 require (
+	cel.dev/expr v0.25.1 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/DataDog/datadog-go/v5 v5.8.3 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect

@@ -126,7 +126,11 @@ func (a *authzCache) CheckWithContext(ctx context.Context, relations []*descope.
 	if err != nil {
 		return nil, err // notest
 	}
-	// update cache (conditional results are keyed by the request context hash; fact-gated never cached)
+	// if any cacheable conditional appeared, load the schema's conditions so the edge can re-evaluate
+	// them on a later request; then cache (fact-gated never cached)
+	if hasCacheableConditional(sdkChecks) {
+		a.ensureSchemaLoaded(ctx, projectCache, mgmtSDK)
+	}
 	projectCache.UpdateCacheWithChecks(ctx, sdkChecks, extraContext)
 	// merge cached and sdk checks in the same order as input relations and return them
 	var result []*descope.FGACheck
@@ -142,6 +146,34 @@ func (a *authzCache) CheckWithContext(ctx context.Context, relations []*descope.
 	// candidatesCount = relations sent to SDK (not in cache); filteredCount = 0 (Check doesn't filter, every relation gets an answer)
 	a.recordMetric(ctx, metrics.APICheck, false, len(toCheckViaSDK), 0, len(result), start)
 	return result, nil
+}
+
+// ensureSchemaLoaded lazily loads the schema (and its compiled conditions) into the project cache
+// when absent — on first use and after a remote schema change purged it. Best-effort: a load failure
+// is logged and leaves the cache without conditions, which is safe (conditional grants simply won't
+// be cached until the next successful load).
+func (a *authzCache) ensureSchemaLoaded(ctx context.Context, projectCache caches.ProjectAuthzCache, mgmtSDK sdk.Management) {
+	if projectCache.GetSchema() != nil {
+		return
+	}
+	schema, err := mgmtSDK.FGA().LoadSchema(ctx)
+	if err != nil {
+		cctx.Logger(ctx).Warn().Err(err).Msg("Failed to load FGA schema for edge condition handling")
+		return // notest
+	}
+	projectCache.EnsureSchemaLoaded(ctx, schema)
+}
+
+// hasCacheableConditional reports whether any check is a cleanly-evaluated CEL grant or denial (no fact,
+// no missing context, no eval error, with recorded conditions) — the only conditional results the edge
+// caches, and the signal that the schema's conditions need to be loaded for re-evaluation.
+func hasCacheableConditional(checks []*descope.FGACheck) bool {
+	for _, c := range checks {
+		if c.Info.Conditional && !c.Info.FactGated && len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" && len(c.Info.EvaluatedConditions) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *authzCache) recordMetric(ctx context.Context, api metrics.APIName, cacheHit bool, candidatesCount, filteredCount, resultSize int, start time.Time) {
