@@ -174,7 +174,7 @@ func TestCheckError(t *testing.T) {
 func TestWhoCanAccess(t *testing.T) {
 	controller, mockAuthzCache := setup()
 	var authzCalled bool
-	mockAuthzCache.WhoCanAccessFunc = func(_ context.Context, resource, relationDefinition, namespace string) ([]string, error) {
+	mockAuthzCache.WhoCanAccessFunc = func(_ context.Context, resource, relationDefinition, namespace string, _ map[string]any) ([]string, error) {
 		require.Equal(t, "doc1", resource)
 		require.Equal(t, "viewer", relationDefinition)
 		require.Equal(t, "docs", namespace)
@@ -193,7 +193,7 @@ func TestWhoCanAccess(t *testing.T) {
 
 func TestWhoCanAccessError(t *testing.T) {
 	controller, mockAuthzCache := setup()
-	mockAuthzCache.WhoCanAccessFunc = func(_ context.Context, _, _, _ string) ([]string, error) {
+	mockAuthzCache.WhoCanAccessFunc = func(_ context.Context, _, _, _ string, _ map[string]any) ([]string, error) {
 		return nil, assert.AnError
 	}
 
@@ -207,7 +207,7 @@ func TestWhoCanAccessError(t *testing.T) {
 func TestWhatCanTargetAccess(t *testing.T) {
 	controller, mockAuthzCache := setup()
 	var authzCalled bool
-	mockAuthzCache.WhatCanTargetAccessFunc = func(_ context.Context, target string) ([]*descope.AuthzRelation, error) {
+	mockAuthzCache.WhatCanTargetAccessFunc = func(_ context.Context, target string, _ map[string]any) ([]*descope.AuthzRelation, error) {
 		require.Equal(t, "user1", target)
 		authzCalled = true
 		return []*descope.AuthzRelation{
@@ -241,7 +241,7 @@ func TestWhatCanTargetAccess(t *testing.T) {
 
 func TestWhatCanTargetAccessError(t *testing.T) {
 	controller, mockAuthzCache := setup()
-	mockAuthzCache.WhatCanTargetAccessFunc = func(_ context.Context, _ string) ([]*descope.AuthzRelation, error) {
+	mockAuthzCache.WhatCanTargetAccessFunc = func(_ context.Context, _ string, _ map[string]any) ([]*descope.AuthzRelation, error) {
 		return nil, assert.AnError
 	}
 

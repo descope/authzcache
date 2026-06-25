@@ -94,7 +94,11 @@ func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest)
 
 func (ac *authzController) WhoCanAccess(ctx context.Context, req *authzv1.WhoCanAccessRequest) (*authzv1.WhoCanAccessResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Checking who can access")
-	targets, err := ac.authzCache.WhoCanAccess(ctx, req.Resource, req.RelationDefinition, req.Namespace)
+	var extraContext map[string]any
+	if req.Context != nil {
+		extraContext = req.Context.AsMap()
+	}
+	targets, err := ac.authzCache.WhoCanAccess(ctx, req.Resource, req.RelationDefinition, req.Namespace, extraContext)
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
@@ -103,7 +107,11 @@ func (ac *authzController) WhoCanAccess(ctx context.Context, req *authzv1.WhoCan
 
 func (ac *authzController) WhatCanTargetAccess(ctx context.Context, req *authzv1.WhatCanTargetAccessRequest) (*authzv1.WhatCanTargetAccessResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Checking what can target access")
-	relations, err := ac.authzCache.WhatCanTargetAccess(ctx, req.Target)
+	var extraContext map[string]any
+	if req.Context != nil {
+		extraContext = req.Context.AsMap()
+	}
+	relations, err := ac.authzCache.WhatCanTargetAccess(ctx, req.Target, extraContext)
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}

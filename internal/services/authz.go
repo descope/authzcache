@@ -19,8 +19,8 @@ type AuthzCache interface {
 	DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error
 	Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error)
 	CheckWithContext(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error)
-	WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string) ([]string, error)
-	WhatCanTargetAccess(ctx context.Context, target string) ([]*descope.AuthzRelation, error)
+	WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string, extraContext map[string]any) ([]string, error)
+	WhatCanTargetAccess(ctx context.Context, target string, extraContext map[string]any) ([]*descope.AuthzRelation, error)
 }
 
 type RemoteClientCreator func(projectID string, logger logger.LoggerInterface) (sdk.Management, error)
@@ -57,14 +57,8 @@ func (a *authzCache) CreateFGASchema(ctx context.Context, dsl string) error {
 	if err != nil {
 		return err // notest
 	}
-	// load the saved schema back for its conditions (compiled for edge eval); on failure fall back to DSL-only and conditionals just won't be cached until a later load
-	schema, lerr := mgmtSDK.FGA().LoadSchema(ctx)
-	if lerr != nil || schema == nil {
-		cctx.Logger(ctx).Warn().Err(lerr).Msg("Failed to load FGA schema after save, conditional grants won't be cached until next load")
-		schema = &descope.FGASchema{Schema: dsl}
-	}
-	// update cache
-	projectCache.UpdateCacheWithSchema(ctx, schema)
+	// update cache (purges all relations — they may resolve differently under the new schema)
+	projectCache.UpdateCacheWithSchema(ctx, &descope.FGASchema{Schema: dsl})
 	return nil
 }
 
@@ -132,12 +126,8 @@ func (a *authzCache) CheckWithContext(ctx context.Context, relations []*descope.
 	if err != nil {
 		return nil, err // notest
 	}
-	// ensure the schema's conditions are loaded so cacheable conditional grants can be re-evaluated on a later request
-	if hasCacheableConditional(sdkChecks) {
-		a.ensureSchemaLoaded(ctx, projectCache, mgmtSDK)
-	}
-	// update cache
-	projectCache.UpdateCacheWithChecks(ctx, sdkChecks)
+	// update cache (conditional results are keyed by the request context hash; fact-gated never cached)
+	projectCache.UpdateCacheWithChecks(ctx, sdkChecks, extraContext)
 	// merge cached and sdk checks in the same order as input relations and return them
 	var result []*descope.FGACheck
 	var j int
@@ -167,38 +157,31 @@ func (a *authzCache) recordMetric(ctx context.Context, api metrics.APIName, cach
 	})
 }
 
-func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string) ([]string, error) {
+func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string, extraContext map[string]any) ([]string, error) {
 	start := time.Now()
 	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
 		return nil, err // notest
 	}
-	// ensure the schema is loaded so lookup caching is skipped for ABAC schemas (their results are context/fact-dependent)
-	a.ensureSchemaLoaded(ctx, projectCache, mgmtSDK)
 	candidates, cacheHit := projectCache.GetWhoCanAccessCached(ctx, resource, relationDefinition, namespace)
-	if cacheHit && len(candidates) > 0 {
-		verified, err := a.filterWhoCanAccessCandidates(ctx, resource, relationDefinition, namespace, candidates)
+	if !cacheHit {
+		candidates, err = mgmtSDK.Authz().WhoCanAccess(ctx, resource, relationDefinition, namespace)
 		if err != nil {
 			return nil, err // notest
 		}
-		cctx.Logger(ctx).Debug().
-			Str("resource", resource).
-			Int("candidates", len(candidates)).
-			Int("verified", len(verified)).
-			Msg("WhoCanAccess cache hit with candidate filtering")
-		a.recordMetric(ctx, metrics.APIWhoCanAccess, true, len(candidates), len(candidates)-len(verified), len(verified), start)
-		return verified, nil
+		projectCache.SetWhoCanAccessCached(ctx, resource, relationDefinition, namespace, candidates)
 	}
-	targets, err := mgmtSDK.Authz().WhoCanAccess(ctx, resource, relationDefinition, namespace)
+	// The cached set is the context-independent candidate pool; filter it against this request's
+	// context via Check, which is context-correct (hash cache) and fact-fresh (never caches facts).
+	verified, err := a.filterWhoCanAccessCandidates(ctx, resource, relationDefinition, namespace, candidates, extraContext)
 	if err != nil {
 		return nil, err // notest
 	}
-	projectCache.SetWhoCanAccessCached(ctx, resource, relationDefinition, namespace, targets)
-	a.recordMetric(ctx, metrics.APIWhoCanAccess, false, 0, 0, len(targets), start)
-	return targets, nil
+	a.recordMetric(ctx, metrics.APIWhoCanAccess, cacheHit, len(candidates), len(candidates)-len(verified), len(verified), start)
+	return verified, nil
 }
 
-func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource, relationDefinition, namespace string, candidates []string) ([]string, error) {
+func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource, relationDefinition, namespace string, candidates []string, extraContext map[string]any) ([]string, error) {
 	relations := make([]*descope.FGARelation, len(candidates))
 	for i, target := range candidates {
 		relations[i] = &descope.FGARelation{
@@ -208,7 +191,7 @@ func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource,
 			Target:       target,
 		}
 	}
-	checks, err := a.Check(ctx, relations)
+	checks, err := a.CheckWithContext(ctx, relations, extraContext)
 	if err != nil {
 		return nil, err
 	}
@@ -221,38 +204,30 @@ func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource,
 	return verified, nil
 }
 
-func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string) ([]*descope.AuthzRelation, error) {
+func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string, extraContext map[string]any) ([]*descope.AuthzRelation, error) {
 	start := time.Now()
 	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
 		return nil, err // notest
 	}
-	// ensure the schema is loaded so lookup caching is skipped for ABAC schemas (their results are context/fact-dependent)
-	a.ensureSchemaLoaded(ctx, projectCache, mgmtSDK)
 	candidates, cacheHit := projectCache.GetWhatCanTargetAccessCached(ctx, target)
-	if cacheHit && len(candidates) > 0 {
-		verified, err := a.filterWhatCanTargetAccessCandidates(ctx, target, candidates)
+	if !cacheHit {
+		candidates, err = mgmtSDK.Authz().WhatCanTargetAccess(ctx, target)
 		if err != nil {
 			return nil, err // notest
 		}
-		cctx.Logger(ctx).Debug().
-			Str("target", target).
-			Int("candidates", len(candidates)).
-			Int("verified", len(verified)).
-			Msg("WhatCanTargetAccess cache hit with candidate filtering")
-		a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, true, len(candidates), len(candidates)-len(verified), len(verified), start)
-		return verified, nil
+		projectCache.SetWhatCanTargetAccessCached(ctx, target, candidates)
 	}
-	relations, err := mgmtSDK.Authz().WhatCanTargetAccess(ctx, target)
+	// filter the candidate pool against this request's context via Check (see WhoCanAccess)
+	verified, err := a.filterWhatCanTargetAccessCandidates(ctx, target, candidates, extraContext)
 	if err != nil {
 		return nil, err // notest
 	}
-	projectCache.SetWhatCanTargetAccessCached(ctx, target, relations)
-	a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, false, 0, 0, len(relations), start)
-	return relations, nil
+	a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, cacheHit, len(candidates), len(candidates)-len(verified), len(verified), start)
+	return verified, nil
 }
 
-func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, target string, candidates []*descope.AuthzRelation) ([]*descope.AuthzRelation, error) {
+func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, target string, candidates []*descope.AuthzRelation, extraContext map[string]any) ([]*descope.AuthzRelation, error) {
 	relations := make([]*descope.FGARelation, len(candidates))
 	for i, r := range candidates {
 		relations[i] = &descope.FGARelation{
@@ -262,7 +237,7 @@ func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, ta
 			Target:       target,
 		}
 	}
-	checks, err := a.Check(ctx, relations)
+	checks, err := a.CheckWithContext(ctx, relations, extraContext)
 	if err != nil {
 		return nil, err
 	}
@@ -273,29 +248,6 @@ func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, ta
 		}
 	}
 	return verified, nil
-}
-
-// ensureSchemaLoaded lazily loads the schema + compiled conditions when absent (first use or after a purge); best-effort, a load failure is logged and safely leaves the cache without conditions.
-func (a *authzCache) ensureSchemaLoaded(ctx context.Context, projectCache caches.ProjectAuthzCache, mgmtSDK sdk.Management) {
-	if projectCache.GetSchema() != nil {
-		return
-	}
-	schema, err := mgmtSDK.FGA().LoadSchema(ctx)
-	if err != nil {
-		cctx.Logger(ctx).Warn().Err(err).Msg("Failed to load FGA schema for edge condition handling")
-		return // notest
-	}
-	projectCache.EnsureSchemaLoaded(ctx, schema)
-}
-
-// hasCacheableConditional reports whether any check is a positive, cleanly-evaluated CEL grant (no fact/missing-context/error) — the only conditionals the edge caches.
-func hasCacheableConditional(checks []*descope.FGACheck) bool {
-	for _, c := range checks {
-		if c.Info.Conditional && c.Allowed && !c.Info.FactGated && len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" {
-			return true
-		}
-	}
-	return false
 }
 
 func (a *authzCache) getOrCreateProjectCache(ctx context.Context) (caches.ProjectAuthzCache, sdk.Management, error) {

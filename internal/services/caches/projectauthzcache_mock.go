@@ -13,22 +13,15 @@ type ProjectAuthzCacheMock struct {
 	CheckRelationFunc                   func(ctx context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool)
 	CheckRelationsFunc                  func(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck)
 	UpdateCacheWithSchemaFunc           func(ctx context.Context, schema *descope.FGASchema)
-	EnsureSchemaLoadedFunc              func(ctx context.Context, schema *descope.FGASchema)
 	UpdateCacheWithAddedRelationsFunc   func(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithDeletedRelationsFunc func(ctx context.Context, relations []*descope.FGARelation)
-	UpdateCacheWithChecksFunc           func(ctx context.Context, sdkChecks []*descope.FGACheck)
+	UpdateCacheWithChecksFunc           func(ctx context.Context, sdkChecks []*descope.FGACheck, extraContext map[string]any)
 	StartRemoteChangesPollingFunc       func(ctx context.Context)
 	GetWhoCanAccessCachedFunc           func(ctx context.Context, resource, relationDefinition, namespace string) ([]string, bool)
 	SetWhoCanAccessCachedFunc           func(ctx context.Context, resource, relationDefinition, namespace string, targets []string)
 	GetWhatCanTargetAccessCachedFunc    func(ctx context.Context, target string) ([]*descope.AuthzRelation, bool)
 	SetWhatCanTargetAccessCachedFunc    func(ctx context.Context, target string, relations []*descope.AuthzRelation)
 	InvalidateLookupCacheFunc           func(ctx context.Context)
-}
-
-func (m *ProjectAuthzCacheMock) EnsureSchemaLoaded(ctx context.Context, schema *descope.FGASchema) {
-	if m.EnsureSchemaLoadedFunc != nil {
-		m.EnsureSchemaLoadedFunc(ctx, schema)
-	}
 }
 
 func (m *ProjectAuthzCacheMock) GetSchema() *descope.FGASchema {
@@ -70,8 +63,8 @@ func (m *ProjectAuthzCacheMock) UpdateCacheWithDeletedRelations(ctx context.Cont
 	m.UpdateCacheWithDeletedRelationsFunc(ctx, relations)
 }
 
-func (m *ProjectAuthzCacheMock) UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck) {
-	m.UpdateCacheWithChecksFunc(ctx, sdkChecks)
+func (m *ProjectAuthzCacheMock) UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck, extraContext map[string]any) {
+	m.UpdateCacheWithChecksFunc(ctx, sdkChecks, extraContext)
 }
 
 func (m *ProjectAuthzCacheMock) StartRemoteChangesPolling(ctx context.Context) {

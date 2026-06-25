@@ -21,9 +21,6 @@ const (
 	// Metrics reporting configuration
 	ConfigKeyMetricsReportEnabled           = "AUTHZCACHE_METRICS_REPORT_ENABLED"             // TRUE/FALSE, default is TRUE
 	ConfigKeyMetricsReportIntervalInSeconds = "AUTHZCACHE_METRICS_REPORT_INTERVAL_IN_SECONDS" // interval in seconds, default is 60, min is 10
-
-	// Edge CEL evaluation configuration
-	ConfigKeyCELEvalTimeoutInMillis = "AUTHZCACHE_CEL_EVAL_TIMEOUT_IN_MILLIS" // wall-clock backstop per condition eval, default 1000ms
 )
 
 func GetDirectRelationCacheSizePerProject() int {
@@ -68,8 +65,4 @@ func GetMetricsReportEnabled() bool {
 
 func GetMetricsReportIntervalInSeconds() int {
 	return max(10, cconfig.GetIntOrProvidedLocal(ConfigKeyMetricsReportIntervalInSeconds, 60))
-}
-
-func GetCELEvalTimeoutInMillis() int {
-	return max(1, cconfig.GetIntOrProvidedLocal(ConfigKeyCELEvalTimeoutInMillis, 1000))
 }
