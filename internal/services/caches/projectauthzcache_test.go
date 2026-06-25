@@ -1174,7 +1174,7 @@ func TestConditionalRelationCaching_ReEvaluatesAtEdge(t *testing.T) {
 
 	// backend returned a positive CEL grant gated by isAdmin under an admin context
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, InvolvedConditions: []string{"isAdmin"}}},
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, Conditions: []string{"isAdmin"}}},
 	})
 
 	t.Run("context still satisfies the condition - served from cache", func(t *testing.T) {
@@ -1206,7 +1206,7 @@ func TestConditionalRelationCaching_NeverCachesFactInvolved(t *testing.T) {
 	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
 
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, InvolvesFact: true, InvolvedConditions: []string{"isAdmin"}}},
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, FactGated: true, Conditions: []string{"isAdmin"}}},
 	})
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, map[string]any{"role": "admin"})
@@ -1221,7 +1221,7 @@ func TestConditionalRelationCaching_NeverCachesDenials(t *testing.T) {
 	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
 
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, InvolvedConditions: []string{"isAdmin"}}},
+		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, Conditions: []string{"isAdmin"}}},
 	})
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, map[string]any{"role": "admin"})

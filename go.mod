@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/descope/backend v0.0.0-20260624145849-ddd6a310f841
-	github.com/descope/go-sdk v1.24.1-0.20260624153025-6ad1f0d168da
+	github.com/descope/go-sdk v1.24.1-0.20260625080255-929a5e8f63b4
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20260529153440-788f40f5959c
 	github.com/descope/protoc-gen-validate v1.6.6

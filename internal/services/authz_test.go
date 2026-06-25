@@ -876,7 +876,7 @@ func TestCheckWithContext_LazyLoadsSchemaForCacheableConditional(t *testing.T) {
 		return nil, rels, map[int]*descope.FGACheck{}
 	}
 	mockSDK.MockFGA.CheckWithContextResponse = []*descope.FGACheck{
-		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, InvolvedConditions: []string{"isAdmin"}}},
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, Conditions: []string{"isAdmin"}}},
 	}
 	loaded := &descope.FGASchema{Schema: "model AuthZ\n", Conditions: []*descope.FGACondition{{Name: "isAdmin"}}}
 	mockSDK.MockFGA.LoadSchemaResponse = loaded

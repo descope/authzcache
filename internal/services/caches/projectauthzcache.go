@@ -168,7 +168,7 @@ func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*de
 			indexToCheck[i] = check
 		} else if condNames, ok := pc.conditionalRelationCache.Get(ctx, key(r)); ok && pc.allConditionsPass(ctx, condNames, extraContext) {
 			// cached positive CEL grant whose conditions all still hold for this request's context
-			check := &descope.FGACheck{Allowed: true, Relation: r, Info: &descope.FGACheckInfo{Conditional: true, InvolvedConditions: condNames}}
+			check := &descope.FGACheck{Allowed: true, Relation: r, Info: &descope.FGACheckInfo{Conditional: true, Conditions: condNames}}
 			checks = append(checks, check)
 			indexToCheck[i] = check
 		} else {
@@ -275,13 +275,13 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 	defer pc.mutex.Unlock()
 	for _, c := range sdkChecks {
 		switch {
-		case c.Info.InvolvesFact:
+		case c.Info.FactGated:
 			// fact-involved results depend on mutable backend state the edge can't observe — never cache
 			continue
 		case c.Info.Conditional:
 			// cache only positive, cleanly-evaluated CEL grants the edge can re-evaluate; denials and partial/errored evals are left to the backend
-			if c.Allowed && len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" && pc.hasAllCompiledConditions(c.Info.InvolvedConditions) {
-				pc.conditionalRelationCache.Add(ctx, key(c.Relation), c.Info.InvolvedConditions)
+			if c.Allowed && len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" && pc.hasAllCompiledConditions(c.Info.Conditions) {
+				pc.conditionalRelationCache.Add(ctx, key(c.Relation), c.Info.Conditions)
 			}
 		case c.Info.Direct:
 			pc.addDirectRelation(ctx, c.Relation, c.Allowed)
