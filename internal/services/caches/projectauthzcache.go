@@ -60,8 +60,7 @@ type projectAuthzCache struct {
 	directTargetsIndex    map[target]map[resource][]resourceTargetRelation
 	directKeyComponents   map[resourceTargetRelation]keyComponents
 	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, bool] // resource:target:relation -> bool, e.g. file1:user2:owner -> false
-	// conditionalRelationCache holds positive CEL-conditional grants: resource:target:relation -> involved condition names.
-	// On a hit the edge re-evaluates those conditions against the current request context; fact-involved grants are never stored here.
+	// conditionalRelationCache: resource:target:relation -> involved condition names; positive CEL grants re-evaluated at the edge on hit, never fact-involved.
 	conditionalRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, []string]
 	compiledConditions       map[string]*edgecel.CompiledCondition                // condition name -> compiled CEL program, from the loaded schema
 	schemaHasABAC            bool                                                 // true when the loaded schema declares any condition
@@ -179,10 +178,7 @@ func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*de
 	return
 }
 
-// allConditionsPass re-evaluates every involved condition against the request context.
-// It returns true only if all conditions are compiled, evaluate without error, and yield true;
-// anything else (missing condition, missing/invalid param, error, timeout, or a false result)
-// means the cached grant can't be confirmed at the edge, so the caller defers to the backend.
+// allConditionsPass returns true only if every involved condition is compiled and evaluates to true; anything else means the cached grant can't be confirmed, so the caller defers to the backend.
 func (pc *projectAuthzCache) allConditionsPass(ctx context.Context, condNames []string, extraContext map[string]any) bool {
 	if len(condNames) == 0 {
 		return false
@@ -208,9 +204,7 @@ func (pc *projectAuthzCache) UpdateCacheWithSchema(ctx context.Context, schema *
 	pc.purgeRelationCaches(ctx)
 }
 
-// EnsureSchemaLoaded populates the schema (and its compiled conditions) only if absent, without
-// purging cached relations. Used to lazily load conditions the edge needs to re-evaluate
-// conditional grants when the schema is not yet (or no longer) cached.
+// EnsureSchemaLoaded populates the schema + compiled conditions only if absent, without purging cached relations (used for lazy loading).
 func (pc *projectAuthzCache) EnsureSchemaLoaded(ctx context.Context, schema *descope.FGASchema) {
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
@@ -220,9 +214,7 @@ func (pc *projectAuthzCache) EnsureSchemaLoaded(ctx context.Context, schema *des
 	pc.setSchema(ctx, schema)
 }
 
-// setSchema stores the schema and compiles its conditions for edge evaluation. Must be called
-// while holding the write lock. A condition that fails to compile is skipped (logged), so a
-// grant gated by it simply won't be served from cache — never incorrectly allowed.
+// setSchema stores the schema and compiles its conditions for edge evaluation (write lock held); a condition that fails to compile is skipped, so a grant gated by it just won't be cached.
 func (pc *projectAuthzCache) setSchema(ctx context.Context, schema *descope.FGASchema) {
 	pc.schemaCache = schema
 	pc.compiledConditions = nil
@@ -252,9 +244,7 @@ func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, 
 	pc.indirectRelationCache.Purge(ctx)    // added (direct) relations can change the result of indirect checks, so we must purge all indirect relations
 	pc.conditionalRelationCache.Purge(ctx) // a relation change can also flip a conditional grant's resolution path
 	if pc.schemaHasABAC {
-		// under ABAC a created tuple may sit on a conditional relation, so it is NOT an
-		// unconditional grant — caching it as a direct allow would shadow condition re-evaluation.
-		// Leave it for the backend; checks resolve via the conditional cache instead.
+		// under ABAC a created tuple may sit on a conditional relation, so it's not an unconditional grant — don't cache it as a direct allow (would shadow condition re-evaluation)
 		return
 	}
 	for _, r := range relations {
@@ -289,8 +279,7 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 			// fact-involved results depend on mutable backend state the edge can't observe — never cache
 			continue
 		case c.Info.Conditional:
-			// cache only positive, cleanly-evaluated CEL grants whose conditions the edge can re-evaluate;
-			// conditional denials and partial/errored evaluations are left for the backend to decide each time
+			// cache only positive, cleanly-evaluated CEL grants the edge can re-evaluate; denials and partial/errored evals are left to the backend
 			if c.Allowed && len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" && pc.hasAllCompiledConditions(c.Info.InvolvedConditions) {
 				pc.conditionalRelationCache.Add(ctx, key(c.Relation), c.Info.InvolvedConditions)
 			}
@@ -302,8 +291,7 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 	}
 }
 
-// hasAllCompiledConditions reports whether every involved condition has a compiled program ready
-// for edge re-evaluation. If any is missing (e.g. schema not loaded), the grant is not cached.
+// hasAllCompiledConditions reports whether every involved condition has a compiled program; if any is missing the grant is not cached.
 func (pc *projectAuthzCache) hasAllCompiledConditions(condNames []string) bool {
 	if len(condNames) == 0 {
 		return false

@@ -103,8 +103,7 @@ func TestUpdateCacheWithChecks_SkipsConditionalResults(t *testing.T) {
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, Direct: true}},
 	})
-	// Conditional result with no involved conditions (nothing to re-evaluate at the edge) must
-	// NOT be stored — the relation should be unchecked (cache miss).
+	// conditional result with no involved conditions (nothing to re-evaluate) must not be stored — relation stays unchecked
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, nil)
 	assert.Empty(t, checks, "conditional result should not be served from cache")
 	assert.Len(t, unchecked, 1, "conditional relation should be forwarded for re-evaluation")
@@ -1262,8 +1261,7 @@ func TestUpdateCacheWithAddedRelations_SkipsDirectUnderABAC(t *testing.T) {
 	cache.UpdateCacheWithSchema(ctx, abacSchema())
 	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
 	cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{rel})
-	// a created tuple on a conditional relation is NOT an unconditional grant; it must not be
-	// served from the direct cache, or it would shadow edge condition re-evaluation
+	// a created tuple on a conditional relation is not an unconditional grant — must not be served from the direct cache
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, map[string]any{"role": "admin"})
 	assert.Empty(t, checks, "created tuple under an ABAC schema must not be cached as a direct grant")
 	assert.Len(t, unchecked, 1)

@@ -1,7 +1,4 @@
-// Package cel compiles and evaluates ABAC schema conditions at the edge. It reuses the
-// backend's custom CEL types (the ipaddress type/functions and the DSL→cel type mapping)
-// over a direct cel-go dependency, so the edge re-evaluates the exact expressions the
-// backend returns for each condition — without importing the backend CEL runtime.
+// Package cel compiles and evaluates ABAC schema conditions at the edge, reusing the backend's custom CEL types (pkg) over a direct cel-go dependency instead of the internal CEL runtime.
 package cel
 
 import (
@@ -14,16 +11,14 @@ import (
 	"github.com/google/cel-go/cel"
 )
 
-// CompiledCondition is a compiled CEL condition together with its typed parameters,
-// ready to evaluate against a request context.
+// CompiledCondition is a compiled CEL condition plus its typed parameters, ready to evaluate against a request context.
 type CompiledCondition struct {
 	name    string
 	program cel.Program
 	params  []*descope.FGAConditionParam
 }
 
-// Compile builds a CEL program for a single schema condition using the shared custom env
-// (ipaddress type/functions) plus a typed variable per declared parameter.
+// Compile builds a CEL program for one schema condition using the shared custom env plus a typed variable per parameter.
 func Compile(c *descope.FGACondition) (*CompiledCondition, error) {
 	opts := celtypes.EnvOptions()
 	for _, p := range c.Params {
@@ -48,10 +43,7 @@ func Compile(c *descope.FGACondition) (*CompiledCondition, error) {
 	return &CompiledCondition{name: c.Name, program: program, params: c.Params}, nil
 }
 
-// Eval reports whether the condition evaluates to true for the given request context.
-// ok is false when the condition cannot be evaluated at the edge — a missing or wrong-typed
-// parameter, a non-bool result, an evaluation error, or a timeout — in which case the caller
-// must defer the decision to the backend rather than trust a stale cached grant.
+// Eval reports whether the condition is true for the request context; ok is false when it can't be evaluated at the edge (missing/wrong-typed param, non-bool, error, timeout) and the caller must defer to the backend.
 func (cc *CompiledCondition) Eval(ctx context.Context, requestContext map[string]any, timeout time.Duration) (pass bool, ok bool) {
 	vars := make(map[string]any, len(cc.params))
 	for _, p := range cc.params {
@@ -82,10 +74,7 @@ func (cc *CompiledCondition) Eval(ctx context.Context, requestContext map[string
 	return b, true
 }
 
-// coerce maps a JSON-decoded request-context value to the Go type cel-go expects for the
-// declared DSL parameter type. JSON numbers decode to float64, so integer params need a
-// conversion, and the custom ipaddress type is built from its string form. Other types pass
-// through; a genuine mismatch surfaces as an eval error and defers to the backend.
+// coerce maps a JSON-decoded value to the Go type cel-go expects for the DSL param type (float64->int64 for ints, string->ipaddress); other types pass through and a mismatch defers to the backend.
 func coerce(dslType string, raw any) (any, bool) {
 	switch dslType {
 	case "int":

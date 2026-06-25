@@ -37,8 +37,7 @@ func TestCompileAndEval(t *testing.T) {
 		assert.False(t, ok)
 	})
 	t.Run("wrong-typed param never yields a positive grant", func(t *testing.T) {
-		// a wrong-typed value must not be served as allowed — either it can't evaluate (ok=false)
-		// or the cross-type comparison is false; both keep the result out of the cache.
+		// wrong-typed value must not be served as allowed (ok=false, or cross-type compare is false)
 		pass, ok := compiled.Eval(context.Background(), map[string]any{"role": 42}, evalTimeout)
 		assert.False(t, ok && pass)
 	})

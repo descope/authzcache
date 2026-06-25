@@ -45,8 +45,7 @@ func injectAuthzMocks(t *testing.T) (AuthzCache, *mocksmgmt.MockManagement, *moc
 		return mockSDK, nil
 	}
 	mockCache := &mockCache{}
-	// default: schema already loaded (no conditions) so ensureSchemaLoaded is a no-op; tests
-	// exercising lazy load or ABAC gating override GetSchemaFunc/SchemaHasABACFunc as needed
+	// default: schema already loaded (no conditions) so ensureSchemaLoaded is a no-op; lazy-load/ABAC tests override GetSchemaFunc
 	mockCache.GetSchemaFunc = func() *descope.FGASchema {
 		return &descope.FGASchema{}
 	}
