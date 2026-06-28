@@ -1141,8 +1141,8 @@ func isAdminSchema(t *testing.T) *descope.FGASchema {
 	b, err := proto.Marshal(checked)
 	require.NoError(t, err)
 	return &descope.FGASchema{
-		// DSL drives the edge's loaded schema version (sha256 of this string); content is arbitrary for the test.
-		Schema: "model AuthZ 1.0\ncondition IsAdmin(role string) { role == \"admin\" }",
+		Schema:  "model AuthZ 1.0\ncondition IsAdmin(role string) { role == \"admin\" }",
+		Version: 1, // the edge's loaded version; Check responses must carry this same version to be cached
 		Conditions: []*descope.FGACondition{
 			{Name: "IsAdmin", ID: 1, Params: []*descope.FGAConditionParam{{Name: "role", Type: "string"}}, Expression: `role == "admin"`, CheckedExpr: b},
 		},
@@ -1269,7 +1269,7 @@ func TestConditionalRelationCaching_SkipsSchemaVersionMismatch(t *testing.T) {
 	// a result computed against a different schema version must not be cached — the IDs may map to other
 	// conditions under that version (the guard against ID-scheme skew).
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: "stale-version", TrueConditions: []int32{1}}},
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: 999, TrueConditions: []int32{1}}},
 	}, adminCtx)
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
