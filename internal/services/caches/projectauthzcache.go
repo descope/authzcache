@@ -2,6 +2,8 @@ package caches
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"slices"
 	"strings"
@@ -53,10 +55,12 @@ type LookupCacheEntry struct {
 	ExpiresAt time.Time
 }
 
-// conditionalCert is a cached Check result plus the raw condition values that produced it; valid while each still re-evaluates the same. Never fact-gated.
+// conditionalCert is a cached Check result plus the condition IDs that evaluated true/false (raw, pre-NOT)
+// to produce it; valid while each still re-evaluates to its bucket. Never fact-gated.
 type conditionalCert struct {
-	allowed bool
-	conds   map[string]bool
+	allowed    bool
+	trueConds  []int32
+	falseConds []int32
 }
 
 type projectAuthzCache struct {
@@ -68,7 +72,8 @@ type projectAuthzCache struct {
 	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, bool] // resource:target:relation -> bool, e.g. file1:user2:owner -> false
 	// conditionalRelationCache: resource:target:relation -> certificate; served only while its conditions re-evaluate the same at the edge (never fact-gated).
 	conditionalRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, *conditionalCert]
-	compiledConditions       map[string]*edgecel.CompiledCondition                // condition name -> compiled CEL program, from the loaded schema
+	compiledConditions       map[int32]*edgecel.CompiledCondition                 // condition ID -> compiled CEL program, from the loaded schema
+	loadedSchemaVersion      string                                               // version of the loaded schema; certs from a Check with a different version are not cached
 	celEvalTimeout           time.Duration                                        // wall-clock backstop per condition evaluation
 	lookupCache              *lru.MonitoredLRUCache[lookupKey, *LookupCacheEntry] // lookup cache for WhoCanAccess/WhatCanTargetAccess
 	lookupCacheEnabled       bool
@@ -183,13 +188,20 @@ func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*de
 	return
 }
 
-// certMatches reports whether every recorded condition still re-evaluates to its cached raw value; any uncompiled/failed/changed condition → defer to backend.
+// certMatches reports whether every recorded condition still re-evaluates to its cached bucket; any
+// uncompiled/failed/changed condition → defer to backend.
 func (pc *projectAuthzCache) certMatches(ctx context.Context, cert *conditionalCert, extraContext map[string]any) bool {
-	if len(cert.conds) == 0 {
+	if len(cert.trueConds) == 0 && len(cert.falseConds) == 0 {
 		return false
 	}
-	for name, want := range cert.conds {
-		compiled, ok := pc.compiledConditions[name]
+	return pc.conditionsEvalTo(ctx, cert.trueConds, true, extraContext) &&
+		pc.conditionsEvalTo(ctx, cert.falseConds, false, extraContext)
+}
+
+// conditionsEvalTo reports whether every listed condition ID re-evaluates to want at the edge.
+func (pc *projectAuthzCache) conditionsEvalTo(ctx context.Context, ids []int32, want bool, extraContext map[string]any) bool {
+	for _, id := range ids {
+		compiled, ok := pc.compiledConditions[id]
 		if !ok {
 			return false
 		}
@@ -227,17 +239,22 @@ func (pc *projectAuthzCache) EnsureSchemaLoaded(ctx context.Context, schema *des
 func (pc *projectAuthzCache) setSchema(ctx context.Context, schema *descope.FGASchema) {
 	pc.schemaCache = schema
 	pc.compiledConditions = nil
+	pc.loadedSchemaVersion = ""
 	if schema == nil {
 		return
 	}
-	compiled := make(map[string]*edgecel.CompiledCondition, len(schema.Conditions))
+	// schema version = sha256-hex of the DSL. MUST match the backend's descopecel.SchemaCacheVersion; if it
+	// ever drifts the versions simply never match and conditionals aren't cached (safe — never wrong).
+	sum := sha256.Sum256([]byte(schema.Schema))
+	pc.loadedSchemaVersion = hex.EncodeToString(sum[:])
+	compiled := make(map[int32]*edgecel.CompiledCondition, len(schema.Conditions))
 	for _, c := range schema.Conditions {
 		program, err := edgecel.Compile(c)
 		if err != nil {
 			cctx.Logger(ctx).Warn().Str("condition", c.Name).Err(err).Msg("Failed to compile schema condition for edge evaluation, conditional grants gated by it won't be cached")
 			continue
 		}
-		compiled[c.Name] = program
+		compiled[c.ID] = program
 	}
 	pc.compiledConditions = compiled
 }
@@ -284,9 +301,16 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 			// fact-involved results depend on mutable backend state the edge can't observe — never cache
 			continue
 		case c.Info.Conditional:
+			// The condition IDs are only meaningful for the schema version that assigned them; if the response
+			// was computed against a different schema than the one we loaded, the IDs may map to other
+			// conditions — don't cache (it heals once the edge reloads the schema).
+			if c.Info.SchemaVersion != pc.loadedSchemaVersion {
+				continue
+			}
 			// cache the result (allow or deny) as a certificate; skip incomplete/errored evals and any condition not compiled at the edge
-			if len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" && len(c.Info.EvaluatedConditions) > 0 && pc.hasAllCompiledConditions(c.Info.EvaluatedConditions) {
-				pc.conditionalRelationCache.Add(ctx, key(c.Relation), &conditionalCert{allowed: c.Allowed, conds: c.Info.EvaluatedConditions})
+			if len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" && (len(c.Info.TrueConditions) > 0 || len(c.Info.FalseConditions) > 0) &&
+				pc.hasAllCompiledConditions(c.Info.TrueConditions) && pc.hasAllCompiledConditions(c.Info.FalseConditions) {
+				pc.conditionalRelationCache.Add(ctx, key(c.Relation), &conditionalCert{allowed: c.Allowed, trueConds: c.Info.TrueConditions, falseConds: c.Info.FalseConditions})
 			}
 		case c.Info.Direct:
 			pc.addDirectRelation(ctx, c.Relation, c.Allowed)
@@ -296,14 +320,14 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 	}
 }
 
-// hasAllCompiledConditions reports whether every named condition is compiled at the edge (else the grant isn't cached).
-func (pc *projectAuthzCache) hasAllCompiledConditions(conds map[string]bool) bool {
-	for name := range conds {
-		if _, ok := pc.compiledConditions[name]; !ok {
+// hasAllCompiledConditions reports whether every listed condition ID is compiled at the edge (else the grant isn't cached).
+func (pc *projectAuthzCache) hasAllCompiledConditions(ids []int32) bool {
+	for _, id := range ids {
+		if _, ok := pc.compiledConditions[id]; !ok {
 			return false
 		}
 	}
-	return len(conds) > 0
+	return true
 }
 
 func (pc *projectAuthzCache) StartRemoteChangesPolling(ctx context.Context) {

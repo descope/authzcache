@@ -1140,9 +1140,13 @@ func isAdminSchema(t *testing.T) *descope.FGASchema {
 	require.NoError(t, err)
 	b, err := proto.Marshal(checked)
 	require.NoError(t, err)
-	return &descope.FGASchema{Conditions: []*descope.FGACondition{
-		{Name: "IsAdmin", Params: []*descope.FGAConditionParam{{Name: "role", Type: "string"}}, Expression: `role == "admin"`, CheckedExpr: b},
-	}}
+	return &descope.FGASchema{
+		// DSL drives the edge's loaded schema version (sha256 of this string); content is arbitrary for the test.
+		Schema: "model AuthZ 1.0\ncondition IsAdmin(role string) { role == \"admin\" }",
+		Conditions: []*descope.FGACondition{
+			{Name: "IsAdmin", ID: 1, Params: []*descope.FGAConditionParam{{Name: "role", Type: "string"}}, Expression: `role == "admin"`, CheckedExpr: b},
+		},
+	}
 }
 
 func TestConditionalRelationCaching_PerContext(t *testing.T) {
@@ -1154,9 +1158,10 @@ func TestConditionalRelationCaching_PerContext(t *testing.T) {
 
 	// load the schema so the edge can compile + re-evaluate IsAdmin
 	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
-	// backend allowed this tuple; cache it as a certificate of the conditions that produced it
+	ver := cache.loadedSchemaVersion
+	// backend allowed this tuple; cache it as a certificate of the conditions (by ID) that produced it
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, EvaluatedConditions: map[string]bool{"IsAdmin": true}}},
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: ver, TrueConditions: []int32{1}}},
 	}, adminCtx)
 
 	t.Run("same context - conditions still match, served from cache", func(t *testing.T) {
@@ -1190,9 +1195,10 @@ func TestConditionalRelationCaching_CachesDenials(t *testing.T) {
 	userCtx := map[string]any{"role": "user"}
 
 	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
-	// a conditional denial is cached with its certificate too (deterministic for these condition values)
+	ver := cache.loadedSchemaVersion
+	// a conditional denial is cached with its certificate too (IsAdmin evaluated false)
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, EvaluatedConditions: map[string]bool{"IsAdmin": false}}},
+		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: ver, FalseConditions: []int32{1}}},
 	}, userCtx)
 
 	_, unchecked, idx := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, userCtx)
@@ -1208,9 +1214,10 @@ func TestConditionalRelationCaching_NeverCachesFactInvolved(t *testing.T) {
 	adminCtx := map[string]any{"role": "admin"}
 
 	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
+	ver := cache.loadedSchemaVersion
 	// even though the condition is compiled and complete, a fact participated → never cached
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, FactGated: true, EvaluatedConditions: map[string]bool{"IsAdmin": true}}},
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, FactGated: true, SchemaVersion: ver, TrueConditions: []int32{1}}},
 	}, adminCtx)
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
@@ -1224,9 +1231,10 @@ func TestConditionalRelationCaching_SkipsIncompleteEval(t *testing.T) {
 	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
 
 	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
-	// partial evaluation (missing context var) is not cached
+	ver := cache.loadedSchemaVersion
+	// partial evaluation (missing context var) is not cached even though the version matches
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, MissingContext: []string{"role"}}},
+		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: ver, MissingContext: []string{"role"}}},
 	}, nil)
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, nil)
@@ -1240,13 +1248,32 @@ func TestConditionalRelationCaching_SkipsUncompiledCondition(t *testing.T) {
 	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
 	adminCtx := map[string]any{"role": "admin"}
 
-	// no schema loaded → IsAdmin isn't compiled at the edge → can't be re-verified, so it isn't cached
+	// no schema loaded → loadedSchemaVersion is "" (matches the empty version below), but ID 1 isn't compiled
+	// at the edge → can't be re-verified, so it isn't cached
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, EvaluatedConditions: map[string]bool{"IsAdmin": true}}},
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, TrueConditions: []int32{1}}},
 	}, adminCtx)
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
 	assert.Empty(t, checks, "without a compiled condition the grant can't be re-verified, so it isn't cached")
+	assert.Len(t, unchecked, 1)
+}
+
+func TestConditionalRelationCaching_SkipsSchemaVersionMismatch(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	adminCtx := map[string]any{"role": "admin"}
+
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
+	// a result computed against a different schema version must not be cached — the IDs may map to other
+	// conditions under that version (the guard against ID-scheme skew).
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: "stale-version", TrueConditions: []int32{1}}},
+	}, adminCtx)
+
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
+	assert.Empty(t, checks, "a schema-version mismatch must prevent caching")
 	assert.Len(t, unchecked, 1)
 }
 
