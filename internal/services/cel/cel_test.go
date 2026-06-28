@@ -6,19 +6,40 @@ import (
 	"time"
 
 	edgecel "github.com/descope/authzcache/internal/services/cel"
+	celtypes "github.com/descope/backend/authzservice/pkg/authzservice/cel/descopecel"
 	"github.com/descope/go-sdk/descope"
+	"github.com/google/cel-go/cel"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 const evalTimeout = time.Second
 
-func TestCompileAndEval(t *testing.T) {
-	cond := &descope.FGACondition{
-		Name:       "isAdmin",
-		Params:     []*descope.FGAConditionParam{{Name: "role", Type: "string"}},
-		Expression: `role == "admin"`,
+// mustCheckedCond builds an FGACondition carrying a serialized type-checked CEL program, exactly the way
+// the backend produces it (compile in an env with the shared custom types + per-param vars, then
+// AstToCheckedExpr). The edge runs this checked program rather than re-parsing the expression.
+func mustCheckedCond(t *testing.T, name string, params []*descope.FGAConditionParam, expr string) *descope.FGACondition {
+	t.Helper()
+	opts := celtypes.EnvOptions()
+	for _, p := range params {
+		ct, err := celtypes.DSLTypeToCEL(p.Type)
+		require.NoError(t, err)
+		opts = append(opts, cel.Variable(p.Name, ct))
 	}
+	env, err := cel.NewEnv(opts...)
+	require.NoError(t, err)
+	ast, iss := env.Compile(expr)
+	require.NoError(t, iss.Err())
+	checked, err := cel.AstToCheckedExpr(ast)
+	require.NoError(t, err)
+	b, err := proto.Marshal(checked)
+	require.NoError(t, err)
+	return &descope.FGACondition{Name: name, Params: params, CheckedExpr: b}
+}
+
+func TestCompileAndEval(t *testing.T) {
+	cond := mustCheckedCond(t, "isAdmin", []*descope.FGAConditionParam{{Name: "role", Type: "string"}}, `role == "admin"`)
 	compiled, err := edgecel.Compile(cond)
 	require.NoError(t, err)
 
@@ -46,11 +67,7 @@ func TestCompileAndEval(t *testing.T) {
 
 func TestEvalIntCoercion(t *testing.T) {
 	// JSON numbers decode to float64; an int param must be coerced to int64 to match cel-go.
-	cond := &descope.FGACondition{
-		Name:       "highClearance",
-		Params:     []*descope.FGAConditionParam{{Name: "level", Type: "int"}},
-		Expression: `level >= 5`,
-	}
+	cond := mustCheckedCond(t, "highClearance", []*descope.FGAConditionParam{{Name: "level", Type: "int"}}, `level >= 5`)
 	compiled, err := edgecel.Compile(cond)
 	require.NoError(t, err)
 
@@ -65,11 +82,7 @@ func TestEvalIntCoercion(t *testing.T) {
 
 func TestEvalIPAddress(t *testing.T) {
 	// custom ipaddress type + in_cidr function, shared with the backend via pkg.
-	cond := &descope.FGACondition{
-		Name:       "inOfficeRange",
-		Params:     []*descope.FGAConditionParam{{Name: "ip", Type: "ipaddress"}},
-		Expression: `ip.in_cidr("10.0.0.0/8")`,
-	}
+	cond := mustCheckedCond(t, "inOfficeRange", []*descope.FGAConditionParam{{Name: "ip", Type: "ipaddress"}}, `ip.in_cidr("10.0.0.0/8")`)
 	compiled, err := edgecel.Compile(cond)
 	require.NoError(t, err)
 
@@ -85,20 +98,16 @@ func TestEvalIPAddress(t *testing.T) {
 	assert.False(t, ok, "an unparseable ip must defer to the backend")
 }
 
-func TestCompileInvalidExpression(t *testing.T) {
-	_, err := edgecel.Compile(&descope.FGACondition{
-		Name:       "broken",
-		Params:     []*descope.FGAConditionParam{{Name: "role", Type: "string"}},
-		Expression: `role ==`, // syntax error
-	})
-	require.Error(t, err)
+func TestCompileRejectsMissingCheckedExpr(t *testing.T) {
+	_, err := edgecel.Compile(&descope.FGACondition{Name: "empty"})
+	require.Error(t, err, "a condition with no checked expression must not compile")
 }
 
 func TestCompileUnknownParamType(t *testing.T) {
 	_, err := edgecel.Compile(&descope.FGACondition{
-		Name:       "weird",
-		Params:     []*descope.FGAConditionParam{{Name: "x", Type: "nonexistent"}},
-		Expression: `true`,
+		Name:        "weird",
+		Params:      []*descope.FGAConditionParam{{Name: "x", Type: "nonexistent"}},
+		CheckedExpr: []byte("x"), // non-empty so Compile reaches the param-type mapping
 	})
 	require.Error(t, err)
 }

@@ -9,11 +9,14 @@ import (
 	"unsafe"
 
 	"github.com/descope/authzcache/internal/config"
+	celtypes "github.com/descope/backend/authzservice/pkg/authzservice/cel/descopecel"
 	"github.com/descope/go-sdk/descope"
 	lru "github.com/descope/golang-lru"
+	"github.com/google/cel-go/cel"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 type mockRemoteChangesChecker struct {
@@ -1123,10 +1126,22 @@ func updateBothCachesWithChecks(ctx context.Context, t *testing.T, cache *projec
 	}
 }
 
-// isAdminSchema is a one-condition schema the edge can compile: IsAdmin(role) == "admin".
-func isAdminSchema() *descope.FGASchema {
+// isAdminSchema is a one-condition schema (IsAdmin(role) == "admin") carrying the type-checked CEL
+// program the edge runs — built the same way the backend ships it.
+func isAdminSchema(t *testing.T) *descope.FGASchema {
+	t.Helper()
+	ct, err := celtypes.DSLTypeToCEL("string")
+	require.NoError(t, err)
+	env, err := cel.NewEnv(append(celtypes.EnvOptions(), cel.Variable("role", ct))...)
+	require.NoError(t, err)
+	ast, iss := env.Compile(`role == "admin"`)
+	require.NoError(t, iss.Err())
+	checked, err := cel.AstToCheckedExpr(ast)
+	require.NoError(t, err)
+	b, err := proto.Marshal(checked)
+	require.NoError(t, err)
 	return &descope.FGASchema{Conditions: []*descope.FGACondition{
-		{Name: "IsAdmin", Params: []*descope.FGAConditionParam{{Name: "role", Type: "string"}}, Expression: `role == "admin"`},
+		{Name: "IsAdmin", Params: []*descope.FGAConditionParam{{Name: "role", Type: "string"}}, Expression: `role == "admin"`, CheckedExpr: b},
 	}}
 }
 
@@ -1138,7 +1153,7 @@ func TestConditionalRelationCaching_PerContext(t *testing.T) {
 	userCtx := map[string]any{"role": "user"}
 
 	// load the schema so the edge can compile + re-evaluate IsAdmin
-	cache.UpdateCacheWithSchema(ctx, isAdminSchema())
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
 	// backend allowed this tuple; cache it as a certificate of the conditions that produced it
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, EvaluatedConditions: map[string]bool{"IsAdmin": true}}},
@@ -1174,7 +1189,7 @@ func TestConditionalRelationCaching_CachesDenials(t *testing.T) {
 	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
 	userCtx := map[string]any{"role": "user"}
 
-	cache.UpdateCacheWithSchema(ctx, isAdminSchema())
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
 	// a conditional denial is cached with its certificate too (deterministic for these condition values)
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, EvaluatedConditions: map[string]bool{"IsAdmin": false}}},
@@ -1192,7 +1207,7 @@ func TestConditionalRelationCaching_NeverCachesFactInvolved(t *testing.T) {
 	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
 	adminCtx := map[string]any{"role": "admin"}
 
-	cache.UpdateCacheWithSchema(ctx, isAdminSchema())
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
 	// even though the condition is compiled and complete, a fact participated → never cached
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, FactGated: true, EvaluatedConditions: map[string]bool{"IsAdmin": true}}},
@@ -1208,7 +1223,7 @@ func TestConditionalRelationCaching_SkipsIncompleteEval(t *testing.T) {
 	cache, _ := setup(t)
 	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
 
-	cache.UpdateCacheWithSchema(ctx, isAdminSchema())
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
 	// partial evaluation (missing context var) is not cached
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, MissingContext: []string{"role"}}},

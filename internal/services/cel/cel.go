@@ -1,17 +1,20 @@
-// Package cel compiles and evaluates ABAC schema conditions at the edge. It reuses the
-// backend's custom CEL types (the ipaddress type/functions and the DSL→cel type mapping)
-// over a direct cel-go dependency, so the edge re-evaluates the exact expressions the
-// backend returns for each condition — without importing the backend CEL runtime.
+// Package cel evaluates ABAC schema conditions at the edge. It runs the backend's already
+// type-checked CEL program (shipped as exprpb.CheckedExpr) over a direct cel-go dependency, reusing
+// the backend's custom CEL types (the ipaddress type/functions). The edge never parses or type-checks
+// the DSL — parity with the backend rests only on the cel-go version + the shared custom functions.
 package cel
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	celtypes "github.com/descope/backend/authzservice/pkg/authzservice/cel/descopecel"
 	cctx "github.com/descope/backend/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
 	"github.com/google/cel-go/cel"
+	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+	"google.golang.org/protobuf/proto"
 )
 
 // CompiledCondition is a compiled CEL condition together with its typed parameters,
@@ -22,9 +25,13 @@ type CompiledCondition struct {
 	params  []*descope.FGAConditionParam
 }
 
-// Compile builds a CEL program for a single schema condition using the shared custom env
-// (ipaddress type/functions) plus a typed variable per declared parameter.
+// Compile builds an executable program from the backend's type-checked CEL program (CheckedExpr). The
+// edge does not parse or type-check the expression — it runs the backend's checked AST in an env that
+// declares the same custom functions/types and per-param variables, so the program matches the backend.
 func Compile(c *descope.FGACondition) (*CompiledCondition, error) {
+	if len(c.CheckedExpr) == 0 {
+		return nil, fmt.Errorf("condition %q has no checked expression", c.Name)
+	}
 	opts := celtypes.EnvOptions()
 	for _, p := range c.Params {
 		t, err := celtypes.DSLTypeToCEL(p.Type)
@@ -37,11 +44,11 @@ func Compile(c *descope.FGACondition) (*CompiledCondition, error) {
 	if err != nil {
 		return nil, err
 	}
-	ast, iss := env.Compile(c.Expression)
-	if iss.Err() != nil {
-		return nil, iss.Err()
+	var checked exprpb.CheckedExpr
+	if err := proto.Unmarshal(c.CheckedExpr, &checked); err != nil {
+		return nil, err
 	}
-	program, err := env.Program(ast)
+	program, err := env.Program(cel.CheckedExprToAst(&checked))
 	if err != nil {
 		return nil, err
 	}
