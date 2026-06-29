@@ -219,6 +219,7 @@ func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource,
 			ResourceType: namespace,
 			Relation:     relationDefinition,
 			Target:       target,
+			TargetType:   "*", // WhoCanAccess is TargetType-agnostic
 		}
 	}
 	checks, err := a.CheckWithContext(ctx, relations, extraContext)
@@ -265,6 +266,7 @@ func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, ta
 			ResourceType: r.Namespace,
 			Relation:     r.RelationDefinition,
 			Target:       target,
+			TargetType:   "*", // WhatCanTargetAccess is TargetType-agnostic
 		}
 	}
 	checks, err := a.CheckWithContext(ctx, relations, extraContext)
