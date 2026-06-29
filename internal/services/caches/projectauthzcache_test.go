@@ -9,11 +9,14 @@ import (
 	"unsafe"
 
 	"github.com/descope/authzcache/internal/config"
+	celtypes "github.com/descope/backend/authzservice/pkg/authzservice/cel/descopecel"
 	"github.com/descope/go-sdk/descope"
 	lru "github.com/descope/golang-lru"
+	"github.com/google/cel-go/cel"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 type mockRemoteChangesChecker struct {
@@ -28,7 +31,7 @@ var _ RemoteChangesChecker = &mockRemoteChangesChecker{} // ensure mockRemoteCha
 
 // checkRelation is a test helper that calls CheckRelations with a single relation
 func checkRelation(ctx context.Context, cache ProjectAuthzCache, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
-	_, _, indexToCheck := cache.CheckRelations(ctx, []*descope.FGARelation{r})
+	_, _, indexToCheck := cache.CheckRelations(ctx, []*descope.FGARelation{r}, nil)
 	check, ok := indexToCheck[0]
 	if !ok {
 		return false, false, false
@@ -85,7 +88,7 @@ func TestUpdateCacheWithChecks(t *testing.T) {
 	directSize := cache.directRelationCache.Len(ctx)
 	indirectSize := cache.indirectRelationCache.Len(ctx)
 	for _, cr := range cachedRelations {
-		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: cr.allowed, Relation: cr.r, Info: &descope.FGACheckInfo{Direct: cr.direct}}})
+		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: cr.allowed, Relation: cr.r, Info: &descope.FGACheckInfo{Direct: cr.direct}}}, nil)
 		// validate CheckRelation after the 2nd update, should return the same results
 		allowed, direct, ok := checkRelation(ctx, cache, cr.r)
 		assert.True(t, ok)
@@ -117,11 +120,10 @@ func TestUpdateCacheWithAddedRelations(t *testing.T) {
 		expectedAllowed := expectedToRemainInCache && old.allowed
 		assert.Equal(t, expectedAllowed, allowed) // if the relation is still in the cache, it should have the same allowed value
 	}
-	// all new relations should be allowed
+	// new relations are NOT pre-cached (a created tuple may be conditional); they resolve via Check
 	for _, r := range newRelations {
-		allowed, _, ok := checkRelation(ctx, cache, r)
-		assert.True(t, ok)
-		assert.True(t, allowed)
+		_, _, ok := checkRelation(ctx, cache, r)
+		assert.False(t, ok)
 	}
 }
 
@@ -158,21 +160,18 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 	assert.Equal(t, 0, len(cache.directTargetsIndex), "%v", cache.directTargetsIndex)
 }
 
-func TestUpdateCacheWithAddedRelations_AddsToLookupCache(t *testing.T) {
+func TestUpdateCacheWithAddedRelations_PurgesLookupCache(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)
 	cache.lookupCacheEnabled = true
 	cache.SetWhoCanAccessCached(ctx, "doc1", "viewer", "docs", []string{"user1", "user2"})
 	cache.SetWhatCanTargetAccessCached(ctx, "user3", []*descope.AuthzRelation{{Resource: "other", RelationDefinition: "editor", Namespace: "docs", Target: "user3"}})
+	// a new relation can add a candidate to a lookup pool, so the lookup cache is invalidated
 	cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{{Resource: "doc1", Target: "user3", Relation: "viewer", ResourceType: "docs"}})
-	targets, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
-	assert.True(t, ok, "lookup cache entry should still exist")
-	assert.Contains(t, targets, "user1", "existing target should remain")
-	assert.Contains(t, targets, "user2", "existing target should remain")
-	assert.Contains(t, targets, "user3", "new target should be added to lookup cache")
-	relations, ok := cache.GetWhatCanTargetAccessCached(ctx, "user3")
-	assert.True(t, ok, "lookup cache entry should still exist")
-	assert.Len(t, relations, 2, "new relation should be added to existing entry")
+	_, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
+	assert.False(t, ok, "lookup cache should be purged after a relation is added")
+	_, ok = cache.GetWhatCanTargetAccessCached(ctx, "user3")
+	assert.False(t, ok, "lookup cache should be purged after a relation is added")
 }
 
 func TestUpdateCacheWithDeletedRelations_DoesNotPurgeLookupCache(t *testing.T) {
@@ -201,7 +200,7 @@ func TestEmptyActions(t *testing.T) {
 	// perform empty updates
 	cache.UpdateCacheWithAddedRelations(ctx, nil)
 	cache.UpdateCacheWithDeletedRelations(ctx, nil)
-	cache.UpdateCacheWithChecks(ctx, nil)
+	cache.UpdateCacheWithChecks(ctx, nil, nil)
 	// cache should not change
 	assert.Equal(t, expectedDirectSize, cache.directRelationCache.Len(ctx))
 	assert.Equal(t, expectedIndirectSize, cache.indirectRelationCache.Len(ctx))
@@ -744,7 +743,7 @@ func TestCooldownMechanism_ConcurrentStressTest(t *testing.T) {
 							Relation: &descope.FGARelation{Resource: "r" + uuid.NewString(), Target: "t" + uuid.NewString(), Relation: "owner"},
 							Info:     &descope.FGACheckInfo{Direct: i%2 == 0},
 						},
-					})
+					}, nil)
 				case 6:
 					// get schema (read operation)
 					_ = cache.GetSchema()
@@ -829,7 +828,7 @@ func TestCooldownMechanism_ConcurrentPollingWithTimerExpiry(t *testing.T) {
 						Relation: &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"},
 						Info:     &descope.FGACheckInfo{Direct: true},
 					},
-				})
+				}, nil)
 				// trigger polling
 				cache.updateCacheWithRemotePolling(ctx)
 				// small sleep to allow timer callbacks to potentially fire
@@ -1080,7 +1079,7 @@ func populateLargeDirectCache(ctx context.Context) (*projectAuthzCache, []string
 	for i := 0; i < 1_000_000; i++ {
 		resources[i] = uuid.NewString()
 		targets[i] = uuid.NewString()
-		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: true, Relation: &descope.FGARelation{Resource: resources[i], Target: targets[i], Relation: "owner"}, Info: &descope.FGACheckInfo{Direct: true}}})
+		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: true, Relation: &descope.FGARelation{Resource: resources[i], Target: targets[i], Relation: "owner"}, Info: &descope.FGACheckInfo{Direct: true}}}, nil)
 	}
 	return cache.(*projectAuthzCache), resources, targets
 }
@@ -1113,7 +1112,7 @@ func updateBothCachesWithChecks(ctx context.Context, t *testing.T, cache *projec
 		{Allowed: true, Relation: extraDirectTrueRelation, Info: &descope.FGACheckInfo{Direct: true}},
 		{Allowed: true, Relation: differentResourceAndTargetDirectTrueRelation, Info: &descope.FGACheckInfo{Direct: true}},
 	}
-	cache.UpdateCacheWithChecks(ctx, checks)
+	cache.UpdateCacheWithChecks(ctx, checks, nil)
 	// validate cache distribution
 	require.Equal(t, 4, cache.directRelationCache.Len(ctx))
 	require.Equal(t, 2, cache.indirectRelationCache.Len(ctx))
@@ -1125,4 +1124,176 @@ func updateBothCachesWithChecks(ctx context.Context, t *testing.T, cache *projec
 		{allowed: true, direct: true, r: extraDirectTrueRelation},
 		{allowed: true, direct: true, r: differentResourceAndTargetDirectTrueRelation},
 	}
+}
+
+// isAdminSchema is a one-condition schema (IsAdmin(role) == "admin") carrying the type-checked CEL
+// program the edge runs — built the same way the backend ships it.
+func isAdminSchema(t *testing.T) *descope.FGASchema {
+	t.Helper()
+	ct, err := celtypes.DSLTypeToCEL("string")
+	require.NoError(t, err)
+	env, err := cel.NewEnv(append(celtypes.EnvOptions(), cel.Variable("role", ct))...)
+	require.NoError(t, err)
+	ast, iss := env.Compile(`role == "admin"`)
+	require.NoError(t, iss.Err())
+	checked, err := cel.AstToCheckedExpr(ast)
+	require.NoError(t, err)
+	b, err := proto.Marshal(checked)
+	require.NoError(t, err)
+	return &descope.FGASchema{
+		Schema:  "model AuthZ 1.0\ncondition IsAdmin(role string) { role == \"admin\" }",
+		Version: 1, // the edge's loaded version; Check responses must carry this same version to be cached
+		Conditions: []*descope.FGACondition{
+			{Name: "IsAdmin", ID: 1, Params: []*descope.FGAConditionParam{{Name: "role", Type: "string"}}, Expression: `role == "admin"`, CheckedExpr: b},
+		},
+	}
+}
+
+func TestConditionalRelationCaching_PerContext(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	adminCtx := map[string]any{"role": "admin"}
+	userCtx := map[string]any{"role": "user"}
+
+	// load the schema so the edge can compile + re-evaluate IsAdmin
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
+	ver := cache.loadedSchemaVersion
+	// backend allowed this tuple; cache it as a certificate of the conditions (by ID) that produced it
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: ver, TrueConditions: []int32{1}}},
+	}, adminCtx)
+
+	t.Run("same context - conditions still match, served from cache", func(t *testing.T) {
+		_, unchecked, idx := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
+		assert.Empty(t, unchecked)
+		require.Contains(t, idx, 0)
+		assert.True(t, idx[0].Allowed)
+		assert.True(t, idx[0].Info.Conditional)
+	})
+
+	t.Run("different but irrelevant context field - still served", func(t *testing.T) {
+		// IsAdmin still evaluates true; the extra field isn't referenced by any condition.
+		noisyCtx := map[string]any{"role": "admin", "ip": "1.2.3.4"}
+		_, unchecked, idx := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, noisyCtx)
+		assert.Empty(t, unchecked, "irrelevant context fields don't bust the certificate")
+		require.Contains(t, idx, 0)
+		assert.True(t, idx[0].Allowed)
+	})
+
+	t.Run("condition flips - cache miss, deferred to backend", func(t *testing.T) {
+		checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, userCtx)
+		assert.Empty(t, checks, "IsAdmin now evaluates false, so the cached grant must not be reused")
+		assert.Len(t, unchecked, 1)
+	})
+}
+
+func TestConditionalRelationCaching_CachesDenials(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	userCtx := map[string]any{"role": "user"}
+
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
+	ver := cache.loadedSchemaVersion
+	// a conditional denial is cached with its certificate too (IsAdmin evaluated false)
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: ver, FalseConditions: []int32{1}}},
+	}, userCtx)
+
+	_, unchecked, idx := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, userCtx)
+	assert.Empty(t, unchecked)
+	require.Contains(t, idx, 0)
+	assert.False(t, idx[0].Allowed)
+}
+
+func TestConditionalRelationCaching_NeverCachesFactInvolved(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	adminCtx := map[string]any{"role": "admin"}
+
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
+	ver := cache.loadedSchemaVersion
+	// even though the condition is compiled and complete, a fact participated → never cached
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, FactUsed: true, SchemaVersion: ver, TrueConditions: []int32{1}}},
+	}, adminCtx)
+
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
+	assert.Empty(t, checks, "fact-gated grants must never be cached")
+	assert.Len(t, unchecked, 1)
+}
+
+func TestConditionalRelationCaching_SkipsIncompleteEval(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
+	ver := cache.loadedSchemaVersion
+	// partial evaluation (missing context var) is not cached even though the version matches
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: ver, MissingContext: []string{"role"}}},
+	}, nil)
+
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, nil)
+	assert.Empty(t, checks)
+	assert.Len(t, unchecked, 1)
+}
+
+func TestConditionalRelationCaching_SkipsUncompiledCondition(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	adminCtx := map[string]any{"role": "admin"}
+
+	// no schema loaded → loadedSchemaVersion is "" (matches the empty version below), but ID 1 isn't compiled
+	// at the edge → can't be re-verified, so it isn't cached
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, TrueConditions: []int32{1}}},
+	}, adminCtx)
+
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
+	assert.Empty(t, checks, "without a compiled condition the grant can't be re-verified, so it isn't cached")
+	assert.Len(t, unchecked, 1)
+}
+
+func TestConditionalRelationCaching_SkipsSchemaVersionMismatch(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	adminCtx := map[string]any{"role": "admin"}
+
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
+	// a result computed against a different schema version must not be cached — the IDs may map to other
+	// conditions under that version (the guard against ID-scheme skew).
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: 999, TrueConditions: []int32{1}}},
+	}, adminCtx)
+
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
+	assert.Empty(t, checks, "a schema-version mismatch must prevent caching")
+	assert.Len(t, unchecked, 1)
+}
+
+func TestLookupCaching_Caches(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+
+	cache.SetWhoCanAccessCached(ctx, "doc1", "viewer", "doc", []string{"u1", "u2"})
+	targets, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "doc")
+	require.True(t, ok, "lookups cache the candidate pool (context-filtered at re-verify)")
+	assert.ElementsMatch(t, []string{"u1", "u2"}, targets)
+}
+
+func TestUpdateCacheWithAddedRelations_DoesNotPreCacheDirect(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{rel})
+	// created tuples aren't pre-cached as direct grants (they may be conditional); first Check defers to backend
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, nil)
+	assert.Empty(t, checks, "created tuple must not be served as a direct grant")
+	assert.Len(t, unchecked, 1)
 }
