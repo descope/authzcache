@@ -1217,7 +1217,7 @@ func TestConditionalRelationCaching_NeverCachesFactInvolved(t *testing.T) {
 	ver := cache.loadedSchemaVersion
 	// even though the condition is compiled and complete, a fact participated → never cached
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, FactGated: true, SchemaVersion: ver, TrueConditions: []int32{1}}},
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, FactUsed: true, SchemaVersion: ver, TrueConditions: []int32{1}}},
 	}, adminCtx)
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)

@@ -294,7 +294,7 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 	defer pc.mutex.Unlock()
 	for _, c := range sdkChecks {
 		switch {
-		case c.Info.FactGated:
+		case c.Info.FactUsed:
 			// fact-involved results depend on mutable backend state the edge can't observe — never cache
 			continue
 		case c.Info.Conditional:

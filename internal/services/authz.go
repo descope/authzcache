@@ -166,7 +166,7 @@ func (a *authzCache) ensureSchemaLoaded(ctx context.Context, projectCache caches
 // hasCacheableConditional reports whether any check is a cleanly-evaluated CEL grant/denial with recorded conditions — the only cacheable conditionals.
 func hasCacheableConditional(checks []*descope.FGACheck) bool {
 	for _, c := range checks {
-		if c.Info.Conditional && !c.Info.FactGated && len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" &&
+		if c.Info.Conditional && !c.Info.FactUsed && len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" &&
 			(len(c.Info.TrueConditions) > 0 || len(c.Info.FalseConditions) > 0) {
 			return true
 		}

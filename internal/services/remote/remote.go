@@ -28,7 +28,7 @@ func NewDescopeClientWithProjectID(projectID string, loggerInstance logger.Logge
 		Logger:              loggerInstance,
 		ManagementKey:       managementKey,
 		// the edge cache needs per-condition results on Check to build its certificates
-		FGAIncludeEvaluatedConditions: true,
+		FGAListConditions: true,
 	})
 	if err != nil {
 		return nil, err // notest
