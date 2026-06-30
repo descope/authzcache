@@ -10,24 +10,16 @@ var _ AuthzCache = &AuthzCacheMock{} // ensure AuthzMock implements Authz
 
 type AuthzCacheMock struct {
 	GetSchemaFunc           func() *descope.FGASchema
-	CheckFunc               func(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error)
-	CheckWithContextFunc    func(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error)
+	CheckFunc               func(ctx context.Context, relations []*descope.FGARelation, conditionsContext map[string]any) ([]*descope.FGACheck, error)
 	CreateFGARelationsFunc  func(ctx context.Context, relations []*descope.FGARelation) error
 	CreateFGASchemaFunc     func(ctx context.Context, dsl string) error
 	DeleteFGARelationsFunc  func(ctx context.Context, relations []*descope.FGARelation) error
-	WhoCanAccessFunc        func(ctx context.Context, resource, relationDefinition, namespace string, extraContext map[string]any) ([]string, error)
-	WhatCanTargetAccessFunc func(ctx context.Context, target string, extraContext map[string]any) ([]*descope.AuthzRelation, error)
+	WhoCanAccessFunc        func(ctx context.Context, resource, relationDefinition, namespace string, conditionsContext map[string]any) ([]string, error)
+	WhatCanTargetAccessFunc func(ctx context.Context, target string, conditionsContext map[string]any) ([]*descope.AuthzRelation, error)
 }
 
-func (a *AuthzCacheMock) Check(ctx context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
-	return a.CheckFunc(ctx, relations)
-}
-
-func (a *AuthzCacheMock) CheckWithContext(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error) {
-	if a.CheckWithContextFunc != nil {
-		return a.CheckWithContextFunc(ctx, relations, extraContext)
-	}
-	return a.CheckFunc(ctx, relations)
+func (a *AuthzCacheMock) Check(ctx context.Context, relations []*descope.FGARelation, conditionsContext map[string]any) ([]*descope.FGACheck, error) {
+	return a.CheckFunc(ctx, relations, conditionsContext)
 }
 
 func (a *AuthzCacheMock) CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error {
@@ -42,16 +34,16 @@ func (a *AuthzCacheMock) DeleteFGARelations(ctx context.Context, relations []*de
 	return a.DeleteFGARelationsFunc(ctx, relations)
 }
 
-func (a *AuthzCacheMock) WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string, extraContext map[string]any) ([]string, error) {
+func (a *AuthzCacheMock) WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string, conditionsContext map[string]any) ([]string, error) {
 	if a.WhoCanAccessFunc != nil {
-		return a.WhoCanAccessFunc(ctx, resource, relationDefinition, namespace, extraContext)
+		return a.WhoCanAccessFunc(ctx, resource, relationDefinition, namespace, conditionsContext)
 	}
 	return nil, nil
 }
 
-func (a *AuthzCacheMock) WhatCanTargetAccess(ctx context.Context, target string, extraContext map[string]any) ([]*descope.AuthzRelation, error) {
+func (a *AuthzCacheMock) WhatCanTargetAccess(ctx context.Context, target string, conditionsContext map[string]any) ([]*descope.AuthzRelation, error) {
 	if a.WhatCanTargetAccessFunc != nil {
-		return a.WhatCanTargetAccessFunc(ctx, target, extraContext)
+		return a.WhatCanTargetAccessFunc(ctx, target, conditionsContext)
 	}
 	return nil, nil
 }

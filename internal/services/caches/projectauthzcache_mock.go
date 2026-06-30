@@ -11,12 +11,12 @@ var _ ProjectAuthzCache = &ProjectAuthzCacheMock{} // ensure ProjectAuthzCacheMo
 type ProjectAuthzCacheMock struct {
 	GetSchemaFunc                       func() *descope.FGASchema
 	CheckRelationFunc                   func(ctx context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool)
-	CheckRelationsFunc                  func(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck)
+	CheckRelationsFunc                  func(ctx context.Context, relations []*descope.FGARelation, conditionsContext map[string]any) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck)
 	UpdateCacheWithSchemaFunc           func(ctx context.Context, schema *descope.FGASchema)
 	EnsureSchemaLoadedFunc              func(ctx context.Context, schema *descope.FGASchema)
 	UpdateCacheWithAddedRelationsFunc   func(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithDeletedRelationsFunc func(ctx context.Context, relations []*descope.FGARelation)
-	UpdateCacheWithChecksFunc           func(ctx context.Context, sdkChecks []*descope.FGACheck, extraContext map[string]any)
+	UpdateCacheWithChecksFunc           func(ctx context.Context, sdkChecks []*descope.FGACheck, conditionsContext map[string]any)
 	StartRemoteChangesPollingFunc       func(ctx context.Context)
 	GetWhoCanAccessCachedFunc           func(ctx context.Context, resource, relationDefinition, namespace string) ([]string, bool)
 	SetWhoCanAccessCachedFunc           func(ctx context.Context, resource, relationDefinition, namespace string, targets []string)
@@ -32,9 +32,9 @@ func (m *ProjectAuthzCacheMock) GetSchema() *descope.FGASchema {
 	return nil
 }
 
-func (m *ProjectAuthzCacheMock) CheckRelations(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, []*descope.FGARelation, map[int]*descope.FGACheck) {
+func (m *ProjectAuthzCacheMock) CheckRelations(ctx context.Context, relations []*descope.FGARelation, conditionsContext map[string]any) ([]*descope.FGACheck, []*descope.FGARelation, map[int]*descope.FGACheck) {
 	if m.CheckRelationsFunc != nil {
-		return m.CheckRelationsFunc(ctx, relations, extraContext)
+		return m.CheckRelationsFunc(ctx, relations, conditionsContext)
 	}
 	// default: delegate to CheckRelationFunc for backwards compatibility
 	indexToCheck := make(map[int]*descope.FGACheck, len(relations))
@@ -70,8 +70,8 @@ func (m *ProjectAuthzCacheMock) UpdateCacheWithDeletedRelations(ctx context.Cont
 	m.UpdateCacheWithDeletedRelationsFunc(ctx, relations)
 }
 
-func (m *ProjectAuthzCacheMock) UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck, extraContext map[string]any) {
-	m.UpdateCacheWithChecksFunc(ctx, sdkChecks, extraContext)
+func (m *ProjectAuthzCacheMock) UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck, conditionsContext map[string]any) {
+	m.UpdateCacheWithChecksFunc(ctx, sdkChecks, conditionsContext)
 }
 
 func (m *ProjectAuthzCacheMock) StartRemoteChangesPolling(ctx context.Context) {

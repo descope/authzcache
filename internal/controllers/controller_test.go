@@ -129,7 +129,7 @@ func TestCheck(t *testing.T) {
 	tuples := []*authzv1.Tuple{
 		{Resource: "testR", Target: "testT", ResourceType: "testRT", Relation: "testRel", TargetType: "testTT"},
 	}
-	mockAuthzCache.CheckFunc = func(_ context.Context, relations []*descope.FGARelation) ([]*descope.FGACheck, error) {
+	mockAuthzCache.CheckFunc = func(_ context.Context, relations []*descope.FGARelation, _ map[string]any) ([]*descope.FGACheck, error) {
 		require.Equal(t, 1, len(relations))
 		require.Equal(t, tuples[0].Resource, relations[0].Resource)
 		require.Equal(t, tuples[0].Target, relations[0].Target)
@@ -160,7 +160,7 @@ func TestCheck(t *testing.T) {
 
 func TestCheckError(t *testing.T) {
 	controller, mockAuthzCache := setup()
-	mockAuthzCache.CheckFunc = func(_ context.Context, _ []*descope.FGARelation) ([]*descope.FGACheck, error) {
+	mockAuthzCache.CheckFunc = func(_ context.Context, _ []*descope.FGARelation, _ map[string]any) ([]*descope.FGACheck, error) {
 		return nil, assert.AnError
 	}
 
@@ -259,8 +259,8 @@ func TestCheckWithContextForwarding(t *testing.T) {
 	}
 	wantCtx := map[string]any{"role": "admin"}
 	var gotCtx map[string]any
-	mockAuthzCache.CheckWithContextFunc = func(_ context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error) {
-		gotCtx = extraContext
+	mockAuthzCache.CheckFunc = func(_ context.Context, relations []*descope.FGARelation, conditionsContext map[string]any) ([]*descope.FGACheck, error) {
+		gotCtx = conditionsContext
 		return []*descope.FGACheck{
 			{Allowed: true, Relation: relations[0], Info: &descope.FGACheckInfo{Direct: true}},
 		}, nil
@@ -279,7 +279,7 @@ func TestCheckResponseInfoConditionalFields(t *testing.T) {
 	tuples := []*authzv1.Tuple{
 		{Resource: "testR", Target: "testT", ResourceType: "testRT", Relation: "testRel", TargetType: "testTT"},
 	}
-	mockAuthzCache.CheckWithContextFunc = func(_ context.Context, relations []*descope.FGARelation, _ map[string]any) ([]*descope.FGACheck, error) {
+	mockAuthzCache.CheckFunc = func(_ context.Context, relations []*descope.FGARelation, _ map[string]any) ([]*descope.FGACheck, error) {
 		return []*descope.FGACheck{
 			{
 				Allowed:  false,
