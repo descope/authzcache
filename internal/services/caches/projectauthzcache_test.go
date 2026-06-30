@@ -1275,6 +1275,26 @@ func TestConditionalRelationCaching_SkipsSchemaVersionMismatch(t *testing.T) {
 	assert.Len(t, unchecked, 1)
 }
 
+func TestConditionalRelationCaching_SkipsEmptyCertificate(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	adminCtx := map[string]any{"role": "admin"}
+
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
+	ver := cache.loadedSchemaVersion
+	// a conditional result with no true/false condition IDs (e.g. the schema changed between evaluation and
+	// response build, so the backend couldn't map the deciding conditions) carries an empty certificate — it
+	// must not be cached, else a later request would be served a grant with nothing to re-verify.
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: ver}},
+	}, adminCtx)
+
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
+	assert.Empty(t, checks, "a conditional result with an empty certificate (no true/false conditions) must not be cached")
+	assert.Len(t, unchecked, 1)
+}
+
 func TestLookupCaching_Caches(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)
