@@ -71,7 +71,7 @@ type projectAuthzCache struct {
 	// conditionalRelationCache: resource:target:relation -> certificate; served only while its conditions re-evaluate the same at the edge (never fact-gated).
 	conditionalRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, *conditionalCert]
 	compiledConditions       map[int32]*edgecel.CompiledCondition                 // condition ID -> compiled CEL program, from the loaded schema
-	loadedSchemaVersion      int32                                                // version of the loaded schema; certs from a Check with a different version are not cached
+	loadedSchemaVersion      string                                               // version of the loaded schema; certs from a Check with a different version are not cached
 	celEvalTimeout           time.Duration                                        // wall-clock backstop per condition evaluation
 	lookupCache              *lru.MonitoredLRUCache[lookupKey, *LookupCacheEntry] // lookup cache for WhoCanAccess/WhatCanTargetAccess
 	lookupCacheEnabled       bool
@@ -237,11 +237,11 @@ func (pc *projectAuthzCache) EnsureSchemaLoaded(ctx context.Context, schema *des
 func (pc *projectAuthzCache) setSchema(ctx context.Context, schema *descope.FGASchema) {
 	pc.schemaCache = schema
 	pc.compiledConditions = nil
-	pc.loadedSchemaVersion = 0
+	pc.loadedSchemaVersion = ""
 	if schema == nil {
 		return
 	}
-	// the backend's monotonic schema version; the guard in UpdateCacheWithChecks only caches a result whose
+	// the backend's unique schema version; the guard in UpdateCacheWithChecks only caches a result whose
 	// Check response carried this same version, so the condition IDs map to the conditions we compiled.
 	pc.loadedSchemaVersion = schema.Version
 	compiled := make(map[int32]*edgecel.CompiledCondition, len(schema.Conditions))

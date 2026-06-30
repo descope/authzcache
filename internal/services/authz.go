@@ -142,23 +142,18 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	return result, nil
 }
 
-// ensureSchemaLoaded lazily loads the schema (and its compiled conditions) into the project cache
-// when absent — on first use and after a remote schema change purged it. Best-effort: a load failure
-// is logged and leaves the cache without conditions, which is safe (conditional grants simply won't
-// be cached until the next successful load).
 func (a *authzCache) ensureSchemaLoaded(ctx context.Context, projectCache caches.ProjectAuthzCache, mgmtSDK sdk.Management) {
 	if projectCache.GetSchema() != nil {
 		return
 	}
 	schema, err := mgmtSDK.FGA().LoadSchema(ctx)
 	if err != nil {
-		cctx.Logger(ctx).Warn().Err(err).Msg("Failed to load FGA schema for edge condition handling")
+		cctx.Logger(ctx).Warn().Err(err).Msg("Failed to load FGA schema in ensureSchemaLoaded")
 		return // notest
 	}
 	projectCache.EnsureSchemaLoaded(ctx, schema)
 }
 
-// hasCacheableConditional reports whether any check is a cleanly-evaluated CEL grant/denial with recorded conditions — the only cacheable conditionals.
 func hasCacheableConditional(checks []*descope.FGACheck) bool {
 	for _, c := range checks {
 		if c.Info.Conditional && !c.Info.FactUsed && len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" &&
