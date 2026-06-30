@@ -26,21 +26,14 @@ type CompiledCondition struct {
 }
 
 // Compile builds an executable program from the backend's type-checked CEL program (CheckedExpr). The
-// edge does not parse or type-check the expression — it runs the backend's checked AST in an env that
-// declares the same custom functions/types and per-param variables, so the program matches the backend.
+// edge does not parse or type-check the expression — it runs the backend's checked AST in an env with the
+// shared custom functions/types (EnvOptions). Param variables need no declaration: their types are baked
+// into the checked program and their values come from the request context at Eval time.
 func Compile(c *descope.FGACondition) (*CompiledCondition, error) {
 	if len(c.CheckedExpr) == 0 {
 		return nil, fmt.Errorf("condition %q has no checked expression", c.Name)
 	}
-	opts := celtypes.EnvOptions()
-	for _, p := range c.Params {
-		t, err := celtypes.DSLTypeToCEL(p.Type)
-		if err != nil {
-			return nil, err
-		}
-		opts = append(opts, cel.Variable(p.Name, t))
-	}
-	env, err := cel.NewEnv(opts...)
+	env, err := cel.NewEnv(celtypes.EnvOptions()...)
 	if err != nil {
 		return nil, err
 	}

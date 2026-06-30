@@ -23,9 +23,7 @@ func mustCheckedCond(t *testing.T, name string, params []*descope.FGAConditionPa
 	t.Helper()
 	opts := celtypes.EnvOptions()
 	for _, p := range params {
-		ct, err := celtypes.DSLTypeToCEL(p.Type)
-		require.NoError(t, err)
-		opts = append(opts, cel.Variable(p.Name, ct))
+		opts = append(opts, cel.Variable(p.Name, celType(p.Type)))
 	}
 	env, err := cel.NewEnv(opts...)
 	require.NoError(t, err)
@@ -103,11 +101,16 @@ func TestCompileRejectsMissingCheckedExpr(t *testing.T) {
 	require.Error(t, err, "a condition with no checked expression must not compile")
 }
 
-func TestCompileUnknownParamType(t *testing.T) {
-	_, err := edgecel.Compile(&descope.FGACondition{
-		Name:        "weird",
-		Params:      []*descope.FGAConditionParam{{Name: "x", Type: "nonexistent"}},
-		CheckedExpr: []byte("x"), // non-empty so Compile reaches the param-type mapping
-	})
-	require.Error(t, err)
+// celType maps the DSL param types these tests use to their cel.Type, mirroring what the backend's
+// type-checker applies when producing the CheckedExpr. The backend's DSLTypeToCEL is internal; the edge
+// no longer maps types — it runs the already-checked program — so the fixture maps them itself.
+func celType(dslType string) *cel.Type {
+	switch dslType {
+	case "int":
+		return cel.IntType
+	case celtypes.IPAddressTypeName:
+		return celtypes.IPAddressType
+	default:
+		return cel.StringType
+	}
 }

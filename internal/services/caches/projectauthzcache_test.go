@@ -1130,9 +1130,7 @@ func updateBothCachesWithChecks(ctx context.Context, t *testing.T, cache *projec
 // program the edge runs — built the same way the backend ships it.
 func isAdminSchema(t *testing.T) *descope.FGASchema {
 	t.Helper()
-	ct, err := celtypes.DSLTypeToCEL("string")
-	require.NoError(t, err)
-	env, err := cel.NewEnv(append(celtypes.EnvOptions(), cel.Variable("role", ct))...)
+	env, err := cel.NewEnv(append(celtypes.EnvOptions(), cel.Variable("role", cel.StringType))...)
 	require.NoError(t, err)
 	ast, iss := env.Compile(`role == "admin"`)
 	require.NoError(t, iss.Err())
