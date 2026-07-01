@@ -881,8 +881,8 @@ func TestDirectIndices(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)
 	// add 2 direct relations
-	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"}, true)
-	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"}, true)
+	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"}, &cachedGrant{allowed: true})
+	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"}, &cachedGrant{allowed: true})
 	// assert all indices created and added
 	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t1"], key(&descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})))
 	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t2"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
@@ -920,15 +920,15 @@ func TestRemoveIndexOnEviction(t *testing.T) {
 	t.Setenv(config.ConfigKeyDirectRelationCacheSizePerProject, "2")
 	cache, _ := setup(t)
 	// add 2 direct relations
-	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"}, true)
-	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"}, true)
+	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"}, &cachedGrant{allowed: true})
+	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"}, &cachedGrant{allowed: true})
 	// assert all indices created and added
 	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t1"], key(&descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})))
 	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t2"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
 	assert.True(t, slices.Contains(cache.directTargetsIndex["t1"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})))
 	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
 	// add 3rd relation (this should trigger an eviction)
-	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"}, true)
+	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"}, &cachedGrant{allowed: true})
 	// assert that the 1st relation was evicted from the cache and the indices
 	_, _, ok := checkRelation(ctx, cache, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})
 	assert.False(t, ok)
@@ -956,15 +956,15 @@ func TestRemoveIndexOnEviction_ColonInIDs(t *testing.T) {
 	r1 := &descope.FGARelation{Resource: "org:r1", Target: "user:t1", Relation: "owner"}
 	r2 := &descope.FGARelation{Resource: "org:r1", Target: "user:t2", Relation: "owner"}
 	r3 := &descope.FGARelation{Resource: "org:r1", Target: "user:t3", Relation: "owner"}
-	cache.addDirectRelation(ctx, r1, true)
-	cache.addDirectRelation(ctx, r2, true)
+	cache.addDirectRelation(ctx, r1, &cachedGrant{allowed: true})
+	cache.addDirectRelation(ctx, r2, &cachedGrant{allowed: true})
 	// assert all indices created and added
 	assert.True(t, slices.Contains(cache.directResourcesIndex["org:r1"]["user:t1"], key(r1)))
 	assert.True(t, slices.Contains(cache.directResourcesIndex["org:r1"]["user:t2"], key(r2)))
 	assert.True(t, slices.Contains(cache.directTargetsIndex["user:t1"]["org:r1"], key(r1)))
 	assert.True(t, slices.Contains(cache.directTargetsIndex["user:t2"]["org:r1"], key(r2)))
 	// add 3rd relation (triggers eviction of r1)
-	cache.addDirectRelation(ctx, r3, true)
+	cache.addDirectRelation(ctx, r3, &cachedGrant{allowed: true})
 	// assert that r1 was evicted from the cache and indices (no orphaned entries)
 	_, _, ok := checkRelation(ctx, cache, r1)
 	assert.False(t, ok)
@@ -1187,6 +1187,35 @@ func TestConditionalRelationCaching_PerContext(t *testing.T) {
 		assert.Empty(t, checks, "IsAdmin now evaluates false, so the cached grant must not be reused")
 		assert.Len(t, unchecked, 1)
 	})
+}
+
+func TestConditionalRelationCaching_DirectConditionalSurvivesIndirectPurge(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	adminCtx := map[string]any{"role": "admin"}
+	directRel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
+	indirectRel := &descope.FGARelation{Resource: "doc2", ResourceType: "doc", Relation: "viewer", Target: "u2", TargetType: "user"}
+
+	cache.UpdateCacheWithSchema(ctx, isAdminSchema(t))
+	ver := cache.loadedSchemaVersion
+	// a direct-conditional grant (depends only on the condition value) and an indirect-conditional grant
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: directRel, Info: &descope.FGACheckInfo{Direct: true, Conditional: true, SchemaVersion: ver, TrueConditions: []int32{1}}},
+		{Allowed: true, Relation: indirectRel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: ver, TrueConditions: []int32{1}}},
+	}, adminCtx)
+
+	// adding a relation purges the indirect cache (the graph changed); direct-conditional grants must survive it
+	cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{{Resource: "grp", Target: "x", Relation: "member", ResourceType: "group"}})
+
+	_, unchecked, idx := cache.CheckRelations(ctx, []*descope.FGARelation{directRel}, adminCtx)
+	assert.Empty(t, unchecked, "direct-conditional grant is graph-independent and must survive an indirect purge")
+	require.Contains(t, idx, 0)
+	assert.True(t, idx[0].Allowed)
+	assert.True(t, idx[0].Info.Conditional)
+
+	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{indirectRel}, adminCtx)
+	assert.Empty(t, checks, "indirect-conditional grant depends on the graph and must be purged")
+	assert.Len(t, unchecked, 1)
 }
 
 func TestConditionalRelationCaching_CachesDenials(t *testing.T) {

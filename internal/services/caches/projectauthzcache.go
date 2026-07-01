@@ -53,26 +53,33 @@ type LookupCacheEntry struct {
 	ExpiresAt time.Time
 }
 
-// conditionalCert is a cached Check result plus the condition IDs that evaluated true/false (raw, pre-NOT)
-// to produce it;
+// conditionalCert holds the condition IDs that evaluated true/false (raw, pre-NOT) on the deciding path;
+// a conditional grant stays cacheable while each still re-evaluates to its recorded bucket.
 type conditionalCert struct {
-	allowed    bool
 	trueConds  []int32
 	falseConds []int32
 }
 
+// cachedGrant is a cached Check decision. cond == nil is an unconditional grant; cond != nil is a
+// conditional grant, served only while its certificate re-evaluates against the request context.
+// Conditional grants live in whichever cache (direct/indirect) matches their resolution: a direct
+// conditional grant depends only on the condition value, so it survives indirect (graph) purges.
+type cachedGrant struct {
+	allowed bool
+	cond    *conditionalCert
+}
+
 type projectAuthzCache struct {
-	schemaCache           *descope.FGASchema                                   // schema
-	directRelationCache   *lru.MonitoredLRUCache[resourceTargetRelation, bool] // resource:target:relation -> bool, e.g. file1:user2:owner -> false
+	schemaCache           *descope.FGASchema                                           // schema
+	directRelationCache   *lru.MonitoredLRUCache[resourceTargetRelation, *cachedGrant] // resource:target:relation -> grant, e.g. file1:user2:owner
 	directResourcesIndex  map[resource]map[target][]resourceTargetRelation
 	directTargetsIndex    map[target]map[resource][]resourceTargetRelation
 	directKeyComponents   map[resourceTargetRelation]keyComponents
-	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, bool] // resource:target:relation -> bool, e.g. file1:user2:owner -> false
+	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, *cachedGrant] // resource:target:relation -> grant
 
-	conditionalRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, *conditionalCert] // conditionalRelationCache: resource:target:relation -> certificate
-	compiledConditions       map[int32]*edgecel.CompiledCondition                             // condition ID -> compiled CEL program, from the loaded schema
-	loadedSchemaVersion      string
-	celEvalTimeout           time.Duration
+	compiledConditions  map[int32]*edgecel.CompiledCondition // condition ID -> compiled CEL program, from the loaded schema
+	loadedSchemaVersion string
+	celEvalTimeout      time.Duration
 
 	lookupCache          *lru.MonitoredLRUCache[lookupKey, *LookupCacheEntry] // lookup cache for WhoCanAccess/WhatCanTargetAccess
 	lookupCacheEnabled   bool
@@ -103,12 +110,7 @@ type ProjectAuthzCache interface {
 var _ ProjectAuthzCache = &projectAuthzCache{} // ensure projectAuthzCache implements ProjectAuthzCache
 
 func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChangesChecker) (ProjectAuthzCache, error) {
-	indirectRelationCache, err := lru.New[resourceTargetRelation, bool](config.GetIndirectRelationCacheSizePerProject(), "authz-indirect-relations-"+cctx.ProjectID(ctx))
-	if err != nil {
-		return nil, err // notest
-	}
-	// conditional results are cached per tuple (with the condition values that produced them); size them alongside indirect results
-	conditionalRelationCache, err := lru.New[resourceTargetRelation, *conditionalCert](config.GetIndirectRelationCacheSizePerProject(), "authz-conditional-relations-"+cctx.ProjectID(ctx))
+	indirectRelationCache, err := lru.New[resourceTargetRelation, *cachedGrant](config.GetIndirectRelationCacheSizePerProject(), "authz-indirect-relations-"+cctx.ProjectID(ctx))
 	if err != nil {
 		return nil, err // notest
 	}
@@ -121,16 +123,15 @@ func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChange
 		}
 	}
 	pc := &projectAuthzCache{
-		directResourcesIndex:     make(map[resource]map[target][]resourceTargetRelation),
-		directTargetsIndex:       make(map[target]map[resource][]resourceTargetRelation),
-		directKeyComponents:      make(map[resourceTargetRelation]keyComponents),
-		indirectRelationCache:    indirectRelationCache,
-		conditionalRelationCache: conditionalRelationCache,
-		celEvalTimeout:           time.Millisecond * time.Duration(config.GetCELEvalTimeoutInMillis()),
-		lookupCache:              lookupCache,
-		lookupCacheEnabled:       lookupCacheEnabled,
-		lookupCacheTTL:           time.Second * time.Duration(config.GetLookupCacheTTLInSeconds()),
-		lookupCacheMaxResult:     config.GetLookupCacheMaxResultSize(),
+		directResourcesIndex:  make(map[resource]map[target][]resourceTargetRelation),
+		directTargetsIndex:    make(map[target]map[resource][]resourceTargetRelation),
+		directKeyComponents:   make(map[resourceTargetRelation]keyComponents),
+		indirectRelationCache: indirectRelationCache,
+		celEvalTimeout:        time.Millisecond * time.Duration(config.GetCELEvalTimeoutInMillis()),
+		lookupCache:           lookupCache,
+		lookupCacheEnabled:    lookupCacheEnabled,
+		lookupCacheTTL:        time.Second * time.Duration(config.GetLookupCacheTTLInSeconds()),
+		lookupCacheMaxResult:  config.GetLookupCacheMaxResultSize(),
 		remoteChanges: &remoteChangesTracking{
 			lastPollTime:          time.Now(),
 			remote:                remoteChangesChecker,
@@ -138,7 +139,7 @@ func NewProjectAuthzCache(ctx context.Context, remoteChangesChecker RemoteChange
 			purgeCooldownWindow:   time.Minute * time.Duration(config.GetPurgeCooldownWindowInMinutes()),
 		},
 	}
-	directRelationCache, err := lru.NewWithEvict[resourceTargetRelation, bool](config.GetDirectRelationCacheSizePerProject(), "authz-direct-relations-"+cctx.ProjectID(ctx), pc.removeIndexOnCacheEviction)
+	directRelationCache, err := lru.NewWithEvict[resourceTargetRelation, *cachedGrant](config.GetDirectRelationCacheSizePerProject(), "authz-direct-relations-"+cctx.ProjectID(ctx), pc.removeIndexOnCacheEviction)
 	if err != nil {
 		return nil, err // notest
 	}
@@ -168,24 +169,40 @@ func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*de
 	pc.mutex.RLock()
 	defer pc.mutex.RUnlock()
 	for i, r := range relations {
-		if allowed, ok := pc.checkDirectRelation(ctx, r); ok {
-			check := &descope.FGACheck{Allowed: allowed, Relation: r, Info: &descope.FGACheckInfo{Direct: true}}
-			checks = append(checks, check)
-			indexToCheck[i] = check
-		} else if allowed, ok := pc.checkIndirectRelation(ctx, r); ok {
-			check := &descope.FGACheck{Allowed: allowed, Relation: r, Info: &descope.FGACheckInfo{Direct: false}}
-			checks = append(checks, check)
-			indexToCheck[i] = check
-		} else if cert, ok := pc.conditionalRelationCache.Get(ctx, key(r)); ok && pc.certMatches(ctx, cert, extraContext) {
-			// cached conditional result whose conditions all still re-evaluate to their recorded values — safe to serve
-			check := &descope.FGACheck{Allowed: cert.allowed, Relation: r, Info: &descope.FGACheckInfo{Conditional: true}}
-			checks = append(checks, check)
-			indexToCheck[i] = check
-		} else {
+		grant, direct, ok := pc.lookupRelation(ctx, r)
+		if !ok {
 			unchecked = append(unchecked, r)
+			continue
 		}
+		var check *descope.FGACheck
+		if grant.cond == nil {
+			// unconditional grant (direct or indirect)
+			check = &descope.FGACheck{Allowed: grant.allowed, Relation: r, Info: &descope.FGACheckInfo{Direct: direct}}
+		} else if pc.certMatches(ctx, grant.cond, extraContext) {
+			// conditional grant whose conditions all still re-evaluate to their recorded values — safe to serve
+			check = &descope.FGACheck{Allowed: grant.allowed, Relation: r, Info: &descope.FGACheckInfo{Conditional: true}}
+		} else {
+			// cached conditional grant no longer matches this request's context — needs a fresh Check
+			unchecked = append(unchecked, r)
+			continue
+		}
+		checks = append(checks, check)
+		indexToCheck[i] = check
 	}
 	return
+}
+
+// lookupRelation returns the cached grant for r, preferring the direct cache over the indirect cache.
+// The second return reports whether the hit was a direct grant.
+func (pc *projectAuthzCache) lookupRelation(ctx context.Context, r *descope.FGARelation) (grant *cachedGrant, direct bool, ok bool) {
+	k := key(r)
+	if grant, ok := pc.directRelationCache.Get(ctx, k); ok {
+		return grant, true, true
+	}
+	if grant, ok := pc.indirectRelationCache.Get(ctx, k); ok {
+		return grant, false, true
+	}
+	return nil, false, false
 }
 
 func (pc *projectAuthzCache) certMatches(ctx context.Context, cert *conditionalCert, extraContext map[string]any) bool {
@@ -255,11 +272,10 @@ func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, 
 	}
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
-	// A new relation can change indirect and conditional results, so invalidate them. Direct entries are
-	// populated lazily from Check results — a created tuple may sit on a conditional relation, so it isn't
-	// necessarily an unconditional grant.
+	// A new relation can change indirect results (incl. indirect-conditional grants, which live in the
+	// indirect cache), so invalidate them. Direct entries — including direct-conditional grants, which
+	// depend only on the condition value, not the graph — are left intact and re-verified on read.
 	pc.indirectRelationCache.Purge(ctx)
-	pc.conditionalRelationCache.Purge(ctx)
 	// Lookup cache is not purged: the new relation is added to existing entries incrementally; candidate
 	// filtering re-verifies each via Check and TTL bounds staleness (as in main).
 	for _, r := range relations {
@@ -273,9 +289,9 @@ func (pc *projectAuthzCache) UpdateCacheWithDeletedRelations(ctx context.Context
 	}
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
-	pc.indirectRelationCache.Purge(ctx)    // deleted (direct) relations can change the result of indirect checks, so we must purge all indirect relations
-	pc.conditionalRelationCache.Purge(ctx) // a relation change can also flip a conditional grant's resolution path
-	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation
+	pc.indirectRelationCache.Purge(ctx) // deleted relations can change indirect results (incl. indirect-conditional grants), so purge them all
+	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation.
+	// Direct entries (incl. direct-conditional) are graph-independent; only the deleted tuples' own direct entries are removed.
 	for _, r := range relations {
 		pc.removeDirectRelation(ctx, r)
 	}
@@ -288,23 +304,29 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
 	for _, c := range sdkChecks {
-		switch {
-		case c.Info.FactUsed:
+		if c.Info.FactUsed {
 			// fact-involved results depend on mutable backend state the edge can't observe — never cache
 			continue
-		case c.Info.Conditional:
-			if c.Info.SchemaVersion != pc.loadedSchemaVersion {
+		}
+		grant := &cachedGrant{allowed: c.Allowed}
+		if c.Info.Conditional {
+			// only cache a conditional grant whose certificate we can re-verify at the edge: same schema
+			// version, non-empty, fully compiled, and a complete/clean eval (no missing context or error)
+			if c.Info.SchemaVersion != pc.loadedSchemaVersion ||
+				len(c.Info.MissingContext) != 0 || c.Info.ConditionalErr != "" ||
+				(len(c.Info.TrueConditions) == 0 && len(c.Info.FalseConditions) == 0) ||
+				!pc.hasAllCompiledConditions(c.Info.TrueConditions) || !pc.hasAllCompiledConditions(c.Info.FalseConditions) {
 				continue
 			}
-			// cache the result (allow or deny) as a certificate; skip incomplete/errored evals and any condition not compiled at the edge
-			if len(c.Info.MissingContext) == 0 && c.Info.ConditionalErr == "" && (len(c.Info.TrueConditions) > 0 || len(c.Info.FalseConditions) > 0) &&
-				pc.hasAllCompiledConditions(c.Info.TrueConditions) && pc.hasAllCompiledConditions(c.Info.FalseConditions) {
-				pc.conditionalRelationCache.Add(ctx, key(c.Relation), &conditionalCert{allowed: c.Allowed, trueConds: c.Info.TrueConditions, falseConds: c.Info.FalseConditions})
-			}
-		case c.Info.Direct:
-			pc.addDirectRelation(ctx, c.Relation, c.Allowed)
-		default:
-			pc.addIndirectRelation(ctx, c.Relation, c.Allowed)
+			grant.cond = &conditionalCert{trueConds: c.Info.TrueConditions, falseConds: c.Info.FalseConditions}
+		}
+		// Route by resolution: direct grants (incl. direct-conditional, which depend only on the condition
+		// value, not the graph) go to the direct cache so they survive indirect purges; the rest go to the
+		// indirect cache, which is purged on any relation change.
+		if c.Info.Direct {
+			pc.addDirectRelation(ctx, c.Relation, grant)
+		} else {
+			pc.addIndirectRelation(ctx, c.Relation, grant)
 		}
 	}
 }
@@ -338,7 +360,7 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
 	// in case of no cached relations, we skip the server call but invalidate the schema cache to make sure we don't miss schema changes
-	if noRelations := pc.directRelationCache.Len(ctx) == 0 && pc.indirectRelationCache.Len(ctx) == 0 && pc.conditionalRelationCache.Len(ctx) == 0; noRelations {
+	if noRelations := pc.directRelationCache.Len(ctx) == 0 && pc.indirectRelationCache.Len(ctx) == 0; noRelations {
 		pc.remoteChanges.lastPollTime = time.Now()
 		pc.schemaCache = nil
 		cctx.Logger(ctx).Debug().Msg("No cached relations, skipping remote changes check")
@@ -372,9 +394,9 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 		return
 	}
 	cctx.Logger(ctx).Debug().Msg(fmt.Sprintf("Remote changes found, Resources: %v, Targets: %v, updating caches", remoteChanges.Resources, remoteChanges.Targets))
-	pc.indirectRelationCache.Purge(ctx)
-	pc.conditionalRelationCache.Purge(ctx) // conditional grants depend on the (now-changed) relation graph, re-fetch them
-	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation
+	pc.indirectRelationCache.Purge(ctx) // remote relation changes can flip indirect results (incl. indirect-conditional grants), so purge them
+	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation.
+	// Direct-conditional grants are graph-independent; the changed resources/targets' direct entries are removed below.
 	for _, r := range remoteChanges.Resources {
 		pc.removeDirectRelationByResource(ctx, resource(r))
 	}
@@ -397,9 +419,9 @@ func (pc *projectAuthzCache) fetchRemoteChanges(ctx context.Context) (*descope.A
 	return remoteChanges, nil
 }
 
-func (pc *projectAuthzCache) addDirectRelation(ctx context.Context, r *descope.FGARelation, isAllowed bool) {
+func (pc *projectAuthzCache) addDirectRelation(ctx context.Context, r *descope.FGARelation, grant *cachedGrant) {
 	key := key(r)
-	pc.directRelationCache.Add(ctx, key, isAllowed)
+	pc.directRelationCache.Add(ctx, key, grant)
 	resource := resource(r.Resource)
 	target := target(r.Target)
 	pc.directKeyComponents[key] = keyComponents{r: resource, t: target}
@@ -423,9 +445,9 @@ func (pc *projectAuthzCache) addKeyToDirectTargetIndex(k resourceTargetRelation,
 	}
 }
 
-func (pc *projectAuthzCache) addIndirectRelation(ctx context.Context, r *descope.FGARelation, isAllowed bool) {
+func (pc *projectAuthzCache) addIndirectRelation(ctx context.Context, r *descope.FGARelation, grant *cachedGrant) {
 	key := key(r)
-	pc.indirectRelationCache.Add(ctx, key, isAllowed)
+	pc.indirectRelationCache.Add(ctx, key, grant)
 }
 
 func (pc *projectAuthzCache) removeDirectRelation(ctx context.Context, r *descope.FGARelation) {
@@ -498,27 +520,11 @@ func (pc *projectAuthzCache) removeKeyFromTargetIndex(r resource, t target, keyT
 	}
 }
 
-func (pc *projectAuthzCache) checkDirectRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
-	key := key(r)
-	if allowed, ok := pc.directRelationCache.Get(ctx, key); ok {
-		return allowed, true
-	}
-	return false, false
-}
-
-func (pc *projectAuthzCache) checkIndirectRelation(ctx context.Context, r *descope.FGARelation) (allowed bool, ok bool) {
-	key := key(r)
-	if allowed, ok := pc.indirectRelationCache.Get(ctx, key); ok {
-		return allowed, true
-	}
-	return false, false
-}
-
 func key(r *descope.FGARelation) resourceTargetRelation {
 	return resourceTargetRelation(r.Resource + ":" + r.Target + ":" + r.Relation)
 }
 
-func (pc *projectAuthzCache) removeIndexOnCacheEviction(key resourceTargetRelation, _ bool) {
+func (pc *projectAuthzCache) removeIndexOnCacheEviction(key resourceTargetRelation, _ *cachedGrant) {
 	// on eviction, we need to remove the keys from the indexes as well
 	components, ok := pc.directKeyComponents[key]
 	if !ok {
@@ -543,7 +549,6 @@ func (pc *projectAuthzCache) purgeRelationCaches(ctx context.Context) {
 	pc.directKeyComponents = make(map[resourceTargetRelation]keyComponents)
 	pc.directRelationCache.Purge(ctx)
 	pc.indirectRelationCache.Purge(ctx)
-	pc.conditionalRelationCache.Purge(ctx)
 	if pc.lookupCache != nil {
 		pc.lookupCache.Purge(ctx)
 	}
