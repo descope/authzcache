@@ -448,6 +448,22 @@ func TestWhatCanTargetAccess_CacheHitWithCandidateFiltering(t *testing.T) {
 	require.Equal(t, 3, checkCallCount)
 }
 
+func TestWhoCanAccess_EmptyCacheHitFallsBackToSDK(t *testing.T) {
+	ac, mockSDK, mockCache := injectAuthzMocks(t)
+	mockCache.GetWhoCanAccessCachedFunc = func(_ context.Context, _, _, _ string) ([]string, bool) {
+		return []string{}, true
+	}
+	mockCache.SetWhoCanAccessCachedFunc = func(_ context.Context, _, _, _ string, _ []string) {}
+	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (allowed bool, direct bool, ok bool) {
+		require.Fail(t, "should not check empty candidates")
+		return false, false, false
+	}
+	mockSDK.MockAuthz.WhoCanAccessResponse = []string{"user1"}
+	result, err := ac.WhoCanAccess(context.TODO(), "doc1", "viewer", "docs", nil)
+	require.NoError(t, err)
+	require.Equal(t, []string{"user1"}, result)
+}
+
 func TestWhoCanAccess_DirectRelationRemoved_FilteredImmediately(t *testing.T) {
 	ac, _, mockCache := injectAuthzMocks(t)
 	mockCache.GetWhoCanAccessCachedFunc = func(_ context.Context, _, _, _ string) ([]string, bool) {
@@ -853,4 +869,3 @@ func BenchmarkCheck(b *testing.B) {
 		})
 	}
 }
-
