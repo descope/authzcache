@@ -97,7 +97,7 @@ type ProjectAuthzCache interface {
 	EnsureSchemaLoaded(ctx context.Context, schema *descope.FGASchema)
 	UpdateCacheWithAddedRelations(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithDeletedRelations(ctx context.Context, relations []*descope.FGARelation)
-	UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck, extraContext map[string]any)
+	UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck)
 	StartRemoteChangesPolling(ctx context.Context)
 	// Lookup cache methods
 	GetWhoCanAccessCached(ctx context.Context, resource, relationDefinition, namespace string) (targets []string, ok bool)
@@ -289,7 +289,7 @@ func (pc *projectAuthzCache) UpdateCacheWithDeletedRelations(ctx context.Context
 	}
 }
 
-func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck, extraContext map[string]any) {
+func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck) {
 	if len(sdkChecks) == 0 {
 		return
 	}

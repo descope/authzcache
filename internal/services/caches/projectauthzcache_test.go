@@ -88,7 +88,7 @@ func TestUpdateCacheWithChecks(t *testing.T) {
 	directSize := cache.directRelationCache.Len(ctx)
 	indirectSize := cache.indirectRelationCache.Len(ctx)
 	for _, cr := range cachedRelations {
-		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: cr.allowed, Relation: cr.r, Info: &descope.FGACheckInfo{Direct: cr.direct}}}, nil)
+		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: cr.allowed, Relation: cr.r, Info: &descope.FGACheckInfo{Direct: cr.direct}}})
 		// validate CheckRelation after the 2nd update, should return the same results
 		allowed, direct, ok := checkRelation(ctx, cache, cr.r)
 		assert.True(t, ok)
@@ -203,7 +203,7 @@ func TestEmptyActions(t *testing.T) {
 	// perform empty updates
 	cache.UpdateCacheWithAddedRelations(ctx, nil)
 	cache.UpdateCacheWithDeletedRelations(ctx, nil)
-	cache.UpdateCacheWithChecks(ctx, nil, nil)
+	cache.UpdateCacheWithChecks(ctx, nil)
 	// cache should not change
 	assert.Equal(t, expectedDirectSize, cache.directRelationCache.Len(ctx))
 	assert.Equal(t, expectedIndirectSize, cache.indirectRelationCache.Len(ctx))
@@ -746,7 +746,7 @@ func TestCooldownMechanism_ConcurrentStressTest(t *testing.T) {
 							Relation: &descope.FGARelation{Resource: "r" + uuid.NewString(), Target: "t" + uuid.NewString(), Relation: "owner"},
 							Info:     &descope.FGACheckInfo{Direct: i%2 == 0},
 						},
-					}, nil)
+					})
 				case 6:
 					// get schema (read operation)
 					_ = cache.GetSchema()
@@ -831,7 +831,7 @@ func TestCooldownMechanism_ConcurrentPollingWithTimerExpiry(t *testing.T) {
 						Relation: &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: "owner"},
 						Info:     &descope.FGACheckInfo{Direct: true},
 					},
-				}, nil)
+				})
 				// trigger polling
 				cache.updateCacheWithRemotePolling(ctx)
 				// small sleep to allow timer callbacks to potentially fire
@@ -1082,7 +1082,7 @@ func populateLargeDirectCache(ctx context.Context) (*projectAuthzCache, []string
 	for i := 0; i < 1_000_000; i++ {
 		resources[i] = uuid.NewString()
 		targets[i] = uuid.NewString()
-		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: true, Relation: &descope.FGARelation{Resource: resources[i], Target: targets[i], Relation: "owner"}, Info: &descope.FGACheckInfo{Direct: true}}}, nil)
+		cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: true, Relation: &descope.FGARelation{Resource: resources[i], Target: targets[i], Relation: "owner"}, Info: &descope.FGACheckInfo{Direct: true}}})
 	}
 	return cache.(*projectAuthzCache), resources, targets
 }
@@ -1115,7 +1115,7 @@ func updateBothCachesWithChecks(ctx context.Context, t *testing.T, cache *projec
 		{Allowed: true, Relation: extraDirectTrueRelation, Info: &descope.FGACheckInfo{Direct: true}},
 		{Allowed: true, Relation: differentResourceAndTargetDirectTrueRelation, Info: &descope.FGACheckInfo{Direct: true}},
 	}
-	cache.UpdateCacheWithChecks(ctx, checks, nil)
+	cache.UpdateCacheWithChecks(ctx, checks)
 	// validate cache distribution
 	require.Equal(t, 4, cache.directRelationCache.Len(ctx))
 	require.Equal(t, 2, cache.indirectRelationCache.Len(ctx))
@@ -1163,7 +1163,7 @@ func TestConditionalRelationCaching_PerContext(t *testing.T) {
 	// backend allowed this tuple; cache it as a certificate of the conditions (by ID) that produced it
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: ver, TrueConditions: []int32{1}}},
-	}, adminCtx)
+	})
 
 	t.Run("same context - conditions still match, served from cache", func(t *testing.T) {
 		_, unchecked, idx := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
@@ -1202,7 +1202,7 @@ func TestConditionalRelationCaching_DirectConditionalSurvivesIndirectPurge(t *te
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: true, Relation: directRel, Info: &descope.FGACheckInfo{Direct: true, Conditional: true, SchemaVersion: ver, TrueConditions: []int32{1}}},
 		{Allowed: true, Relation: indirectRel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: ver, TrueConditions: []int32{1}}},
-	}, adminCtx)
+	})
 
 	// adding a relation purges the indirect cache (the graph changed); direct-conditional grants must survive it
 	cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{{Resource: "grp", Target: "x", Relation: "member", ResourceType: "group"}})
@@ -1229,7 +1229,7 @@ func TestConditionalRelationCaching_CachesDenials(t *testing.T) {
 	// a conditional denial is cached with its certificate too (IsAdmin evaluated false)
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: ver, FalseConditions: []int32{1}}},
-	}, userCtx)
+	})
 
 	_, unchecked, idx := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, userCtx)
 	assert.Empty(t, unchecked)
@@ -1248,7 +1248,7 @@ func TestConditionalRelationCaching_NeverCachesFactInvolved(t *testing.T) {
 	// even though the condition is compiled and complete, a fact participated → never cached
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, FactUsed: true, SchemaVersion: ver, TrueConditions: []int32{1}}},
-	}, adminCtx)
+	})
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
 	assert.Empty(t, checks, "fact-gated grants must never be cached")
@@ -1265,7 +1265,7 @@ func TestConditionalRelationCaching_SkipsIncompleteEval(t *testing.T) {
 	// partial evaluation (missing context var) is not cached even though the version matches
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: ver, MissingContext: []string{"role"}}},
-	}, nil)
+	})
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, nil)
 	assert.Empty(t, checks)
@@ -1282,7 +1282,7 @@ func TestConditionalRelationCaching_SkipsUncompiledCondition(t *testing.T) {
 	// at the edge → can't be re-verified, so it isn't cached
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, TrueConditions: []int32{1}}},
-	}, adminCtx)
+	})
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
 	assert.Empty(t, checks, "without a compiled condition the grant can't be re-verified, so it isn't cached")
@@ -1300,7 +1300,7 @@ func TestConditionalRelationCaching_SkipsSchemaVersionMismatch(t *testing.T) {
 	// conditions under that version (the guard against ID-scheme skew).
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: "v-other", TrueConditions: []int32{1}}},
-	}, adminCtx)
+	})
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
 	assert.Empty(t, checks, "a schema-version mismatch must prevent caching")
@@ -1320,7 +1320,7 @@ func TestConditionalRelationCaching_SkipsEmptyCertificate(t *testing.T) {
 	// must not be cached, else a later request would be served a grant with nothing to re-verify.
 	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
 		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true, SchemaVersion: ver}},
-	}, adminCtx)
+	})
 
 	checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel}, adminCtx)
 	assert.Empty(t, checks, "a conditional result with an empty certificate (no true/false conditions) must not be cached")

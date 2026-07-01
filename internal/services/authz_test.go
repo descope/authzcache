@@ -175,7 +175,7 @@ func TestCheckEmptyRelations(t *testing.T) {
 		require.Fail(t, "should not be called")
 		return false, false, false
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {
 		require.Fail(t, "should not be called")
 	}
 	// run test with nil relations
@@ -215,7 +215,7 @@ func TestCheckAllInCache(t *testing.T) {
 		}
 		return false, true, true
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {
 		require.Fail(t, "should not be called")
 	}
 	// run test
@@ -249,7 +249,7 @@ func TestCheckAllInSDK(t *testing.T) {
 		return false, false, false
 	}
 	mockSDK.MockFGA.CheckWithContextResponse = expected
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, checks []*descope.FGACheck, _ map[string]any) {
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, checks []*descope.FGACheck) {
 		require.Equal(t, expected, checks)
 	}
 	// run test
@@ -270,7 +270,7 @@ func TestCheckWithContextPassthrough(t *testing.T) {
 	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (bool, bool, bool) {
 		return false, false, false
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	mockSDK.MockFGA.CheckWithContextResponse = []*descope.FGACheck{
 		{Allowed: true, Relation: relations[0], Info: &descope.FGACheckInfo{Direct: true}},
 	}
@@ -318,7 +318,7 @@ func TestCheckMixed(t *testing.T) {
 	}
 	sdkChecks := []*descope.FGACheck{expected[0], expected[2]}
 	mockSDK.MockFGA.CheckWithContextResponse = sdkChecks
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, checks []*descope.FGACheck, _ map[string]any) {
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, checks []*descope.FGACheck) {
 		require.Equal(t, sdkChecks, checks) // only the checks returning from sdk should be updated in cache
 	}
 	// run test
@@ -367,7 +367,7 @@ func TestWhoCanAccess_CacheHitWithCandidateFiltering(t *testing.T) {
 		}
 		return true, true, true
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	mockSDK.MockAuthz.WhoCanAccessAssert = func(_, _, _ string) {
 		require.Fail(t, "should not call SDK on cache hit")
 	}
@@ -386,7 +386,7 @@ func TestWhoCanAccess_CacheHitFiltersStaleResults(t *testing.T) {
 	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (allowed bool, direct bool, ok bool) {
 		return r.Target == "user1" || r.Target == "user4", true, true
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	result, err := ac.WhoCanAccess(context.TODO(), "doc1", "viewer", "docs", nil)
 	require.NoError(t, err)
 	require.Equal(t, []string{"user1", "user4"}, result)
@@ -436,7 +436,7 @@ func TestWhatCanTargetAccess_CacheHitWithCandidateFiltering(t *testing.T) {
 		}
 		return true, true, true
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	mockSDK.MockAuthz.WhatCanTargetAccessAssert = func(_ string) {
 		require.Fail(t, "should not call SDK on cache hit")
 	}
@@ -459,7 +459,7 @@ func TestWhoCanAccess_DirectRelationRemoved_FilteredImmediately(t *testing.T) {
 		}
 		return true, true, true
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	result, err := ac.WhoCanAccess(context.TODO(), "doc1", "viewer", "docs", nil)
 	require.NoError(t, err)
 	require.Equal(t, []string{"user1", "user3"}, result)
@@ -476,7 +476,7 @@ func TestWhoCanAccess_IndirectRelationRemoved_FilteredImmediately(t *testing.T) 
 		}
 		return true, false, true
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	result, err := ac.WhoCanAccess(context.TODO(), "doc1", "viewer", "docs", nil)
 	require.NoError(t, err)
 	require.Equal(t, []string{"user1", "user3"}, result)
@@ -495,7 +495,7 @@ func TestWhoCanAccess_NewCandidateAddedViaLocalMutation_VisibleImmediately(t *te
 	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (allowed bool, direct bool, ok bool) {
 		return true, true, true
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	result1, err := ac.WhoCanAccess(context.TODO(), "doc1", "viewer", "docs", nil)
 	require.NoError(t, err)
 	require.Equal(t, []string{"user1", "user2"}, result1)
@@ -519,7 +519,7 @@ func TestWhatCanTargetAccess_DirectRelationRemoved_FilteredImmediately(t *testin
 		}
 		return true, true, true
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	result, err := ac.WhatCanTargetAccess(context.TODO(), "user1", nil)
 	require.NoError(t, err)
 	require.Len(t, result, 2)
@@ -541,7 +541,7 @@ func TestWhatCanTargetAccess_IndirectRelationRemoved_FilteredImmediately(t *test
 		}
 		return true, false, true
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	result, err := ac.WhatCanTargetAccess(context.TODO(), "user1", nil)
 	require.NoError(t, err)
 	require.Len(t, result, 1)
@@ -602,7 +602,7 @@ func TestWhoCanAccess_MetricsRecorded_CacheHit(t *testing.T) {
 	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (bool, bool, bool) {
 		return r.Target != "u2", true, true
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	_, err := ac.WhoCanAccess(ctx, "doc1", "viewer", "docs", nil)
 	require.NoError(t, err)
 	snapshot := collector.SnapshotAndReset()
@@ -657,7 +657,7 @@ func TestWhatCanTargetAccess_MetricsRecorded_CacheHit(t *testing.T) {
 	mockCache.CheckRelationFunc = func(_ context.Context, r *descope.FGARelation) (bool, bool, bool) {
 		return r.Resource != "doc2", true, true // doc2 filtered out
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	_, err := ac.WhatCanTargetAccess(ctx, "u1", nil)
 	require.NoError(t, err)
 	snapshot := collector.SnapshotAndReset()
@@ -685,7 +685,7 @@ func TestCheck_MetricsRecorded_FullCacheHit(t *testing.T) {
 	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (bool, bool, bool) {
 		return true, true, true
 	}
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {
 		require.Fail(t, "should not be called on full cache hit")
 	}
 	_, err := ac.Check(ctx, relations, nil)
@@ -716,7 +716,7 @@ func TestCheck_MetricsRecorded_FullCacheMiss(t *testing.T) {
 		return false, false, false
 	}
 	mockSDK.MockFGA.CheckWithContextResponse = sdkResponse
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	_, err := ac.Check(ctx, relations, nil)
 	require.NoError(t, err)
 	snapshot := collector.SnapshotAndReset()
@@ -749,7 +749,7 @@ func TestCheck_MetricsRecorded_PartialHit(t *testing.T) {
 		return false, false, false // not cached
 	}
 	mockSDK.MockFGA.CheckWithContextResponse = sdkResponse
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, _ map[string]any) {}
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck) {}
 	_, err := ac.Check(ctx, relations, nil)
 	require.NoError(t, err)
 	snapshot := collector.SnapshotAndReset()
@@ -790,7 +790,7 @@ func BenchmarkCheck(b *testing.B) {
 					Info:     &descope.FGACheckInfo{Direct: true},
 				}
 			}
-			projectCache.UpdateCacheWithChecks(ctx, cachedChecks, nil)
+			projectCache.UpdateCacheWithChecks(ctx, cachedChecks)
 			// SDK response for the miss half (fixed length, reused across goroutines)
 			missCount := numRelations - halfIdx
 			sdkResponse := make([]*descope.FGACheck, missCount)
@@ -854,25 +854,3 @@ func BenchmarkCheck(b *testing.B) {
 	}
 }
 
-func TestCheckWithContext_CachesByContextHash(t *testing.T) {
-	ac, mockSDK, mockCache := injectAuthzMocks(t)
-	rel := &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "viewer", Target: "u1", TargetType: "user"}
-	mockCache.CheckRelationsFunc = func(_ context.Context, rels []*descope.FGARelation, _ map[string]any) ([]*descope.FGACheck, []*descope.FGARelation, map[int]*descope.FGACheck) {
-		return nil, rels, map[int]*descope.FGACheck{}
-	}
-	mockSDK.MockFGA.CheckWithContextResponse = []*descope.FGACheck{
-		{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Conditional: true}},
-	}
-	// the request context must be forwarded to UpdateCacheWithChecks so it can key by context hash
-	var gotContext map[string]any
-	called := false
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, extraContext map[string]any) {
-		gotContext = extraContext
-		called = true
-	}
-
-	_, err := ac.Check(context.TODO(), []*descope.FGARelation{rel}, map[string]any{"role": "admin"})
-	require.NoError(t, err)
-	require.True(t, called)
-	require.Equal(t, map[string]any{"role": "admin"}, gotContext)
-}

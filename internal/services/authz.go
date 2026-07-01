@@ -125,7 +125,7 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	if hasCacheableConditional(sdkChecks) {
 		a.ensureSchemaLoaded(ctx, projectCache, mgmtSDK)
 	}
-	projectCache.UpdateCacheWithChecks(ctx, sdkChecks, extraContext)
+	projectCache.UpdateCacheWithChecks(ctx, sdkChecks)
 	// merge cached and sdk checks in the same order as input relations and return them
 	var result []*descope.FGACheck
 	var j int
