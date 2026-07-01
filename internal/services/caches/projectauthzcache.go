@@ -302,8 +302,6 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 		}
 		grant := &cachedGrant{allowed: c.Allowed}
 		if c.Info.Conditional {
-			// only cache a conditional grant whose certificate we can re-verify at the edge: same schema
-			// version, non-empty, fully compiled, and a complete/clean eval (no missing context or error)
 			if c.Info.SchemaVersion != pc.loadedSchemaVersion ||
 				len(c.Info.MissingContext) != 0 || c.Info.ConditionalErr != "" ||
 				(len(c.Info.TrueConditions) == 0 && len(c.Info.FalseConditions) == 0) ||
