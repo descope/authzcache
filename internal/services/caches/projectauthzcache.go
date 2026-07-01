@@ -60,27 +60,27 @@ type conditionalCert struct {
 	falseConds []int32
 }
 
-// cachedGrant is a cached Check decision. cond == nil is an unconditional grant; cond != nil is a
-// conditional grant, served only while its certificate re-evaluates against the request context.
-// Conditional grants live in whichever cache (direct/indirect) matches their resolution: a direct
-// conditional grant depends only on the condition value, so it survives indirect (graph) purges.
 type cachedGrant struct {
 	allowed bool
 	cond    *conditionalCert
 }
 
 type projectAuthzCache struct {
-	schemaCache           *descope.FGASchema                                           // schema
-	directRelationCache   *lru.MonitoredLRUCache[resourceTargetRelation, *cachedGrant] // resource:target:relation -> grant, e.g. file1:user2:owner
+	schemaCache *descope.FGASchema // schema
+
+	// relation caches
+	directRelationCache   *lru.MonitoredLRUCache[resourceTargetRelation, *cachedGrant]
 	directResourcesIndex  map[resource]map[target][]resourceTargetRelation
 	directTargetsIndex    map[target]map[resource][]resourceTargetRelation
 	directKeyComponents   map[resourceTargetRelation]keyComponents
-	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, *cachedGrant] // resource:target:relation -> grant
+	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, *cachedGrant]
 
+	// edge CEL evaluation
 	compiledConditions  map[int32]*edgecel.CompiledCondition // condition ID -> compiled CEL program, from the loaded schema
 	loadedSchemaVersion string
 	celEvalTimeout      time.Duration
 
+	// lookups
 	lookupCache          *lru.MonitoredLRUCache[lookupKey, *LookupCacheEntry] // lookup cache for WhoCanAccess/WhatCanTargetAccess
 	lookupCacheEnabled   bool
 	lookupCacheTTL       time.Duration
@@ -169,7 +169,7 @@ func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*de
 	pc.mutex.RLock()
 	defer pc.mutex.RUnlock()
 	for i, r := range relations {
-		grant, direct, ok := pc.lookupRelation(ctx, r)
+		grant, direct, ok := pc.getCachedGrant(ctx, r)
 		if !ok {
 			unchecked = append(unchecked, r)
 			continue
@@ -192,9 +192,9 @@ func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*de
 	return
 }
 
-// lookupRelation returns the cached grant for r, preferring the direct cache over the indirect cache.
+// getCachedGrant returns the cached grant for r, preferring the direct cache over the indirect cache.
 // The second return reports whether the hit was a direct grant.
-func (pc *projectAuthzCache) lookupRelation(ctx context.Context, r *descope.FGARelation) (grant *cachedGrant, direct bool, ok bool) {
+func (pc *projectAuthzCache) getCachedGrant(ctx context.Context, r *descope.FGARelation) (grant *cachedGrant, direct bool, ok bool) {
 	k := key(r)
 	if grant, ok := pc.directRelationCache.Get(ctx, k); ok {
 		return grant, true, true
