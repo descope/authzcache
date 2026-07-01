@@ -343,10 +343,6 @@ func TestWhoCanAccess_CacheMiss(t *testing.T) {
 		setCacheCalled = true
 	}
 	mockSDK.MockAuthz.WhoCanAccessResponse = expectedTargets
-	// the fetched pool is re-verified against the request context via Check; all pass here
-	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (bool, bool, bool) {
-		return true, true, true
-	}
 	result, err := ac.WhoCanAccess(context.TODO(), "doc1", "viewer", "docs", nil)
 	require.NoError(t, err)
 	require.Equal(t, expectedTargets, result)
@@ -412,10 +408,6 @@ func TestWhatCanTargetAccess_CacheMiss(t *testing.T) {
 		setCacheCalled = true
 	}
 	mockSDK.MockAuthz.WhatCanTargetAccessResponse = expectedRelations
-	// the fetched pool is re-verified against the request context via Check; all pass here
-	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (bool, bool, bool) {
-		return true, true, true
-	}
 	result, err := ac.WhatCanTargetAccess(context.TODO(), "user1", nil)
 	require.NoError(t, err)
 	require.Equal(t, expectedRelations, result)
@@ -584,7 +576,6 @@ func TestWhoCanAccess_MetricsRecorded_CacheMiss(t *testing.T) {
 		return nil, false
 	}
 	mockCache.SetWhoCanAccessCachedFunc = func(_ context.Context, _, _, _ string, _ []string) {}
-	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (bool, bool, bool) { return true, true, true }
 	mockSDK.MockAuthz.WhoCanAccessResponse = []string{"u1", "u2"}
 	_, err := ac.WhoCanAccess(ctx, "doc1", "viewer", "docs", nil)
 	require.NoError(t, err)
@@ -636,7 +627,6 @@ func TestWhatCanTargetAccess_MetricsRecorded_CacheMiss(t *testing.T) {
 		return nil, false
 	}
 	mockCache.SetWhatCanTargetAccessCachedFunc = func(_ context.Context, _ string, _ []*descope.AuthzRelation) {}
-	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (bool, bool, bool) { return true, true, true }
 	mockSDK.MockAuthz.WhatCanTargetAccessResponse = expected
 	_, err := ac.WhatCanTargetAccess(ctx, "u1", nil)
 	require.NoError(t, err)
