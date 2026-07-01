@@ -17,9 +17,9 @@ type AuthzCache interface {
 	CreateFGASchema(ctx context.Context, dsl string) error
 	CreateFGARelations(ctx context.Context, relations []*descope.FGARelation) error
 	DeleteFGARelations(ctx context.Context, relations []*descope.FGARelation) error
-	Check(ctx context.Context, relations []*descope.FGARelation, conditionsContext map[string]any) ([]*descope.FGACheck, error)
-	WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string, conditionsContext map[string]any) ([]string, error)
-	WhatCanTargetAccess(ctx context.Context, target string, conditionsContext map[string]any) ([]*descope.AuthzRelation, error)
+	Check(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error)
+	WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string, extraContext map[string]any) ([]string, error)
+	WhatCanTargetAccess(ctx context.Context, target string, extraContext map[string]any) ([]*descope.AuthzRelation, error)
 }
 
 type RemoteClientCreator func(projectID string, logger logger.LoggerInterface) (sdk.Management, error)
@@ -101,15 +101,15 @@ func (a *authzCache) DeleteFGARelations(ctx context.Context, relations []*descop
 	return nil
 }
 
-func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation, conditionsContext map[string]any) ([]*descope.FGACheck, error) {
+func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error) {
 	start := time.Now()
 	// get cache and mgmt sdk
 	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
 		return nil, err // notest
 	}
-	// check all relations against cache in one read-lock; cached conditional grants are re-evaluated against conditionsContext inside CheckRelations
-	cachedChecks, toCheckViaSDK, indexToCachedChecks := projectCache.CheckRelations(ctx, relations, conditionsContext)
+	// check all relations against cache in one read-lock; cached conditional grants are re-evaluated against extraContext inside CheckRelations
+	cachedChecks, toCheckViaSDK, indexToCachedChecks := projectCache.CheckRelations(ctx, relations, extraContext)
 	// if all relations were found in cache, return
 	if len(toCheckViaSDK) == 0 {
 		// candidatesCount = 0 (nothing sent to SDK); filteredCount = 0 (Check doesn't filter, every relation gets an answer)
@@ -117,7 +117,7 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 		return cachedChecks, nil
 	}
 	// fetch missing relations from sdk
-	sdkChecks, err := mgmtSDK.FGA().CheckWithContext(ctx, toCheckViaSDK, conditionsContext)
+	sdkChecks, err := mgmtSDK.FGA().CheckWithContext(ctx, toCheckViaSDK, extraContext)
 	if err != nil {
 		return nil, err // notest
 	}
@@ -125,7 +125,7 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	if hasCacheableConditional(sdkChecks) {
 		a.ensureSchemaLoaded(ctx, projectCache, mgmtSDK)
 	}
-	projectCache.UpdateCacheWithChecks(ctx, sdkChecks, conditionsContext)
+	projectCache.UpdateCacheWithChecks(ctx, sdkChecks, extraContext)
 	// merge cached and sdk checks in the same order as input relations and return them
 	var result []*descope.FGACheck
 	var j int
@@ -177,7 +177,7 @@ func (a *authzCache) recordMetric(ctx context.Context, api metrics.APIName, cach
 	})
 }
 
-func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string, conditionsContext map[string]any) ([]string, error) {
+func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string, extraContext map[string]any) ([]string, error) {
 	start := time.Now()
 	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
@@ -193,7 +193,7 @@ func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinit
 	}
 	// The cached set is the context-independent candidate pool; filter it against this request's
 	// context via Check, which is context-correct (hash cache) and fact-fresh (never caches facts).
-	verified, err := a.filterWhoCanAccessCandidates(ctx, resource, relationDefinition, namespace, candidates, conditionsContext)
+	verified, err := a.filterWhoCanAccessCandidates(ctx, resource, relationDefinition, namespace, candidates, extraContext)
 	if err != nil {
 		return nil, err // notest
 	}
@@ -201,7 +201,7 @@ func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinit
 	return verified, nil
 }
 
-func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource, relationDefinition, namespace string, candidates []string, conditionsContext map[string]any) ([]string, error) {
+func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource, relationDefinition, namespace string, candidates []string, extraContext map[string]any) ([]string, error) {
 	relations := make([]*descope.FGARelation, len(candidates))
 	for i, target := range candidates {
 		relations[i] = &descope.FGARelation{
@@ -212,7 +212,7 @@ func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource,
 			TargetType:   "*", // WhoCanAccess is TargetType-agnostic
 		}
 	}
-	checks, err := a.Check(ctx, relations, conditionsContext)
+	checks, err := a.Check(ctx, relations, extraContext)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +225,7 @@ func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource,
 	return verified, nil
 }
 
-func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string, conditionsContext map[string]any) ([]*descope.AuthzRelation, error) {
+func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string, extraContext map[string]any) ([]*descope.AuthzRelation, error) {
 	start := time.Now()
 	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
 	if err != nil {
@@ -240,7 +240,7 @@ func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string, con
 		projectCache.SetWhatCanTargetAccessCached(ctx, target, candidates)
 	}
 	// filter the candidate pool against this request's context via Check (see WhoCanAccess)
-	verified, err := a.filterWhatCanTargetAccessCandidates(ctx, target, candidates, conditionsContext)
+	verified, err := a.filterWhatCanTargetAccessCandidates(ctx, target, candidates, extraContext)
 	if err != nil {
 		return nil, err // notest
 	}
@@ -248,7 +248,7 @@ func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string, con
 	return verified, nil
 }
 
-func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, target string, candidates []*descope.AuthzRelation, conditionsContext map[string]any) ([]*descope.AuthzRelation, error) {
+func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, target string, candidates []*descope.AuthzRelation, extraContext map[string]any) ([]*descope.AuthzRelation, error) {
 	relations := make([]*descope.FGARelation, len(candidates))
 	for i, r := range candidates {
 		relations[i] = &descope.FGARelation{
@@ -259,7 +259,7 @@ func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, ta
 			TargetType:   "*", // WhatCanTargetAccess is TargetType-agnostic
 		}
 	}
-	checks, err := a.Check(ctx, relations, conditionsContext)
+	checks, err := a.Check(ctx, relations, extraContext)
 	if err != nil {
 		return nil, err
 	}

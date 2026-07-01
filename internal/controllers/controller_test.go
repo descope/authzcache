@@ -259,8 +259,8 @@ func TestCheckWithContextForwarding(t *testing.T) {
 	}
 	wantCtx := map[string]any{"role": "admin"}
 	var gotCtx map[string]any
-	mockAuthzCache.CheckFunc = func(_ context.Context, relations []*descope.FGARelation, conditionsContext map[string]any) ([]*descope.FGACheck, error) {
-		gotCtx = conditionsContext
+	mockAuthzCache.CheckFunc = func(_ context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error) {
+		gotCtx = extraContext
 		return []*descope.FGACheck{
 			{Allowed: true, Relation: relations[0], Info: &descope.FGACheckInfo{Direct: true}},
 		}, nil

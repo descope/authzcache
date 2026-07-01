@@ -83,12 +83,12 @@ type projectAuthzCache struct {
 
 type ProjectAuthzCache interface {
 	GetSchema() *descope.FGASchema
-	CheckRelations(ctx context.Context, relations []*descope.FGARelation, conditionsContext map[string]any) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck)
+	CheckRelations(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck)
 	UpdateCacheWithSchema(ctx context.Context, schema *descope.FGASchema)
 	EnsureSchemaLoaded(ctx context.Context, schema *descope.FGASchema)
 	UpdateCacheWithAddedRelations(ctx context.Context, relations []*descope.FGARelation)
 	UpdateCacheWithDeletedRelations(ctx context.Context, relations []*descope.FGARelation)
-	UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck, conditionsContext map[string]any)
+	UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck, extraContext map[string]any)
 	StartRemoteChangesPolling(ctx context.Context)
 	// Lookup cache methods
 	GetWhoCanAccessCached(ctx context.Context, resource, relationDefinition, namespace string) (targets []string, ok bool)
@@ -161,7 +161,7 @@ func (pc *projectAuthzCache) GetSchema() *descope.FGASchema {
 	return pc.schemaCache
 }
 
-func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*descope.FGARelation, conditionsContext map[string]any) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck) {
+func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) (checks []*descope.FGACheck, unchecked []*descope.FGARelation, indexToCheck map[int]*descope.FGACheck) {
 	indexToCheck = make(map[int]*descope.FGACheck, len(relations))
 	pc.mutex.RLock()
 	defer pc.mutex.RUnlock()
@@ -174,7 +174,7 @@ func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*de
 			check := &descope.FGACheck{Allowed: allowed, Relation: r, Info: &descope.FGACheckInfo{Direct: false}}
 			checks = append(checks, check)
 			indexToCheck[i] = check
-		} else if cert, ok := pc.conditionalRelationCache.Get(ctx, key(r)); ok && pc.certMatches(ctx, cert, conditionsContext) {
+		} else if cert, ok := pc.conditionalRelationCache.Get(ctx, key(r)); ok && pc.certMatches(ctx, cert, extraContext) {
 			// cached conditional result whose conditions all still re-evaluate to their recorded values — safe to serve
 			check := &descope.FGACheck{Allowed: cert.allowed, Relation: r, Info: &descope.FGACheckInfo{Conditional: true}}
 			checks = append(checks, check)
@@ -188,22 +188,22 @@ func (pc *projectAuthzCache) CheckRelations(ctx context.Context, relations []*de
 
 // certMatches reports whether every recorded condition still re-evaluates to its cached bucket; any
 // uncompiled/failed/changed condition → defer to backend.
-func (pc *projectAuthzCache) certMatches(ctx context.Context, cert *conditionalCert, conditionsContext map[string]any) bool {
+func (pc *projectAuthzCache) certMatches(ctx context.Context, cert *conditionalCert, extraContext map[string]any) bool {
 	if len(cert.trueConds) == 0 && len(cert.falseConds) == 0 {
 		return false
 	}
-	return pc.conditionsEvalTo(ctx, cert.trueConds, true, conditionsContext) &&
-		pc.conditionsEvalTo(ctx, cert.falseConds, false, conditionsContext)
+	return pc.conditionsEvalTo(ctx, cert.trueConds, true, extraContext) &&
+		pc.conditionsEvalTo(ctx, cert.falseConds, false, extraContext)
 }
 
 // conditionsEvalTo reports whether every listed condition ID re-evaluates to want at the edge.
-func (pc *projectAuthzCache) conditionsEvalTo(ctx context.Context, ids []int32, want bool, conditionsContext map[string]any) bool {
+func (pc *projectAuthzCache) conditionsEvalTo(ctx context.Context, ids []int32, want bool, extraContext map[string]any) bool {
 	for _, id := range ids {
 		compiled, ok := pc.compiledConditions[id]
 		if !ok {
 			return false
 		}
-		got, evaluated := compiled.Eval(ctx, conditionsContext, pc.celEvalTimeout)
+		got, evaluated := compiled.Eval(ctx, extraContext, pc.celEvalTimeout)
 		if !evaluated || got != want {
 			return false
 		}
@@ -286,7 +286,7 @@ func (pc *projectAuthzCache) UpdateCacheWithDeletedRelations(ctx context.Context
 	}
 }
 
-func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck, conditionsContext map[string]any) {
+func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkChecks []*descope.FGACheck, extraContext map[string]any) {
 	if len(sdkChecks) == 0 {
 		return
 	}

@@ -264,8 +264,8 @@ func TestCheckWithContextPassthrough(t *testing.T) {
 	relations := []*descope.FGARelation{{Resource: "r", Target: "t", Relation: "viewer", ResourceType: "doc"}}
 	wantCtx := map[string]any{"env": "prod"}
 	var gotCtx map[string]any
-	mockSDK.MockFGA.CheckWithContextAssert = func(_ []*descope.FGARelation, conditionsContext map[string]any) {
-		gotCtx = conditionsContext
+	mockSDK.MockFGA.CheckWithContextAssert = func(_ []*descope.FGARelation, extraContext map[string]any) {
+		gotCtx = extraContext
 	}
 	mockCache.CheckRelationFunc = func(_ context.Context, _ *descope.FGARelation) (bool, bool, bool) {
 		return false, false, false
@@ -890,8 +890,8 @@ func TestCheckWithContext_CachesByContextHash(t *testing.T) {
 	// the request context must be forwarded to UpdateCacheWithChecks so it can key by context hash
 	var gotContext map[string]any
 	called := false
-	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, conditionsContext map[string]any) {
-		gotContext = conditionsContext
+	mockCache.UpdateCacheWithChecksFunc = func(_ context.Context, _ []*descope.FGACheck, extraContext map[string]any) {
+		gotContext = extraContext
 		called = true
 	}
 

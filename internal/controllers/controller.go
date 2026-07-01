@@ -58,12 +58,12 @@ func (ac *authzController) DeleteFGARelations(ctx context.Context, req *authzv1.
 func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest) (*authzv1.CheckResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Checking authz")
 	relations := relationsFromTuples(req.Tuples)
-	var conditionsContext map[string]any
+	var extraContext map[string]any
 	if req.Context != nil {
-		conditionsContext = req.Context.AsMap()
+		extraContext = req.Context.AsMap()
 	}
 
-	checks, err := ac.authzCache.Check(ctx, relations, conditionsContext)
+	checks, err := ac.authzCache.Check(ctx, relations, extraContext)
 
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
@@ -94,11 +94,11 @@ func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest)
 
 func (ac *authzController) WhoCanAccess(ctx context.Context, req *authzv1.WhoCanAccessRequest) (*authzv1.WhoCanAccessResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Checking who can access")
-	var conditionsContext map[string]any
+	var extraContext map[string]any
 	if req.Context != nil {
-		conditionsContext = req.Context.AsMap()
+		extraContext = req.Context.AsMap()
 	}
-	targets, err := ac.authzCache.WhoCanAccess(ctx, req.Resource, req.RelationDefinition, req.Namespace, conditionsContext)
+	targets, err := ac.authzCache.WhoCanAccess(ctx, req.Resource, req.RelationDefinition, req.Namespace, extraContext)
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
@@ -107,11 +107,11 @@ func (ac *authzController) WhoCanAccess(ctx context.Context, req *authzv1.WhoCan
 
 func (ac *authzController) WhatCanTargetAccess(ctx context.Context, req *authzv1.WhatCanTargetAccessRequest) (*authzv1.WhatCanTargetAccessResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Checking what can target access")
-	var conditionsContext map[string]any
+	var extraContext map[string]any
 	if req.Context != nil {
-		conditionsContext = req.Context.AsMap()
+		extraContext = req.Context.AsMap()
 	}
-	relations, err := ac.authzCache.WhatCanTargetAccess(ctx, req.Target, conditionsContext)
+	relations, err := ac.authzCache.WhatCanTargetAccess(ctx, req.Target, extraContext)
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
