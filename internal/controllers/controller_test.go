@@ -9,6 +9,7 @@ import (
 	"github.com/descope/go-sdk/descope"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func setup() (*authzController, *services.AuthzCacheMock) {
@@ -249,4 +250,55 @@ func TestWhatCanTargetAccessError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
+}
+
+func TestCheckWithContextForwarding(t *testing.T) {
+	controller, mockAuthzCache := setup()
+	tuples := []*authzv1.Tuple{
+		{Resource: "testR", Target: "testT", ResourceType: "testRT", Relation: "testRel", TargetType: "testTT"},
+	}
+	wantCtx := map[string]any{"role": "admin"}
+	var gotCtx map[string]any
+	mockAuthzCache.CheckWithContextFunc = func(_ context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error) {
+		gotCtx = extraContext
+		return []*descope.FGACheck{
+			{Allowed: true, Relation: relations[0], Info: &descope.FGACheckInfo{Direct: true}},
+		}, nil
+	}
+	ctxStruct, err := structpb.NewStruct(wantCtx)
+	require.NoError(t, err)
+	req := &authzv1.CheckRequest{Tuples: tuples, Context: ctxStruct}
+	resp, err := controller.Check(context.Background(), req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, wantCtx, gotCtx)
+}
+
+func TestCheckResponseInfoConditionalFields(t *testing.T) {
+	controller, mockAuthzCache := setup()
+	tuples := []*authzv1.Tuple{
+		{Resource: "testR", Target: "testT", ResourceType: "testRT", Relation: "testRel", TargetType: "testTT"},
+	}
+	mockAuthzCache.CheckWithContextFunc = func(_ context.Context, relations []*descope.FGARelation, _ map[string]any) ([]*descope.FGACheck, error) {
+		return []*descope.FGACheck{
+			{
+				Allowed:  false,
+				Relation: relations[0],
+				Info: &descope.FGACheckInfo{
+					Conditional:    true,
+					MissingContext: []string{"role"},
+					ConditionalErr: "eval error",
+				},
+			},
+		}, nil
+	}
+	req := &authzv1.CheckRequest{Tuples: tuples}
+	resp, err := controller.Check(context.Background(), req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Len(t, resp.Tuples, 1)
+	info := resp.Tuples[0].Info
+	require.True(t, info.Conditional)
+	require.Equal(t, []string{"role"}, info.MissingContext)
+	require.Equal(t, "eval error", info.ConditionalErr)
 }
