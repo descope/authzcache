@@ -160,18 +160,21 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 	assert.Equal(t, 0, len(cache.directTargetsIndex), "%v", cache.directTargetsIndex)
 }
 
-func TestUpdateCacheWithAddedRelations_PurgesLookupCache(t *testing.T) {
+func TestUpdateCacheWithAddedRelations_AddsToLookupCache(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)
 	cache.lookupCacheEnabled = true
 	cache.SetWhoCanAccessCached(ctx, "doc1", "viewer", "docs", []string{"user1", "user2"})
 	cache.SetWhatCanTargetAccessCached(ctx, "user3", []*descope.AuthzRelation{{Resource: "other", RelationDefinition: "editor", Namespace: "docs", Target: "user3"}})
-	// a new relation can add a candidate to a lookup pool, so the lookup cache is invalidated
 	cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{{Resource: "doc1", Target: "user3", Relation: "viewer", ResourceType: "docs"}})
-	_, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
-	assert.False(t, ok, "lookup cache should be purged after a relation is added")
-	_, ok = cache.GetWhatCanTargetAccessCached(ctx, "user3")
-	assert.False(t, ok, "lookup cache should be purged after a relation is added")
+	targets, ok := cache.GetWhoCanAccessCached(ctx, "doc1", "viewer", "docs")
+	assert.True(t, ok, "lookup cache entry should still exist")
+	assert.Contains(t, targets, "user1", "existing target should remain")
+	assert.Contains(t, targets, "user2", "existing target should remain")
+	assert.Contains(t, targets, "user3", "new target should be added to lookup cache")
+	relations, ok := cache.GetWhatCanTargetAccessCached(ctx, "user3")
+	assert.True(t, ok, "lookup cache entry should still exist")
+	assert.Len(t, relations, 2, "new relation should be added to existing entry")
 }
 
 func TestUpdateCacheWithDeletedRelations_DoesNotPurgeLookupCache(t *testing.T) {
