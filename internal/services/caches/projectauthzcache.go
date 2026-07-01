@@ -251,8 +251,6 @@ func (pc *projectAuthzCache) setSchema(ctx context.Context, schema *descope.FGAS
 	if schema == nil {
 		return
 	}
-	// the backend's unique schema version; the guard in UpdateCacheWithChecks only caches a result whose
-	// Check response carried this same version, so the condition IDs map to the conditions we compiled.
 	pc.loadedSchemaVersion = schema.Version
 	compiled := make(map[int32]*edgecel.CompiledCondition, len(schema.Conditions))
 	for _, c := range schema.Conditions {
@@ -272,12 +270,7 @@ func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, 
 	}
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
-	// A new relation can change indirect results (incl. indirect-conditional grants, which live in the
-	// indirect cache), so invalidate them. Direct entries — including direct-conditional grants, which
-	// depend only on the condition value, not the graph — are left intact and re-verified on read.
-	pc.indirectRelationCache.Purge(ctx)
-	// Lookup cache is not purged: the new relation is added to existing entries incrementally; candidate
-	// filtering re-verifies each via Check and TTL bounds staleness (as in main).
+	pc.indirectRelationCache.Purge(ctx) // added (direct) relations can change the result of indirect checks, so we must purge all indirect relations
 	for _, r := range relations {
 		pc.addToLookupCache(ctx, r)
 	}
@@ -289,9 +282,8 @@ func (pc *projectAuthzCache) UpdateCacheWithDeletedRelations(ctx context.Context
 	}
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
-	pc.indirectRelationCache.Purge(ctx) // deleted relations can change indirect results (incl. indirect-conditional grants), so purge them all
-	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation.
-	// Direct entries (incl. direct-conditional) are graph-independent; only the deleted tuples' own direct entries are removed.
+	pc.indirectRelationCache.Purge(ctx) // deleted (direct) relations can change the result of indirect checks, so we must purge all indirect relations
+	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation
 	for _, r := range relations {
 		pc.removeDirectRelation(ctx, r)
 	}
@@ -316,13 +308,20 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 				len(c.Info.MissingContext) != 0 || c.Info.ConditionalErr != "" ||
 				(len(c.Info.TrueConditions) == 0 && len(c.Info.FalseConditions) == 0) ||
 				!pc.hasAllCompiledConditions(c.Info.TrueConditions) || !pc.hasAllCompiledConditions(c.Info.FalseConditions) {
+				// Expected only very rarely (schema-version skew, empty certificate, uncompiled condition, or a
+				// check with missing context / eval error); the grant simply isn't cached and falls through to backend.
+				cctx.Logger(ctx).Warn().
+					Str("schema_version", c.Info.SchemaVersion).
+					Str("loaded_schema_version", pc.loadedSchemaVersion).
+					Int("missing_context_count", len(c.Info.MissingContext)).
+					Str("conditional_err", c.Info.ConditionalErr).
+					Int("true_conditions_count", len(c.Info.TrueConditions)).
+					Int("false_conditions_count", len(c.Info.FalseConditions)).
+					Msg("Conditional grant not cacheable at the edge, skipping")
 				continue
 			}
 			grant.cond = &conditionalCert{trueConds: c.Info.TrueConditions, falseConds: c.Info.FalseConditions}
 		}
-		// Route by resolution: direct grants (incl. direct-conditional, which depend only on the condition
-		// value, not the graph) go to the direct cache so they survive indirect purges; the rest go to the
-		// indirect cache, which is purged on any relation change.
 		if c.Info.Direct {
 			pc.addDirectRelation(ctx, c.Relation, grant)
 		} else {
@@ -331,7 +330,6 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 	}
 }
 
-// hasAllCompiledConditions reports whether every listed condition ID is compiled at the edge (else the grant isn't cached).
 func (pc *projectAuthzCache) hasAllCompiledConditions(ids []int32) bool {
 	for _, id := range ids {
 		if _, ok := pc.compiledConditions[id]; !ok {
@@ -394,9 +392,8 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 		return
 	}
 	cctx.Logger(ctx).Debug().Msg(fmt.Sprintf("Remote changes found, Resources: %v, Targets: %v, updating caches", remoteChanges.Resources, remoteChanges.Targets))
-	pc.indirectRelationCache.Purge(ctx) // remote relation changes can flip indirect results (incl. indirect-conditional grants), so purge them
-	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation.
-	// Direct-conditional grants are graph-independent; the changed resources/targets' direct entries are removed below.
+	pc.indirectRelationCache.Purge(ctx)
+	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation
 	for _, r := range remoteChanges.Resources {
 		pc.removeDirectRelationByResource(ctx, resource(r))
 	}
