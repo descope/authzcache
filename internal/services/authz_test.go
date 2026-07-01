@@ -456,20 +456,6 @@ func TestWhatCanTargetAccess_CacheHitWithCandidateFiltering(t *testing.T) {
 	require.Equal(t, 3, checkCallCount)
 }
 
-func TestWhoCanAccess_EmptyCacheHitReturnsEmpty(t *testing.T) {
-	ac, mockSDK, mockCache := injectAuthzMocks(t)
-	// an empty cached pool is a valid result ("no one has access") — serve it without hitting the SDK
-	mockCache.GetWhoCanAccessCachedFunc = func(_ context.Context, _, _, _ string) ([]string, bool) {
-		return []string{}, true
-	}
-	mockSDK.MockAuthz.WhoCanAccessAssert = func(_, _, _ string) {
-		require.Fail(t, "should not call SDK on a cache hit")
-	}
-	result, err := ac.WhoCanAccess(context.TODO(), "doc1", "viewer", "docs", nil)
-	require.NoError(t, err)
-	require.Empty(t, result)
-}
-
 func TestWhoCanAccess_DirectRelationRemoved_FilteredImmediately(t *testing.T) {
 	ac, _, mockCache := injectAuthzMocks(t)
 	mockCache.GetWhoCanAccessCachedFunc = func(_ context.Context, _, _, _ string) ([]string, bool) {

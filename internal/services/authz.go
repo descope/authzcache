@@ -184,24 +184,26 @@ func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinit
 		return nil, err // notest
 	}
 	candidates, cacheHit := projectCache.GetWhoCanAccessCached(ctx, resource, relationDefinition, namespace)
-	if !cacheHit {
-		candidates, err = mgmtSDK.Authz().WhoCanAccess(ctx, resource, relationDefinition, namespace)
+	if cacheHit && len(candidates) > 0 {
+		verified, err := a.filterWhoCanAccessCandidates(ctx, resource, relationDefinition, namespace, candidates, extraContext)
 		if err != nil {
 			return nil, err // notest
 		}
-		projectCache.SetWhoCanAccessCached(ctx, resource, relationDefinition, namespace, candidates)
-		// fresh backend results are already correct — return without re-verifying (the cold request already paid the backend round-trip)
-		a.recordMetric(ctx, metrics.APIWhoCanAccess, false, len(candidates), 0, len(candidates), start)
-		return candidates, nil
+		cctx.Logger(ctx).Debug().
+			Str("resource", resource).
+			Int("candidates", len(candidates)).
+			Int("verified", len(verified)).
+			Msg("WhoCanAccess cache hit with candidate filtering")
+		a.recordMetric(ctx, metrics.APIWhoCanAccess, true, len(candidates), len(candidates)-len(verified), len(verified), start)
+		return verified, nil
 	}
-	// cache hit: the cached set is the context-independent candidate pool; filter it against this request's
-	// context via Check, which is context-correct (hash cache) and fact-fresh (never caches facts).
-	verified, err := a.filterWhoCanAccessCandidates(ctx, resource, relationDefinition, namespace, candidates, extraContext)
+	targets, err := mgmtSDK.Authz().WhoCanAccess(ctx, resource, relationDefinition, namespace)
 	if err != nil {
 		return nil, err // notest
 	}
-	a.recordMetric(ctx, metrics.APIWhoCanAccess, true, len(candidates), len(candidates)-len(verified), len(verified), start)
-	return verified, nil
+	projectCache.SetWhoCanAccessCached(ctx, resource, relationDefinition, namespace, targets)
+	a.recordMetric(ctx, metrics.APIWhoCanAccess, false, 0, 0, len(targets), start)
+	return targets, nil
 }
 
 func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource, relationDefinition, namespace string, candidates []string, extraContext map[string]any) ([]string, error) {
@@ -235,23 +237,26 @@ func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string, ext
 		return nil, err // notest
 	}
 	candidates, cacheHit := projectCache.GetWhatCanTargetAccessCached(ctx, target)
-	if !cacheHit {
-		candidates, err = mgmtSDK.Authz().WhatCanTargetAccess(ctx, target)
+	if cacheHit && len(candidates) > 0 {
+		verified, err := a.filterWhatCanTargetAccessCandidates(ctx, target, candidates, extraContext)
 		if err != nil {
 			return nil, err // notest
 		}
-		projectCache.SetWhatCanTargetAccessCached(ctx, target, candidates)
-		// fresh backend results are already correct — return without re-verifying (see WhoCanAccess)
-		a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, false, len(candidates), 0, len(candidates), start)
-		return candidates, nil
+		cctx.Logger(ctx).Debug().
+			Str("target", target).
+			Int("candidates", len(candidates)).
+			Int("verified", len(verified)).
+			Msg("WhatCanTargetAccess cache hit with candidate filtering")
+		a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, true, len(candidates), len(candidates)-len(verified), len(verified), start)
+		return verified, nil
 	}
-	// cache hit: filter the candidate pool against this request's context via Check (see WhoCanAccess)
-	verified, err := a.filterWhatCanTargetAccessCandidates(ctx, target, candidates, extraContext)
+	relations, err := mgmtSDK.Authz().WhatCanTargetAccess(ctx, target)
 	if err != nil {
 		return nil, err // notest
 	}
-	a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, true, len(candidates), len(candidates)-len(verified), len(verified), start)
-	return verified, nil
+	projectCache.SetWhatCanTargetAccessCached(ctx, target, relations)
+	a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, false, 0, 0, len(relations), start)
+	return relations, nil
 }
 
 func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, target string, candidates []*descope.AuthzRelation, extraContext map[string]any) ([]*descope.AuthzRelation, error) {
