@@ -190,14 +190,17 @@ func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinit
 			return nil, err // notest
 		}
 		projectCache.SetWhoCanAccessCached(ctx, resource, relationDefinition, namespace, candidates)
+		// fresh backend results are already correct — return without re-verifying (the cold request already paid the backend round-trip)
+		a.recordMetric(ctx, metrics.APIWhoCanAccess, false, len(candidates), 0, len(candidates), start)
+		return candidates, nil
 	}
-	// The cached set is the context-independent candidate pool; filter it against this request's
+	// cache hit: the cached set is the context-independent candidate pool; filter it against this request's
 	// context via Check, which is context-correct (hash cache) and fact-fresh (never caches facts).
 	verified, err := a.filterWhoCanAccessCandidates(ctx, resource, relationDefinition, namespace, candidates, extraContext)
 	if err != nil {
 		return nil, err // notest
 	}
-	a.recordMetric(ctx, metrics.APIWhoCanAccess, cacheHit, len(candidates), len(candidates)-len(verified), len(verified), start)
+	a.recordMetric(ctx, metrics.APIWhoCanAccess, true, len(candidates), len(candidates)-len(verified), len(verified), start)
 	return verified, nil
 }
 
@@ -238,13 +241,16 @@ func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string, ext
 			return nil, err // notest
 		}
 		projectCache.SetWhatCanTargetAccessCached(ctx, target, candidates)
+		// fresh backend results are already correct — return without re-verifying (see WhoCanAccess)
+		a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, false, len(candidates), 0, len(candidates), start)
+		return candidates, nil
 	}
-	// filter the candidate pool against this request's context via Check (see WhoCanAccess)
+	// cache hit: filter the candidate pool against this request's context via Check (see WhoCanAccess)
 	verified, err := a.filterWhatCanTargetAccessCandidates(ctx, target, candidates, extraContext)
 	if err != nil {
 		return nil, err // notest
 	}
-	a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, cacheHit, len(candidates), len(candidates)-len(verified), len(verified), start)
+	a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, true, len(candidates), len(candidates)-len(verified), len(verified), start)
 	return verified, nil
 }
 
