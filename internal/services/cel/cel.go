@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	celtypes "github.com/descope/backend/authzservice/pkg/authzservice/cel/descopecel"
+	"github.com/descope/backend/authzservice/pkg/authzservice/cel/descopecel"
 	cctx "github.com/descope/backend/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
 	"github.com/google/cel-go/cel"
@@ -27,13 +27,12 @@ type CompiledCondition struct {
 
 // Compile builds an executable program from the backend's type-checked CEL program (CheckedExpr). The
 // edge does not parse or type-check the expression — it runs the backend's checked AST in an env with the
-// shared custom functions/types (EnvOptions). Param variables need no declaration: their types are baked
-// into the checked program and their values come from the request context at Eval time.
+// shared custom functions/types (EnvOptions).
 func Compile(c *descope.FGACondition) (*CompiledCondition, error) {
 	if len(c.CheckedExpr) == 0 {
 		return nil, fmt.Errorf("condition %q has no checked expression", c.Name)
 	}
-	env, err := cel.NewEnv(celtypes.EnvOptions()...)
+	env, err := cel.NewEnv(descopecel.EnvOptions()...)
 	if err != nil {
 		return nil, err
 	}
@@ -57,12 +56,12 @@ func (cc *CompiledCondition) Eval(ctx context.Context, requestContext map[string
 	for _, p := range cc.params {
 		raw, present := requestContext[p.Name]
 		if !present {
-			cctx.Logger(ctx).Debug().Str("condition", cc.name).Str("param", p.Name).Msg("Condition param missing from request context, deferring to backend")
+			cctx.Logger(ctx).Warn().Str("condition", cc.name).Str("param", p.Name).Msg("Condition param missing from request context, deferring to backend")
 			return false, false
 		}
 		v, coerced := coerce(p.Type, raw)
 		if !coerced {
-			cctx.Logger(ctx).Debug().Str("condition", cc.name).Str("param", p.Name).Msg("Condition param could not be coerced, deferring to backend")
+			cctx.Logger(ctx).Warn().Str("condition", cc.name).Str("param", p.Name).Msg("Condition param could not be coerced, deferring to backend")
 			return false, false
 		}
 		vars[p.Name] = v
@@ -71,12 +70,12 @@ func (cc *CompiledCondition) Eval(ctx context.Context, requestContext map[string
 	defer cancel()
 	out, _, err := cc.program.ContextEval(evalCtx, vars)
 	if err != nil {
-		cctx.Logger(ctx).Debug().Str("condition", cc.name).Err(err).Msg("Condition evaluation failed, deferring to backend")
+		cctx.Logger(ctx).Warn().Str("condition", cc.name).Err(err).Msg("Condition evaluation failed, deferring to backend")
 		return false, false
 	}
 	b, isBool := out.Value().(bool)
 	if !isBool {
-		cctx.Logger(ctx).Debug().Str("condition", cc.name).Msg("Condition did not evaluate to a bool, deferring to backend")
+		cctx.Logger(ctx).Warn().Str("condition", cc.name).Msg("Condition did not evaluate to a bool, deferring to backend")
 		return false, false
 	}
 	return b, true
@@ -108,12 +107,12 @@ func coerce(dslType string, raw any) (any, bool) {
 		default:
 			return nil, false
 		}
-	case celtypes.IPAddressTypeName:
+	case descopecel.IPAddressTypeName:
 		s, isStr := raw.(string)
 		if !isStr {
 			return nil, false
 		}
-		v, err := celtypes.NewIPAddressVal(s)
+		v, err := descopecel.NewIPAddressVal(s)
 		if err != nil {
 			return nil, false
 		}
