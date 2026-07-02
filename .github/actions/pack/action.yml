@@ -78,7 +78,7 @@ runs:
         password: ${{ inputs.action_token}}
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+      uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
       with:
         aws-region: us-east-1
         role-to-assume: arn:aws:iam::${{ inputs.ecr_aws_account }}:role/GitHubActionsECR
@@ -86,7 +86,7 @@ runs:
 
     - name: Login to Amazon ECR
       id: login-ecr
-      uses: aws-actions/amazon-ecr-login@fa648b43de3d4d023bcb3f89ed6940096949c419 # v2.1.5
+      uses: aws-actions/amazon-ecr-login@d539f0932e70871a027e9d5a9d8fc38589180a64 # v2.1.6
 
     - name: Login to Docker Hub
       if: ${{ inputs.enable_dockerhub == 'true' && inputs.dockerhub_username && inputs.dockerhub_token }}
@@ -114,7 +114,7 @@ runs:
         images: docker.io/descope/${{steps.setup_build_args.outputs.repo_name}}
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+      uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
       with:
         version: latest
         cache-binary: false
@@ -134,7 +134,7 @@ runs:
         echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Build and push
-      uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+      uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
       id: push
       with:
         platforms: ${{ inputs.platforms }}
