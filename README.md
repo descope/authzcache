@@ -41,6 +41,14 @@ docker run -d \
 - `AUTHZCACHE_METRICS_REPORT_ENABLED` - Whether to periodically report aggregated cache performance metrics (hit/miss rates, latency) to Descope (TRUE/FALSE, default: TRUE)
 - `AUTHZCACHE_METRICS_REPORT_INTERVAL_IN_SECONDS` - How often to report metrics, in seconds (default: 60, minimum: 10)
 
+### How the lookup cache uses TTL
+
+The lookup caches for `WhoCanAccess` and `WhatCanTargetAccess` use their TTL differently from the check (relation) cache.
+
+The check cache is kept fresh both by remote polling and by pass-through requests, so it tracks the current state of relations. A lookup result is re-verified against the check cache on every call, so an entry whose access has been removed is dropped from the result.
+
+New entries, however, do not appear until the TTL expires. A relation granted after a lookup result was cached is not part of that cached result, so a `WhoCanAccess` / `WhatCanTargetAccess` call keeps omitting the newly authorized entry until the result's TTL (`AUTHZCACHE_LOOKUP_CACHE_TTL_IN_SECONDS`) expires and the result is refetched from the backend.
+
 ## Ports
 
 - **8189** - HTTP REST API endpoint
