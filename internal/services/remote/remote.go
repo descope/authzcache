@@ -7,6 +7,7 @@ import (
 
 	"github.com/descope/authzcache/internal/config"
 	ae "github.com/descope/backend/authzservice/pkg/authzservice/errors"
+	cconfig "github.com/descope/backend/common/pkg/common/config"
 	"github.com/descope/go-sdk/descope"
 	"github.com/descope/go-sdk/descope/client"
 	"github.com/descope/go-sdk/descope/logger"
@@ -27,6 +28,10 @@ func NewDescopeClientWithProjectID(projectID string, loggerInstance logger.Logge
 		LogLevel:            getLogLevel(),
 		Logger:              loggerInstance,
 		ManagementKey:       managementKey,
+		// Stamp the running image git SHA on every request so the backend can log which authzcache
+		// version is talking to it (mirrors the SDK's per-instance client UUID header). Header name
+		// must match backend cconfig.HeaderAuthzCacheGitSha.
+		CustomDefaultHeaders: map[string]string{"x-descope-authzcache-git-sha": cconfig.GetGitSha()},
 	})
 	if err != nil {
 		return nil, err // notest
