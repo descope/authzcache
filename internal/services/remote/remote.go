@@ -22,16 +22,13 @@ func NewDescopeClientWithProjectID(projectID string, loggerInstance logger.Logge
 		return nil, ae.UnknownProject.New(context.Background(), "projectID is empty")
 	}
 	descopeClient, err := client.NewWithConfig(&client.Config{
-		ProjectID:           projectID,
-		SessionJWTViaCookie: true,
-		DescopeBaseURL:      baseURL,
-		LogLevel:            getLogLevel(),
-		Logger:              loggerInstance,
-		ManagementKey:       managementKey,
-		// Stamp the running image git SHA on every request so the backend can log which authzcache
-		// version is talking to it (mirrors the SDK's per-instance client UUID header). Header name
-		// must match backend cconfig.HeaderAuthzCacheGitSha.
-		CustomDefaultHeaders: map[string]string{"x-descope-authzcache-git-sha": cconfig.GetGitSha()},
+		ProjectID:            projectID,
+		SessionJWTViaCookie:  true,
+		DescopeBaseURL:       baseURL,
+		LogLevel:             getLogLevel(),
+		Logger:               loggerInstance,
+		ManagementKey:        managementKey,
+		CustomDefaultHeaders: map[string]string{cconfig.HeaderAuthzCacheGitSha: cconfig.GetGitSha()},
 	})
 	if err != nil {
 		return nil, err // notest

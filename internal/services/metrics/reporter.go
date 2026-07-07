@@ -177,7 +177,7 @@ func (r *Reporter) post(ctx context.Context, projectID string, payloads []APIMet
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+projectID+":"+r.managementKey)
-	req.Header.Set("x-descope-authzcache-git-sha", cconfig.GetGitSha()) // running image version; header must match backend cconfig.HeaderAuthzCacheGitSha
+	req.Header.Set(cconfig.HeaderAuthzCacheGitSha, cconfig.GetGitSha())
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
