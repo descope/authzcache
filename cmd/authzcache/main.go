@@ -40,6 +40,9 @@ func serve() {
 	ctx, err := server.StartServerWithGatewayAndOptions(
 		[]server.RegisterGRPCFunc{
 			func(ctx context.Context, s *grpc.Server) error {
+				cctx.Logger(ctx).Info().
+					Str("git_sha", cconfig.GetGitSha()).
+					Msg("Starting authzcache")
 				reporter.Start(ctx)
 				//authz cache service init
 				as, err := services.New(ctx, caches.NewProjectAuthzCache, remote.NewDescopeClientWithProjectID, collector)
