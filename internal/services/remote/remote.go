@@ -7,6 +7,7 @@ import (
 
 	"github.com/descope/authzcache/internal/config"
 	ae "github.com/descope/backend/authzservice/pkg/authzservice/errors"
+	cconfig "github.com/descope/backend/common/pkg/common/config"
 	"github.com/descope/go-sdk/descope"
 	"github.com/descope/go-sdk/descope/client"
 	"github.com/descope/go-sdk/descope/logger"
@@ -21,12 +22,13 @@ func NewDescopeClientWithProjectID(projectID string, loggerInstance logger.Logge
 		return nil, ae.UnknownProject.New(context.Background(), "projectID is empty")
 	}
 	descopeClient, err := client.NewWithConfig(&client.Config{
-		ProjectID:           projectID,
-		SessionJWTViaCookie: true,
-		DescopeBaseURL:      baseURL,
-		LogLevel:            getLogLevel(),
-		Logger:              loggerInstance,
-		ManagementKey:       managementKey,
+		ProjectID:            projectID,
+		SessionJWTViaCookie:  true,
+		DescopeBaseURL:       baseURL,
+		LogLevel:             getLogLevel(),
+		Logger:               loggerInstance,
+		ManagementKey:        managementKey,
+		CustomDefaultHeaders: map[string]string{cconfig.HeaderAuthzCacheGitSha: cconfig.GetGitSha()},
 	})
 	if err != nil {
 		return nil, err // notest
