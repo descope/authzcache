@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.1.0](https://github.com/descope/authzcache/compare/v1.0.4...v1.1.0) (2026-07-08)
+
+
+### Features
+
+* **authzcache:** log running image git SHA at startup ([#789](https://github.com/descope/authzcache/issues/789)) ([3bbc557](https://github.com/descope/authzcache/commit/3bbc55784e13e9af11fa84e11fc18ccc8f2a15bd))
+* **remote:** stamp running image git SHA on requests ([#793](https://github.com/descope/authzcache/issues/793)) ([2f6a29e](https://github.com/descope/authzcache/commit/2f6a29e2531a77551e84f1479adfa783b08ca9f1))
+
+
+### Bug Fixes
+
+* **deps:** update github.com/descope/backend digest to 001e4ed ([#792](https://github.com/descope/authzcache/issues/792)) ([33936ef](https://github.com/descope/authzcache/commit/33936ef78679187a3e25b1750d169aaabb7f7214))
+* **deps:** update github.com/descope/backend digest to 1a8cc3e ([#783](https://github.com/descope/authzcache/issues/783)) ([74205ab](https://github.com/descope/authzcache/commit/74205ab6519f9eddbf371314fde7fd98f8c5910b))
+* **deps:** update github.com/descope/backend digest to 6a1d8b4 ([#787](https://github.com/descope/authzcache/issues/787)) ([293994b](https://github.com/descope/authzcache/commit/293994b20c63d29b26126e33928bf7808e77f9c3))
+* **deps:** update github.com/descope/backend digest to 740ac3c ([#780](https://github.com/descope/authzcache/issues/780)) ([82b59ec](https://github.com/descope/authzcache/commit/82b59ec5f6f23b127771275e5b710f70be9b8600))
+* **deps:** update github.com/descope/backend digest to 79d4742 ([#786](https://github.com/descope/authzcache/issues/786)) ([6832f11](https://github.com/descope/authzcache/commit/6832f1190f965137d6fc74ae5d48e932fa1e0657))
+* **deps:** update github.com/descope/backend digest to 8158155 ([#782](https://github.com/descope/authzcache/issues/782)) ([cf3d0aa](https://github.com/descope/authzcache/commit/cf3d0aa55f0e8a79a5dad721506b4b144065a915))
+* **deps:** update github.com/descope/backend digest to 8f93be8 ([#790](https://github.com/descope/authzcache/issues/790)) ([0766c6f](https://github.com/descope/authzcache/commit/0766c6f1d12dd4826f3bc792f107e5a5260f5826))
+* **deps:** update github.com/descope/backend digest to 9073beb ([#778](https://github.com/descope/authzcache/issues/778)) ([9e7f880](https://github.com/descope/authzcache/commit/9e7f8802e25a7178c989c6e110fa45bada7de8d4))
+* **deps:** update github.com/descope/backend digest to 92ed63d ([#785](https://github.com/descope/authzcache/issues/785)) ([5540454](https://github.com/descope/authzcache/commit/5540454284408262644f76d2fd752840961e2a1d))
+* **deps:** update github.com/descope/backend digest to a2ebb8a ([#781](https://github.com/descope/authzcache/issues/781)) ([eb18acc](https://github.com/descope/authzcache/commit/eb18accf619dfee67668c47268f33d792d5e5e00))
+* **deps:** update github.com/descope/backend digest to e57fa62 ([#784](https://github.com/descope/authzcache/issues/784)) ([d4a9c61](https://github.com/descope/authzcache/commit/d4a9c61e5faa686644e18eebc298ed61abe6a6f8))
+* **deps:** update github.com/descope/backend digest to ebd7a88 ([#791](https://github.com/descope/authzcache/issues/791)) ([1668b94](https://github.com/descope/authzcache/commit/1668b94bf766840990e51cb6c66542526aa7b8c1))
+
 ## [1.0.4](https://github.com/descope/authzcache/compare/v1.0.3...v1.0.4) (2026-07-02)
 
 
