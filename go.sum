@@ -101,8 +101,8 @@ github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 h1:NMZiJj8QnKe1LgsbDayM4UoHwbvw
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
 github.com/descope/backend v0.0.0-20260625120343-08ae884ca7c2 h1:TJfWjJyYWG/0NXdeBt6HCyn+acrZwwptTTVgPrLMTB4=
 github.com/descope/backend v0.0.0-20260625120343-08ae884ca7c2/go.mod h1:mSfe5I1DChENT/mUVVVBIkrou9zvdz+zMNvMdTcICk4=
-github.com/descope/go-sdk v1.24.1-0.20260629153702-a01d8b6280bb h1:Dx8TA3v7vFu8Kc33a1CvnYO3W/5F+FNJLPaXmU5tZqI=
-github.com/descope/go-sdk v1.24.1-0.20260629153702-a01d8b6280bb/go.mod h1:RCcsYK05DvtO4Li7Rm9iVbwopN1uoy8foj2ag8z3U3k=
+github.com/descope/go-sdk v1.27.0 h1:uSfehpzFo2NCXiJ+IYCpcUQIOUp9mt69OivV6cUzW/U=
+github.com/descope/go-sdk v1.27.0/go.mod h1:RCcsYK05DvtO4Li7Rm9iVbwopN1uoy8foj2ag8z3U3k=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14/go.mod h1:NXzSaAKXU0dil+cxwRcnqgNPdZR0U571aLLqJaRibBw=
 github.com/descope/protoc-gen-mocker v1.0.1-0.20260629151642-4131f9ca3dee h1:pzl/k0ijv4hNwv9rQgQBHqWQN6qXUcgI6HkAN7mJVrA=
