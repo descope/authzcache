@@ -6,10 +6,10 @@ package cel
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/descope/backend/authzservice/pkg/authzservice/cel/descopecel"
+	ae "github.com/descope/backend/authzservice/pkg/authzservice/errors"
 	cctx "github.com/descope/backend/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
 	"github.com/google/cel-go/cel"
@@ -30,7 +30,7 @@ type CompiledCondition struct {
 // shared custom functions/types (EnvOptions).
 func Compile(c *descope.FGACondition) (*CompiledCondition, error) {
 	if len(c.CheckedExpr) == 0 {
-		return nil, fmt.Errorf("condition %q has no checked expression", c.Name)
+		return nil, ae.CELConditionCompile.New(context.Background(), "Condition has no checked expression")
 	}
 	env, err := cel.NewEnv(descopecel.EnvOptions()...)
 	if err != nil {
