@@ -38,7 +38,7 @@ func mustCheckedCond(t *testing.T, name string, params []*descope.FGAConditionPa
 
 func TestCompileAndEval(t *testing.T) {
 	cond := mustCheckedCond(t, "isAdmin", []*descope.FGAConditionParam{{Name: "role", Type: "string"}}, `role == "admin"`)
-	compiled, err := edgecel.Compile(cond)
+	compiled, err := edgecel.Compile(context.Background(), cond)
 	require.NoError(t, err)
 
 	t.Run("condition true", func(t *testing.T) {
@@ -66,7 +66,7 @@ func TestCompileAndEval(t *testing.T) {
 func TestEvalIntCoercion(t *testing.T) {
 	// JSON numbers decode to float64; an int param must be coerced to int64 to match cel-go.
 	cond := mustCheckedCond(t, "highClearance", []*descope.FGAConditionParam{{Name: "level", Type: "int"}}, `level >= 5`)
-	compiled, err := edgecel.Compile(cond)
+	compiled, err := edgecel.Compile(context.Background(), cond)
 	require.NoError(t, err)
 
 	pass, ok := compiled.Eval(context.Background(), map[string]any{"level": float64(7)}, evalTimeout)
@@ -81,7 +81,7 @@ func TestEvalIntCoercion(t *testing.T) {
 func TestEvalIPAddress(t *testing.T) {
 	// custom ipaddress type + in_cidr function, shared with the backend via pkg.
 	cond := mustCheckedCond(t, "inOfficeRange", []*descope.FGAConditionParam{{Name: "ip", Type: "ipaddress"}}, `ip.in_cidr("10.0.0.0/8")`)
-	compiled, err := edgecel.Compile(cond)
+	compiled, err := edgecel.Compile(context.Background(), cond)
 	require.NoError(t, err)
 
 	pass, ok := compiled.Eval(context.Background(), map[string]any{"ip": "10.1.2.3"}, evalTimeout)
@@ -97,7 +97,7 @@ func TestEvalIPAddress(t *testing.T) {
 }
 
 func TestCompileRejectsMissingCheckedExpr(t *testing.T) {
-	_, err := edgecel.Compile(&descope.FGACondition{Name: "empty"})
+	_, err := edgecel.Compile(context.Background(), &descope.FGACondition{Name: "empty"})
 	require.Error(t, err, "a condition with no checked expression must not compile")
 }
 

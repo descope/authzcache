@@ -28,9 +28,10 @@ type CompiledCondition struct {
 // Compile builds an executable program from the backend's type-checked CEL program (CheckedExpr). The
 // edge does not parse or type-check the expression — it runs the backend's checked AST in an env with the
 // shared custom functions/types (EnvOptions).
-func Compile(c *descope.FGACondition) (*CompiledCondition, error) {
+func Compile(ctx context.Context, c *descope.FGACondition) (*CompiledCondition, error) {
 	if len(c.CheckedExpr) == 0 {
-		return nil, ae.CELConditionCompile.New(context.Background(), "Condition has no checked expression")
+		cctx.Logger(ctx).Error().Str("condition", c.Name).Msg("Edge CEL condition has no checked expression, cannot compile")
+		return nil, ae.CELConditionCompile.New(ctx, "Condition has no checked expression")
 	}
 	env, err := cel.NewEnv(descopecel.EnvOptions()...)
 	if err != nil {

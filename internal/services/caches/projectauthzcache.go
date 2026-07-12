@@ -254,7 +254,7 @@ func (pc *projectAuthzCache) setSchema(ctx context.Context, schema *descope.FGAS
 	pc.loadedSchemaVersion = schema.Version
 	compiled := make(map[int32]*edgecel.CompiledCondition, len(schema.Conditions))
 	for _, c := range schema.Conditions {
-		program, err := edgecel.Compile(c)
+		program, err := edgecel.Compile(ctx, c)
 		if err != nil {
 			cctx.Logger(ctx).Error().Str("condition", c.Name).Err(err).Msg("Failed to compile schema condition for edge evaluation, conditional grants gated by it won't be cached")
 			continue
