@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	cconfig "github.com/descope/backend/common/pkg/common/config"
 	cctx "github.com/descope/backend/common/pkg/common/context"
 	"github.com/descope/backend/common/pkg/common/utils"
 )
@@ -176,6 +177,7 @@ func (r *Reporter) post(ctx context.Context, projectID string, payloads []APIMet
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+projectID+":"+r.managementKey)
+	req.Header.Set(cconfig.HeaderAuthzCacheGitSha, cconfig.GetGitSha())
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
