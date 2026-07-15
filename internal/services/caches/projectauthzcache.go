@@ -238,7 +238,7 @@ func (pc *projectAuthzCache) UpdateCacheWithSchema(ctx context.Context, schema *
 func (pc *projectAuthzCache) EnsureSchemaLoaded(ctx context.Context, schema *descope.FGASchema) {
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
-	if pc.schemaCache != nil {
+	if pc.schemaCache != nil && pc.loadedSchemaVersion != "" {
 		return
 	}
 	pc.setSchema(ctx, schema)
@@ -358,7 +358,7 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	// in case of no cached relations, we skip the server call but invalidate the schema cache to make sure we don't miss schema changes
 	if noRelations := pc.directRelationCache.Len(ctx) == 0 && pc.indirectRelationCache.Len(ctx) == 0; noRelations {
 		pc.remoteChanges.lastPollTime = time.Now()
-		pc.schemaCache = nil
+		pc.setSchema(ctx, nil)
 		cctx.Logger(ctx).Debug().Msg("No cached relations, skipping remote changes check")
 		return
 	}
@@ -532,7 +532,7 @@ func (pc *projectAuthzCache) removeIndexOnCacheEviction(key resourceTargetRelati
 
 // must be called while holding the mutex
 func (pc *projectAuthzCache) purgeAllCaches(ctx context.Context) {
-	pc.schemaCache = nil
+	pc.setSchema(ctx, nil)
 	pc.purgeRelationCaches(ctx)
 	// since all caches were purged, we can update the last poll time to the current time
 	pc.remoteChanges.lastPollTime = time.Now()

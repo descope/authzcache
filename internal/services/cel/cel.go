@@ -57,12 +57,12 @@ func (cc *CompiledCondition) Eval(ctx context.Context, requestContext map[string
 	for _, p := range cc.params {
 		raw, present := requestContext[p.Name]
 		if !present {
-			cctx.Logger(ctx).Warn().Str("condition", cc.name).Str("param", p.Name).Msg("Condition param missing from request context, deferring to backend")
+			cctx.Logger(ctx).Debug().Str("condition", cc.name).Str("param", p.Name).Msg("Condition param missing from request context, deferring to backend")
 			return false, false
 		}
 		v, coerced := coerce(p.Type, raw)
 		if !coerced {
-			cctx.Logger(ctx).Warn().Str("condition", cc.name).Str("param", p.Name).Msg("Condition param could not be coerced, deferring to backend")
+			cctx.Logger(ctx).Debug().Str("condition", cc.name).Str("param", p.Name).Msg("Condition param could not be coerced, deferring to backend")
 			return false, false
 		}
 		vars[p.Name] = v
@@ -71,12 +71,12 @@ func (cc *CompiledCondition) Eval(ctx context.Context, requestContext map[string
 	defer cancel()
 	out, _, err := cc.program.ContextEval(evalCtx, vars)
 	if err != nil {
-		cctx.Logger(ctx).Warn().Str("condition", cc.name).Err(err).Msg("Condition evaluation failed, deferring to backend")
+		cctx.Logger(ctx).Debug().Str("condition", cc.name).Err(err).Msg("Condition evaluation failed, deferring to backend")
 		return false, false
 	}
 	b, isBool := out.Value().(bool)
 	if !isBool {
-		cctx.Logger(ctx).Warn().Str("condition", cc.name).Msg("Condition did not evaluate to a bool, deferring to backend")
+		cctx.Logger(ctx).Debug().Str("condition", cc.name).Msg("Condition did not evaluate to a bool, deferring to backend")
 		return false, false
 	}
 	return b, true

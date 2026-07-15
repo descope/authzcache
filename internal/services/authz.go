@@ -143,7 +143,7 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 }
 
 func (a *authzCache) ensureSchemaLoaded(ctx context.Context, projectCache caches.ProjectAuthzCache, mgmtSDK sdk.Management) {
-	if projectCache.GetSchema() != nil {
+	if schema := projectCache.GetSchema(); schema != nil && schema.Version != "" {
 		return
 	}
 	schema, err := mgmtSDK.FGA().LoadSchema(ctx)

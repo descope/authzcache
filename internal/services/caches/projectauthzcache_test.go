@@ -1150,6 +1150,26 @@ func isAdminSchema(t *testing.T) *descope.FGASchema {
 	}
 }
 
+func TestEnsureSchemaLoaded_ReloadsVersionlessSchema(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+
+	// A versionless schema (e.g. the partial one CreateFGASchema stores) must not count as loaded:
+	// loadedSchemaVersion stays empty and no conditions compile.
+	cache.EnsureSchemaLoaded(ctx, &descope.FGASchema{Schema: "partial"})
+	require.Empty(t, cache.loadedSchemaVersion)
+	require.Empty(t, cache.compiledConditions)
+
+	// EnsureSchemaLoaded with the canonical versioned schema replaces the versionless one.
+	cache.EnsureSchemaLoaded(ctx, isAdminSchema(t))
+	assert.Equal(t, "v1", cache.loadedSchemaVersion)
+	assert.Contains(t, cache.compiledConditions, int32(1))
+
+	// Once a versioned schema is loaded, a later EnsureSchemaLoaded is a no-op.
+	cache.EnsureSchemaLoaded(ctx, &descope.FGASchema{Schema: "other", Version: "v2"})
+	assert.Equal(t, "v1", cache.loadedSchemaVersion, "already loaded, must not reload")
+}
+
 func TestConditionalRelationCaching_PerContext(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)
