@@ -60,7 +60,7 @@ func (cc *CompiledCondition) Eval(ctx context.Context, requestContext map[string
 			cctx.Logger(ctx).Debug().Str("condition", cc.name).Str("param", p.Name).Msg("Condition param missing from request context, deferring to backend")
 			return false, false
 		}
-		v, coerced := coerce(p.Type, raw)
+		v, coerced := descopecel.CoerceContextValue(p.Type, raw)
 		if !coerced {
 			cctx.Logger(ctx).Debug().Str("condition", cc.name).Str("param", p.Name).Msg("Condition param could not be coerced, deferring to backend")
 			return false, false
@@ -80,45 +80,4 @@ func (cc *CompiledCondition) Eval(ctx context.Context, requestContext map[string
 		return false, false
 	}
 	return b, true
-}
-
-// coerce maps a JSON-decoded request-context value to the Go type cel-go expects for the
-// declared DSL parameter type. JSON numbers decode to float64, so integer params need a
-// conversion, and the custom ipaddress type is built from its string form. Other types pass
-// through; a genuine mismatch surfaces as an eval error and defers to the backend.
-func coerce(dslType string, raw any) (any, bool) {
-	switch dslType {
-	case "int":
-		switch n := raw.(type) {
-		case float64:
-			return int64(n), true
-		case int64:
-			return n, true
-		case int:
-			return int64(n), true
-		default:
-			return nil, false
-		}
-	case "uint":
-		switch n := raw.(type) {
-		case float64:
-			return uint64(n), true
-		case uint64:
-			return n, true
-		default:
-			return nil, false
-		}
-	case descopecel.IPAddressTypeName:
-		s, isStr := raw.(string)
-		if !isStr {
-			return nil, false
-		}
-		v, err := descopecel.NewIPAddressVal(s)
-		if err != nil {
-			return nil, false
-		}
-		return v, true
-	default:
-		return raw, true
-	}
 }

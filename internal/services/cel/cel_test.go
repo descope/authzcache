@@ -76,6 +76,11 @@ func TestEvalIntCoercion(t *testing.T) {
 	pass, ok = compiled.Eval(context.Background(), map[string]any{"level": float64(3)}, evalTimeout)
 	require.True(t, ok)
 	assert.False(t, pass)
+
+	// a non-integral float can't represent an int param — the shared descopecel coercion rejects it so
+	// the edge defers to the backend instead of truncating (parity with the backend's buildVars).
+	_, ok = compiled.Eval(context.Background(), map[string]any{"level": float64(5.5)}, evalTimeout)
+	assert.False(t, ok, "a non-integral float must defer to the backend")
 }
 
 func TestEvalIPAddress(t *testing.T) {
