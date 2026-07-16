@@ -105,8 +105,8 @@ github.com/descope/go-sdk v1.27.0 h1:uSfehpzFo2NCXiJ+IYCpcUQIOUp9mt69OivV6cUzW/U
 github.com/descope/go-sdk v1.27.0/go.mod h1:RCcsYK05DvtO4Li7Rm9iVbwopN1uoy8foj2ag8z3U3k=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14/go.mod h1:NXzSaAKXU0dil+cxwRcnqgNPdZR0U571aLLqJaRibBw=
-github.com/descope/protoc-gen-mocker v1.0.1-0.20260708181031-0ddc66d3cde3 h1:5hr6OZwySl4QZ+0a624xkqtLvn1zQQVFR/zVLOz5BY4=
-github.com/descope/protoc-gen-mocker v1.0.1-0.20260708181031-0ddc66d3cde3/go.mod h1:mFOKOp2HDwSnRUxFiXnWOAMP/xF2dQ2MEFR7IyfMIrg=
+github.com/descope/protoc-gen-mocker v1.0.1-0.20260714170518-61da3bd5702c h1:IsXVP7lo9IVxU24aUMs0rByF84LrWNQ+mGE2HEJOQ6Y=
+github.com/descope/protoc-gen-mocker v1.0.1-0.20260714170518-61da3bd5702c/go.mod h1:mFOKOp2HDwSnRUxFiXnWOAMP/xF2dQ2MEFR7IyfMIrg=
 github.com/descope/protoc-gen-validate v1.6.6 h1:0iSOzAxkTrN5XPJ6ytgCk3YAUOE8HT5URLSwkoMXTKI=
 github.com/descope/protoc-gen-validate v1.6.6/go.mod h1:Q8vdMSPfjG+LLeKVOCF6lzYcyHrzZ6AZzyZexE7F4kM=
 github.com/descope/redismock/v9 v9.0.0-20260623182854-7816a24577af h1:kHZ/riQgVMnZAFp7v8aZ2Eh07QD1yGJ9J9bFFgguiZA=
