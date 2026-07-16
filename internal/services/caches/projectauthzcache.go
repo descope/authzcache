@@ -302,20 +302,26 @@ func (pc *projectAuthzCache) UpdateCacheWithChecks(ctx context.Context, sdkCheck
 		}
 		grant := &cachedGrant{allowed: c.Allowed}
 		if c.Info.Conditional {
-			if c.Info.SchemaVersion != pc.loadedSchemaVersion ||
-				len(c.Info.MissingContext) != 0 || c.Info.ConditionalErr != "" ||
+			switch {
+			case c.Info.SchemaVersion != pc.loadedSchemaVersion ||
 				(len(c.Info.TrueConditions) == 0 && len(c.Info.FalseConditions) == 0) ||
-				!pc.hasAllCompiledConditions(c.Info.TrueConditions) || !pc.hasAllCompiledConditions(c.Info.FalseConditions) {
-				// Expected only very rarely (schema-version skew, empty certificate, uncompiled condition, or a
-				// check with missing context / eval error); the grant simply isn't cached and falls through to backend.
+				!pc.hasAllCompiledConditions(c.Info.TrueConditions) || !pc.hasAllCompiledConditions(c.Info.FalseConditions):
+				// Schema/state skew that should rarely happen (version mismatch, empty certificate, or an
+				// uncompiled condition) — worth a warning. The grant isn't cached and falls through to backend.
 				cctx.Logger(ctx).Warn().
 					Str("schema_version", c.Info.SchemaVersion).
 					Str("loaded_schema_version", pc.loadedSchemaVersion).
-					Int("missing_context_count", len(c.Info.MissingContext)).
-					Str("conditional_err", c.Info.ConditionalErr).
 					Int("true_conditions_count", len(c.Info.TrueConditions)).
 					Int("false_conditions_count", len(c.Info.FalseConditions)).
-					Msg("Conditional grant not cacheable at the edge, skipping")
+					Msg("Conditional grant not cacheable at the edge (schema state), skipping")
+				continue
+			case len(c.Info.MissingContext) != 0 || c.Info.ConditionalErr != "":
+				// Driven by the request context and expected to happen (a param a condition needs wasn't
+				// supplied, or a condition couldn't be evaluated for this context) — defer to backend.
+				cctx.Logger(ctx).Debug().
+					Int("missing_context_count", len(c.Info.MissingContext)).
+					Str("conditional_err", c.Info.ConditionalErr).
+					Msg("Conditional grant not cacheable at the edge (request context), skipping")
 				continue
 			}
 			grant.cond = &conditionalCert{trueConds: c.Info.TrueConditions, falseConds: c.Info.FalseConditions}
