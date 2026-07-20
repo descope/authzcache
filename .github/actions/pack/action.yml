@@ -78,7 +78,7 @@ runs:
         password: ${{ inputs.action_token}}
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
+      uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
       with:
         aws-region: us-east-1
         role-to-assume: arn:aws:iam::${{ inputs.ecr_aws_account }}:role/GitHubActionsECR
@@ -167,7 +167,7 @@ runs:
         ignore-unfixed: true
 
     - name: Attest
-      uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+      uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
       id: attest
       with:
         subject-name: ghcr.io/descope/${{steps.setup_build_args.outputs.repo_name}}
