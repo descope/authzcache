@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.2.1](https://github.com/descope/authzcache/compare/v1.2.0...v1.2.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **deps:** update github.com/descope dependendies ([#870](https://github.com/descope/authzcache/issues/870)) ([a4ca1d6](https://github.com/descope/authzcache/commit/a4ca1d6fc9b4b3c302b0844daf24dbe31b424f6a))
+* **deps:** update github.com/descope/backend digest to 0e8c605 ([#872](https://github.com/descope/authzcache/issues/872)) ([ed7d543](https://github.com/descope/authzcache/commit/ed7d54364b30b8d2b2c88cc8d897550b43d14376))
+* **deps:** update github.com/descope/backend digest to 3f19607 ([#873](https://github.com/descope/authzcache/issues/873)) ([d6ffbc0](https://github.com/descope/authzcache/commit/d6ffbc0fe0dc1d0ed61d0d71d66f18d141ee416f))
+* **deps:** update github.com/descope/backend digest to 4c2427e ([#877](https://github.com/descope/authzcache/issues/877)) ([e8cf2c6](https://github.com/descope/authzcache/commit/e8cf2c6dea1393d3febf7ad44c92950f0b57a2bb))
+* **deps:** update github.com/descope/backend digest to 605b644 ([#875](https://github.com/descope/authzcache/issues/875)) ([0ddda73](https://github.com/descope/authzcache/commit/0ddda73e5a3da2a2155f4d59c35e2b4565ad9952))
+* **deps:** update github.com/descope/backend digest to 6227fc0 ([#864](https://github.com/descope/authzcache/issues/864)) ([6ac7741](https://github.com/descope/authzcache/commit/6ac774181f384d0137cebce3458eb723bc83d414))
+* **deps:** update github.com/descope/backend digest to 6675483 ([#879](https://github.com/descope/authzcache/issues/879)) ([9e20aef](https://github.com/descope/authzcache/commit/9e20aef44f5a1221c94ff0a07a009658a095e7e9))
+* **deps:** update github.com/descope/backend digest to 67aeaa6 ([#876](https://github.com/descope/authzcache/issues/876)) ([b1f671c](https://github.com/descope/authzcache/commit/b1f671c7809eea58d5b11e21737ce67ac6ca3132))
+* **deps:** update github.com/descope/backend digest to 6fe57bd ([#878](https://github.com/descope/authzcache/issues/878)) ([cf6d91e](https://github.com/descope/authzcache/commit/cf6d91e909b680b39ee3d3293df53872e72f95ea))
+* **deps:** update github.com/descope/backend digest to 73b190c ([#869](https://github.com/descope/authzcache/issues/869)) ([102e42d](https://github.com/descope/authzcache/commit/102e42dba50994125c732b0a72e2b182dd453757))
+* **deps:** update github.com/descope/backend digest to 839d2b1 ([#874](https://github.com/descope/authzcache/issues/874)) ([21ca567](https://github.com/descope/authzcache/commit/21ca567c1efbf3fc12dbf3f19fb3f7c719ba809b))
+* **deps:** update github.com/descope/backend digest to 9b6940c ([#866](https://github.com/descope/authzcache/issues/866)) ([1925c06](https://github.com/descope/authzcache/commit/1925c060e0e5dc71c4ddea848be50977f25ce01c))
+* **deps:** update github.com/descope/backend digest to ba08cde ([#868](https://github.com/descope/authzcache/issues/868)) ([7aa4c3d](https://github.com/descope/authzcache/commit/7aa4c3d79287c14eb8475fca5b01479de70cb212))
+* **deps:** update github.com/descope/backend digest to c389bc3 ([#867](https://github.com/descope/authzcache/issues/867)) ([026fe5f](https://github.com/descope/authzcache/commit/026fe5f4d4ce96bd327a83f3543e641341e0ed31))
+* **deps:** update module github.com/google/cel-go to v0.29.0 ([#883](https://github.com/descope/authzcache/issues/883)) ([6c62221](https://github.com/descope/authzcache/commit/6c622216e3c38eccaf6196391015e2d0741f8fe3))
+* **deps:** update module google.golang.org/grpc to v1.82.0 ([#871](https://github.com/descope/authzcache/issues/871)) ([c2216df](https://github.com/descope/authzcache/commit/c2216dfee8269955aa671e645da8e380b3c85cf3))
+* **deps:** update module google.golang.org/grpc to v1.82.1 [security] ([#882](https://github.com/descope/authzcache/issues/882)) ([42f8c95](https://github.com/descope/authzcache/commit/42f8c9539134ecf5138f01f2558deea678655382))
+
 ## [1.2.0](https://github.com/descope/authzcache/compare/v1.1.0...v1.2.0) (2026-07-20)
 
 
