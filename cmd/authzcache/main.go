@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/descope/authzcache/internal/config"
 	"github.com/descope/authzcache/internal/controllers"
@@ -56,7 +57,8 @@ func serve() {
 			},
 		},
 		[]server.RegisterHTTPFunc{
-			func(ctx context.Context, mux *runtime.ServeMux, conn *grpc.ClientConn, _ *http.Server) error {
+			func(ctx context.Context, mux *runtime.ServeMux, conn *grpc.ClientConn, srv *http.Server) error {
+				setHTTPWriteTimeout(srv)
 				return authzcv1.RegisterAuthzCacheHandler(ctx, mux, conn)
 			},
 		},
@@ -70,4 +72,9 @@ func serve() {
 	if err != nil {
 		cctx.Logger(ctx).Fatal().Str(config.MetricsKeyResourceServiceName, cconfig.GetServiceName()).Err(err).Msg("Failed to start server")
 	}
+}
+
+// setHTTPWriteTimeout keeps the gateway write timeout below the node-sdk 30s cache abort so slow backend calls return via the cache instead of resetting the connection
+func setHTTPWriteTimeout(srv *http.Server) {
+	srv.WriteTimeout = time.Duration(config.GetHTTPWriteTimeoutInSeconds()) * time.Second
 }
