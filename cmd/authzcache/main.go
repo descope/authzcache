@@ -58,7 +58,7 @@ func serve() {
 		},
 		[]server.RegisterHTTPFunc{
 			func(ctx context.Context, mux *runtime.ServeMux, conn *grpc.ClientConn, srv *http.Server) error {
-				setHTTPWriteTimeout(srv)
+				setGatewayWriteTimeout(srv)
 				return authzcv1.RegisterAuthzCacheHandler(ctx, mux, conn)
 			},
 		},
@@ -74,7 +74,7 @@ func serve() {
 	}
 }
 
-// setHTTPWriteTimeout keeps the gateway write timeout below the node-sdk 30s cache abort so slow backend calls return via the cache instead of resetting the connection
-func setHTTPWriteTimeout(srv *http.Server) {
-	srv.WriteTimeout = time.Duration(config.GetHTTPWriteTimeoutInSeconds()) * time.Second
+// setGatewayWriteTimeout applies the configured gateway write timeout so a slow backend call returns via the cache instead of resetting the connection
+func setGatewayWriteTimeout(srv *http.Server) {
+	srv.WriteTimeout = time.Duration(config.GetGatewayWriteTimeoutInSeconds()) * time.Second
 }
