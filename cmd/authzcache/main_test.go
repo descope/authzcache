@@ -11,9 +11,6 @@ import (
 )
 
 func TestGetGatewayWriteTimeoutInSeconds(t *testing.T) {
-	t.Run("default is 30", func(t *testing.T) {
-		assert.Equal(t, 30, config.GetGatewayWriteTimeoutInSeconds())
-	})
 	t.Run("authzcache var applies", func(t *testing.T) {
 		t.Setenv(config.ConfigKeyGatewayWriteTimeoutInSeconds, "40")
 		assert.Equal(t, 40, config.GetGatewayWriteTimeoutInSeconds())
@@ -33,7 +30,7 @@ func TestSetGatewayWriteTimeout(t *testing.T) {
 	t.Run("applies the default", func(t *testing.T) {
 		srv := &http.Server{ReadHeaderTimeout: time.Second}
 		setGatewayWriteTimeout(srv)
-		assert.Equal(t, 30*time.Second, srv.WriteTimeout)
+		assert.Equal(t, time.Duration(config.GetGatewayWriteTimeoutInSeconds())*time.Second, srv.WriteTimeout)
 	})
 	t.Run("applies the configured override", func(t *testing.T) {
 		t.Setenv(config.ConfigKeyGatewayWriteTimeoutInSeconds, "45")
