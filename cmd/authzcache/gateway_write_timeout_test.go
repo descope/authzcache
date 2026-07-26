@@ -9,10 +9,7 @@ import (
 	"time"
 
 	"github.com/descope/authzcache/internal/config"
-	"github.com/descope/authzcache/internal/controllers"
 	"github.com/descope/authzcache/internal/middlewares"
-	"github.com/descope/authzcache/internal/services"
-	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/authzcache/internal/services/metrics"
 	authczv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
 	"github.com/descope/go-sdk/descope"
@@ -26,8 +23,8 @@ import (
 )
 
 // startRealGateway wires the real authzcache stack — gateway http.Server → gRPC
-// server → controller → service — mocking only the downstream Descope SDK. The
-// write timeout is applied through the production setGatewayWriteTimeout override.
+// server → controller → service — reusing main's newAuthzController and
+// registerGateway, mocking only the downstream Descope SDK.
 func startRealGateway(t *testing.T, sdkDelay time.Duration) string {
 	t.Helper()
 	ctx := context.Background()
@@ -46,13 +43,13 @@ func startRealGateway(t *testing.T, sdkDelay time.Duration) string {
 	}
 	remoteCreator := func(_ string, _ logger.LoggerInterface) (sdk.Management, error) { return mockSDK, nil }
 
-	svc, err := services.New(ctx, caches.NewProjectAuthzCache, remoteCreator, metrics.NewCollector())
+	ctrl, err := newAuthzController(ctx, remoteCreator, metrics.NewCollector())
 	require.NoError(t, err)
 
 	grpcLn, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	grpcSrv := grpc.NewServer()
-	authczv1.RegisterAuthzCacheServer(grpcSrv, controllers.New(svc))
+	authczv1.RegisterAuthzCacheServer(grpcSrv, ctrl)
 	go func() { _ = grpcSrv.Serve(grpcLn) }()
 	t.Cleanup(grpcSrv.Stop)
 
@@ -60,12 +57,11 @@ func startRealGateway(t *testing.T, sdkDelay time.Duration) string {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
 	mux := runtime.NewServeMux()
-	require.NoError(t, authczv1.RegisterAuthzCacheHandler(ctx, mux, conn))
 
 	httpLn, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	srv := &http.Server{ReadHeaderTimeout: time.Second, Handler: middlewares.ProjectIDParser(ctx)(mux)}
-	setGatewayWriteTimeout(srv)
+	require.NoError(t, registerGateway(ctx, mux, conn, srv))
 	go func() { _ = srv.Serve(httpLn) }()
 	t.Cleanup(func() { _ = srv.Close() })
 
@@ -90,7 +86,7 @@ func postCheck(t *testing.T, addr string) error {
 // endpoint with a slow (mocked) downstream: a low AUTHZCACHE_HTTP_WRITE_TIMEOUT_IN_SECONDS
 // severs the connection (socket hang up), a high one lets the slow response through.
 func TestGatewayWriteTimeoutAffectsCheckEndpoint(t *testing.T) {
-	const sdkDelay = 3 * time.Second
+	const sdkDelay = 2 * time.Second
 
 	t.Run("low timeout cuts the connection", func(t *testing.T) {
 		t.Setenv(config.ConfigKeyGatewayWriteTimeoutInSeconds, "1")
