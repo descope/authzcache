@@ -45,16 +45,23 @@ func serve() {
 					Str("git_sha", cconfig.GetGitSha()).
 					Msg("Starting authzcache")
 				reporter.Start(ctx)
-				ctrl, err := newAuthzController(ctx, remote.NewDescopeClientWithProjectID, collector)
+				//authz cache service init
+				as, err := services.New(ctx, caches.NewProjectAuthzCache, remote.NewDescopeClientWithProjectID, collector)
 				if err != nil {
 					cctx.Logger(ctx).Err(err).Msg("Failed creating authz cache")
 					return err
 				}
+				ctrl := controllers.New(as)
 				authzcv1.RegisterAuthzCacheServer(s, ctrl)
 				return nil
 			},
 		},
-		[]server.RegisterHTTPFunc{registerGateway},
+		[]server.RegisterHTTPFunc{
+			func(ctx context.Context, mux *runtime.ServeMux, conn *grpc.ClientConn, srv *http.Server) error {
+				setGatewayWriteTimeout(srv)
+				return authzcv1.RegisterAuthzCacheHandler(ctx, mux, conn)
+			},
+		},
 		server.ServerOptions{
 			ServiceMiddlewares: []func(context.Context) func(h http.Handler) http.Handler{
 				middlewares.ProjectIDParser,
@@ -65,19 +72,6 @@ func serve() {
 	if err != nil {
 		cctx.Logger(ctx).Fatal().Str(config.MetricsKeyResourceServiceName, cconfig.GetServiceName()).Err(err).Msg("Failed to start server")
 	}
-}
-
-func newAuthzController(ctx context.Context, remoteCreator services.RemoteClientCreator, collector *metrics.Collector) (authzcv1.AuthzCacheServer, error) {
-	as, err := services.New(ctx, caches.NewProjectAuthzCache, remoteCreator, collector)
-	if err != nil {
-		return nil, err
-	}
-	return controllers.New(as), nil
-}
-
-func registerGateway(ctx context.Context, mux *runtime.ServeMux, conn *grpc.ClientConn, srv *http.Server) error {
-	setGatewayWriteTimeout(srv)
-	return authzcv1.RegisterAuthzCacheHandler(ctx, mux, conn)
 }
 
 // setGatewayWriteTimeout applies the configured gateway write timeout so a slow backend call returns via the cache instead of resetting the connection
