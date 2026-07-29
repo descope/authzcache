@@ -22,6 +22,9 @@ const (
 	// Metrics reporting configuration
 	ConfigKeyMetricsReportEnabled           = "AUTHZCACHE_METRICS_REPORT_ENABLED"             // TRUE/FALSE, default is TRUE
 	ConfigKeyMetricsReportIntervalInSeconds = "AUTHZCACHE_METRICS_REPORT_INTERVAL_IN_SECONDS" // interval in seconds, default is 60, min is 10
+
+	// HTTP gateway configuration
+	ConfigKeyGatewayWriteTimeoutInSeconds = "AUTHZCACHE_HTTP_WRITE_TIMEOUT_IN_SECONDS" // gateway response-write timeout; default 30, the node-sdk cache-abort ceiling
 )
 
 func GetDirectRelationCacheSizePerProject() int {
@@ -70,4 +73,15 @@ func GetMetricsReportEnabled() bool {
 
 func GetMetricsReportIntervalInSeconds() int {
 	return max(10, cconfig.GetIntOrProvidedLocal(ConfigKeyMetricsReportIntervalInSeconds, 60))
+}
+
+func GetGatewayWriteTimeoutInSeconds() int {
+	// AUTHZCACHE override wins; else the shared HTTP_GATEWAY_WRITE_TIMEOUT; else 30 (the node-sdk cache-abort ceiling)
+	if v := cconfig.GetIntOrProvidedLocal(ConfigKeyGatewayWriteTimeoutInSeconds, 0); v > 0 {
+		return v
+	}
+	if v := cconfig.GetIntOrProvidedLocal(cconfig.ConfigKeyHTTPWriteTimeout, 0); v > 0 {
+		return v
+	}
+	return 30
 }
