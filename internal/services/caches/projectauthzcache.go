@@ -272,6 +272,7 @@ func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, 
 	defer pc.mutex.Unlock()
 	pc.indirectRelationCache.Purge(ctx) // added (direct) relations can change the result of indirect checks, so we must purge all indirect relations
 	for _, r := range relations {
+		pc.removeDirectRelationsByResourceAndTarget(ctx, r)
 		pc.addToLookupCache(ctx, r)
 	}
 }
@@ -285,7 +286,7 @@ func (pc *projectAuthzCache) UpdateCacheWithDeletedRelations(ctx context.Context
 	pc.indirectRelationCache.Purge(ctx) // deleted (direct) relations can change the result of indirect checks, so we must purge all indirect relations
 	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation
 	for _, r := range relations {
-		pc.removeDirectRelation(ctx, r)
+		pc.removeDirectRelationsByResourceAndTarget(ctx, r)
 	}
 }
 
@@ -451,34 +452,30 @@ func (pc *projectAuthzCache) addIndirectRelation(ctx context.Context, r *descope
 	pc.indirectRelationCache.Add(ctx, key, grant)
 }
 
-func (pc *projectAuthzCache) removeDirectRelation(ctx context.Context, r *descope.FGARelation) {
-	key := key(r)
-	pc.directRelationCache.Remove(ctx, key)
-	resource := resource(r.Resource)
-	target := target(r.Target)
-	pc.removeKeyFromResourceIndex(resource, target, key)
-	pc.removeKeyFromTargetIndex(resource, target, key)
-	delete(pc.directKeyComponents, key)
+// GetModified never reports our own writes, so a direct key missed here stays stale forever.
+func (pc *projectAuthzCache) removeDirectRelationsByResourceAndTarget(ctx context.Context, r *descope.FGARelation) {
+	pc.removeDirectRelationByResource(ctx, resource(r.Resource))
+	pc.removeDirectRelationByTarget(ctx, target(r.Target))
 }
 
 func (pc *projectAuthzCache) removeDirectRelationByResource(ctx context.Context, r resource) {
 	targetsToKeys := pc.directResourcesIndex[r]
+	delete(pc.directResourcesIndex, r) // dropped up front so the eviction callback skips maintaining it
 	for _, keys := range targetsToKeys {
 		for _, k := range keys {
 			pc.directRelationCache.Remove(ctx, k)
 		}
 	}
-	delete(pc.directResourcesIndex, r)
 }
 
 func (pc *projectAuthzCache) removeDirectRelationByTarget(ctx context.Context, t target) {
 	resourcesToKeys := pc.directTargetsIndex[t]
+	delete(pc.directTargetsIndex, t) // dropped up front so the eviction callback skips maintaining it
 	for _, keys := range resourcesToKeys {
 		for _, k := range keys {
 			pc.directRelationCache.Remove(ctx, k)
 		}
 	}
-	delete(pc.directTargetsIndex, t)
 }
 
 func (pc *projectAuthzCache) removeKeyFromResourceIndex(r resource, t target, keyToRemove resourceTargetRelation) {

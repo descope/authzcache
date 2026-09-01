@@ -104,6 +104,7 @@ func (r *Reporter) report(ctx context.Context) {
 		}
 		payloads := make([]APIMetricsPayload, 0, len(byAPI))
 		for api, agg := range byAPI {
+			logRelationCounts(ctx, projectID, api, agg) // above the guard: an upstream error leaves counts with no call
 			if agg.TotalCalls == 0 {
 				continue
 			}
@@ -116,6 +117,21 @@ func (r *Reporter) report(ctx context.Context) {
 			cctx.Logger(ctx).Error().Err(err).Str("project_id", projectID).Msg("Failed to report FGA cache metrics; metrics for this window are lost")
 		}
 	}
+}
+
+// TODO: report these instead of logging them once the metrics endpoint's proto accepts the fields.
+func logRelationCounts(ctx context.Context, projectID string, api APIName, agg *AggregatedMetrics) {
+	if agg.Relations == (RelationCounts{}) {
+		return
+	}
+	cctx.Logger(ctx).Info().
+		Str("project_id", projectID).
+		Str("api", string(api)).
+		Int64("relation_hits_direct", agg.Relations.HitsDirect).
+		Int64("relation_hits_indirect", agg.Relations.HitsIndirect).
+		Int64("relation_hits_conditional", agg.Relations.HitsConditional).
+		Int64("relation_misses", agg.Relations.Misses).
+		Msg("FGA cache relation-level counters")
 }
 
 func buildPayload(api APIName, agg *AggregatedMetrics) APIMetricsPayload {
