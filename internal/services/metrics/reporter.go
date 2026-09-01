@@ -119,7 +119,7 @@ func (r *Reporter) report(ctx context.Context) {
 	}
 }
 
-// TODO: report these instead of logging them once the metrics endpoint's proto accepts the fields.
+// Logged rather than reported: the metrics endpoint's proto does not accept these fields yet.
 func logRelationCounts(ctx context.Context, projectID string, api APIName, agg *AggregatedMetrics) {
 	if agg.Relations == (RelationCounts{}) {
 		return
