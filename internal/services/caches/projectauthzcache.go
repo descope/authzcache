@@ -452,7 +452,6 @@ func (pc *projectAuthzCache) addIndirectRelation(ctx context.Context, r *descope
 	pc.indirectRelationCache.Add(ctx, key, grant)
 }
 
-// GetModified never reports our own writes, so a direct key missed here stays stale forever.
 func (pc *projectAuthzCache) removeDirectRelationsByResourceAndTarget(ctx context.Context, r *descope.FGARelation) {
 	pc.removeDirectRelationByResource(ctx, resource(r.Resource))
 	pc.removeDirectRelationByTarget(ctx, target(r.Target))
@@ -460,22 +459,22 @@ func (pc *projectAuthzCache) removeDirectRelationsByResourceAndTarget(ctx contex
 
 func (pc *projectAuthzCache) removeDirectRelationByResource(ctx context.Context, r resource) {
 	targetsToKeys := pc.directResourcesIndex[r]
-	delete(pc.directResourcesIndex, r) // dropped up front so the eviction callback skips maintaining it
 	for _, keys := range targetsToKeys {
 		for _, k := range keys {
 			pc.directRelationCache.Remove(ctx, k)
 		}
 	}
+	delete(pc.directResourcesIndex, r)
 }
 
 func (pc *projectAuthzCache) removeDirectRelationByTarget(ctx context.Context, t target) {
 	resourcesToKeys := pc.directTargetsIndex[t]
-	delete(pc.directTargetsIndex, t) // dropped up front so the eviction callback skips maintaining it
 	for _, keys := range resourcesToKeys {
 		for _, k := range keys {
 			pc.directRelationCache.Remove(ctx, k)
 		}
 	}
+	delete(pc.directTargetsIndex, t)
 }
 
 func (pc *projectAuthzCache) removeKeyFromResourceIndex(r resource, t target, keyToRemove resourceTargetRelation) {
