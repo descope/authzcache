@@ -130,7 +130,7 @@ func (r *Reporter) logCacheSizes(ctx context.Context) {
 		Float64("heap_alloc_mb", float64(m.HeapAlloc)/(1<<20)).
 		Int64("total_entries", totalEntries)
 	if totalEntries > 0 {
-		event = event.Int64("heap_bytes_per_entry_max", int64(m.HeapInuse)/totalEntries)
+		event = event.Float64("heap_bytes_per_entry_max", float64(m.HeapInuse)/float64(totalEntries))
 	}
 	event.Msg("FGA cache process memory")
 }
