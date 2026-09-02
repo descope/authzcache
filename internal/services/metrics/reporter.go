@@ -104,18 +104,19 @@ func (r *Reporter) run(ctx context.Context) {
 	}
 }
 
-// logCacheSizes reports exact counts plus the real process heap, so bytes-per-entry can be divided out
-// of a measurement rather than estimated from assumed per-entry overheads. Heap covers the whole
-// process, so the derived figure is an upper bound on what an entry actually costs.
+// logCacheSizes reports exact counts plus the real process heap, so cost per answer can be divided out
+// of a measurement rather than estimated from assumed per-entry overheads. The denominator is cached
+// answers only, so whole-process heap — the indexes included — is charged to the answers that caused
+// it. That keeps index growth visible in the ratio instead of deflating it.
 func (r *Reporter) logCacheSizes(ctx context.Context) {
 	if r.cacheStats == nil {
 		return
 	}
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	var totalEntries int64
+	var cachedAnswers int64
 	for projectID, s := range r.cacheStats() {
-		totalEntries += int64(s.DirectEntries + s.IndirectEntries + s.LookupEntries + s.IndexEntries)
+		cachedAnswers += int64(s.DirectEntries + s.IndirectEntries + s.LookupEntries)
 		cctx.Logger(ctx).Info().
 			Str("project_id", projectID).
 			Int("direct_entries", s.DirectEntries).
@@ -128,9 +129,9 @@ func (r *Reporter) logCacheSizes(ctx context.Context) {
 	event := cctx.Logger(ctx).Info().
 		Float64("heap_inuse_mb", float64(m.HeapInuse)/(1<<20)).
 		Float64("heap_alloc_mb", float64(m.HeapAlloc)/(1<<20)).
-		Int64("total_entries", totalEntries)
-	if totalEntries > 0 {
-		event = event.Float64("heap_bytes_per_entry_max", float64(m.HeapInuse)/float64(totalEntries))
+		Int64("cached_answers", cachedAnswers)
+	if cachedAnswers > 0 {
+		event = event.Float64("heap_bytes_per_answer_max", float64(m.HeapInuse)/float64(cachedAnswers))
 	}
 	event.Msg("FGA cache process memory")
 }
