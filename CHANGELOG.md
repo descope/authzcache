@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.2](https://github.com/descope/authzcache/compare/v1.2.1...v1.2.2) (2026-09-02)
+
+
+### Bug Fixes
+
+* **cache:** invalidate direct grants by resource and target on write-through ([#907](https://github.com/descope/authzcache/issues/907)) ([d5f61de](https://github.com/descope/authzcache/commit/d5f61debae2ca3b8524e429925720f67bddeaecd))
+* **deps:** update module github.com/google/cel-go to v0.30.0 ([#897](https://github.com/descope/authzcache/issues/897)) ([8911a51](https://github.com/descope/authzcache/commit/8911a51c22fdaec4abcaa3c5d35735d79cf2dd97))
+* **deps:** update module github.com/google/cel-go to v0.31.0 ([#905](https://github.com/descope/authzcache/issues/905)) ([86c65ec](https://github.com/descope/authzcache/commit/86c65ecf03a34e46cad5bcf1dee3249206f2f935))
+* **deps:** update module github.com/grpc-ecosystem/grpc-gateway/v2 to v2.30.0 ([#904](https://github.com/descope/authzcache/issues/904)) ([73cd57c](https://github.com/descope/authzcache/commit/73cd57c71045d378037a8f5c51dba34d765f4bca))
+* **deps:** update module github.com/stretchr/testify to v1.12.0 ([#899](https://github.com/descope/authzcache/issues/899)) ([98cbc1f](https://github.com/descope/authzcache/commit/98cbc1fa6bcf768b0c1969da5d771ba0c6a6a013))
+* **deps:** update module google.golang.org/grpc to v1.83.0 ([#901](https://github.com/descope/authzcache/issues/901)) ([cb2ee3b](https://github.com/descope/authzcache/commit/cb2ee3bb03d87e38f9bf46b9fe064fc1708f28fb))
+* **deps:** update module google.golang.org/grpc to v1.83.1 [security] ([#909](https://github.com/descope/authzcache/issues/909)) ([8f4baeb](https://github.com/descope/authzcache/commit/8f4baeb07e3af2ecf2f24bedef3c715e31699b51))
+* **deps:** update module google.golang.org/protobuf to v1.36.12 ([#906](https://github.com/descope/authzcache/issues/906)) ([0b6351c](https://github.com/descope/authzcache/commit/0b6351cfa8b6cf38b0b9000d643f659d0d703ebf))
+
 ## [1.2.1](https://github.com/descope/authzcache/compare/v1.2.0...v1.2.1) (2026-07-29)
 
 
