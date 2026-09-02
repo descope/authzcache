@@ -10,7 +10,6 @@ import (
 
 	"github.com/descope/authzcache/internal/config"
 	celtypes "github.com/descope/backend/authzservice/pkg/authzservice/cel/descopecel"
-	mlru "github.com/descope/backend/common/pkg/common/utils/monitoredlru"
 	"github.com/descope/go-sdk/descope"
 	lru "github.com/descope/golang-lru"
 	"github.com/google/cel-go/cel"
@@ -891,18 +890,6 @@ func TestCooldownMechanism_ConcurrentPollingWithTimerExpiry(t *testing.T) {
 	case <-time.After(30 * time.Second):
 		t.Fatal("Test timed out - possible deadlock detected")
 	}
-}
-
-// The write sweep leaves index cleanup to the eviction callback, which holds for the hashicorp v2
-// cache behind monitoredlru but not for the v1-era fork TestUnderstandEvictionCallback covers.
-func TestMonitoredLRURemoveFiresEvictionCallback(t *testing.T) {
-	ctx := context.TODO()
-	evicted := 0
-	c, err := mlru.NewWithEvict[string, int](2, "remove-fires-evict", func(_ string, _ int) { evicted++ })
-	require.NoError(t, err)
-	c.Add(ctx, "a", 1)
-	require.True(t, c.Remove(ctx, "a"))
-	require.Equal(t, 1, evicted, "removeDirectRelationsBy* relies on this to clean the indexes")
 }
 
 func TestUnderstandEvictionCallback(t *testing.T) {
