@@ -5,9 +5,11 @@ import (
 	"context"
 	"math"
 	"net/http"
+	"runtime"
 	"strings"
 	"time"
 
+	"github.com/descope/authzcache/internal/services/caches"
 	cconfig "github.com/descope/backend/common/pkg/common/config"
 	cctx "github.com/descope/backend/common/pkg/common/context"
 	"github.com/descope/backend/common/pkg/common/utils"
@@ -62,6 +64,12 @@ type Reporter struct {
 	interval      time.Duration
 	enabled       bool
 	httpClient    *http.Client
+	cacheStats    func() map[string]caches.Stats
+}
+
+// SetCacheStatsProvider must be called before Start, since the reporting goroutine reads the field.
+func (r *Reporter) SetCacheStatsProvider(f func() map[string]caches.Stats) {
+	r.cacheStats = f
 }
 
 func NewReporter(collector *Collector, baseURL, managementKey string, intervalSeconds int, enabled bool) *Reporter {
@@ -96,7 +104,40 @@ func (r *Reporter) run(ctx context.Context) {
 	}
 }
 
+// logCacheSizes reports exact counts plus the real process heap, so cost per answer can be divided out
+// of a measurement rather than estimated from assumed per-entry overheads. The denominator is cached
+// answers only, so whole-process heap — the indexes included — is charged to the answers that caused
+// it. That keeps index growth visible in the ratio instead of deflating it.
+func (r *Reporter) logCacheSizes(ctx context.Context) {
+	if r.cacheStats == nil {
+		return
+	}
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	var cachedAnswers int64
+	for projectID, s := range r.cacheStats() {
+		cachedAnswers += int64(s.DirectEntries + s.IndirectEntries + s.LookupEntries)
+		cctx.Logger(ctx).Info().
+			Str("project_id", projectID).
+			Int("direct_entries", s.DirectEntries).
+			Int("indirect_entries", s.IndirectEntries).
+			Int("lookup_entries", s.LookupEntries).
+			Int("index_entries", s.IndexEntries).
+			Int64("direct_key_bytes", s.DirectKeyBytes).
+			Msg("FGA cache sizes")
+	}
+	event := cctx.Logger(ctx).Info().
+		Float64("heap_inuse_mb", float64(m.HeapInuse)/(1<<20)).
+		Float64("heap_alloc_mb", float64(m.HeapAlloc)/(1<<20)).
+		Int64("cached_answers", cachedAnswers)
+	if cachedAnswers > 0 {
+		event = event.Float64("heap_bytes_per_answer_max", float64(m.HeapInuse)/float64(cachedAnswers))
+	}
+	event.Msg("FGA cache process memory")
+}
+
 func (r *Reporter) report(ctx context.Context) {
+	r.logCacheSizes(ctx)
 	snapshot := r.collector.SnapshotAndReset()
 	for projectID, byAPI := range snapshot {
 		if len(byAPI) == 0 {
@@ -104,6 +145,7 @@ func (r *Reporter) report(ctx context.Context) {
 		}
 		payloads := make([]APIMetricsPayload, 0, len(byAPI))
 		for api, agg := range byAPI {
+			logRelationCounts(ctx, projectID, api, agg) // above the guard: an upstream error leaves counts with no call
 			if agg.TotalCalls == 0 {
 				continue
 			}
@@ -116,6 +158,21 @@ func (r *Reporter) report(ctx context.Context) {
 			cctx.Logger(ctx).Error().Err(err).Str("project_id", projectID).Msg("Failed to report FGA cache metrics; metrics for this window are lost")
 		}
 	}
+}
+
+// Logged rather than reported: the metrics endpoint's proto does not accept these fields yet.
+func logRelationCounts(ctx context.Context, projectID string, api APIName, agg *AggregatedMetrics) {
+	if agg.Relations == (RelationCounts{}) {
+		return
+	}
+	cctx.Logger(ctx).Info().
+		Str("project_id", projectID).
+		Str("api", string(api)).
+		Int64("relation_hits_direct", agg.Relations.HitsDirect).
+		Int64("relation_hits_indirect", agg.Relations.HitsIndirect).
+		Int64("relation_hits_conditional", agg.Relations.HitsConditional).
+		Int64("relation_misses", agg.Relations.Misses).
+		Msg("FGA cache relation-level counters")
 }
 
 func buildPayload(api APIName, agg *AggregatedMetrics) APIMetricsPayload {
