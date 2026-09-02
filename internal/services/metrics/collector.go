@@ -20,6 +20,15 @@ type CallMetrics struct {
 	FilteredCount   int
 	ResultSize      int
 	DurationMs      int64
+	Relations       RelationCounts
+}
+
+// RelationCounts breaks a Check batch down per relation, where the rest of CallMetrics is per call.
+type RelationCounts struct {
+	HitsDirect      int64
+	HitsIndirect    int64
+	HitsConditional int64
+	Misses          int64
 }
 
 // AggregatedMetrics accumulates data across many calls.
@@ -36,6 +45,7 @@ type AggregatedMetrics struct {
 	MaxDurationHitsMs   int64
 	MinDurationMissesMs int64
 	MaxDurationMissesMs int64
+	Relations           RelationCounts
 }
 
 func newAggregatedMetrics() *AggregatedMetrics {
@@ -75,6 +85,10 @@ func (c *Collector) Record(projectID string, api APIName, m CallMetrics) {
 	agg.SumCandidates += int64(m.CandidatesCount)
 	agg.SumFiltered += int64(m.FilteredCount)
 	agg.SumResultSize += int64(m.ResultSize)
+	agg.Relations.HitsDirect += m.Relations.HitsDirect
+	agg.Relations.HitsIndirect += m.Relations.HitsIndirect
+	agg.Relations.HitsConditional += m.Relations.HitsConditional
+	agg.Relations.Misses += m.Relations.Misses
 
 	if m.CacheHit {
 		agg.HitCount++

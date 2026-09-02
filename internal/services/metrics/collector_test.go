@@ -8,6 +8,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestRecordAccumulatesRelationCounts(t *testing.T) {
+	c := NewCollector()
+	c.Record("proj1", APICheck, CallMetrics{Relations: RelationCounts{HitsDirect: 2, HitsIndirect: 1, HitsConditional: 1, Misses: 3}})
+	c.Record("proj1", APICheck, CallMetrics{Relations: RelationCounts{HitsIndirect: 1}})
+
+	agg := c.SnapshotAndReset()["proj1"][APICheck]
+	require.NotNil(t, agg)
+	require.Equal(t, RelationCounts{HitsDirect: 2, HitsIndirect: 2, HitsConditional: 1, Misses: 3}, agg.Relations)
+}
+
 func TestRecordAndSnapshot(t *testing.T) {
 	c := NewCollector()
 
