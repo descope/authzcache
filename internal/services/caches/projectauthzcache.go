@@ -272,6 +272,7 @@ func (pc *projectAuthzCache) UpdateCacheWithAddedRelations(ctx context.Context, 
 	defer pc.mutex.Unlock()
 	pc.indirectRelationCache.Purge(ctx) // added (direct) relations can change the result of indirect checks, so we must purge all indirect relations
 	for _, r := range relations {
+		pc.removeDirectRelationsByResourceAndTarget(ctx, r)
 		pc.addToLookupCache(ctx, r)
 	}
 }
@@ -285,7 +286,7 @@ func (pc *projectAuthzCache) UpdateCacheWithDeletedRelations(ctx context.Context
 	pc.indirectRelationCache.Purge(ctx) // deleted (direct) relations can change the result of indirect checks, so we must purge all indirect relations
 	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation
 	for _, r := range relations {
-		pc.removeDirectRelation(ctx, r)
+		pc.removeDirectRelationsByResourceAndTarget(ctx, r)
 	}
 }
 
@@ -399,10 +400,10 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	pc.indirectRelationCache.Purge(ctx)
 	// Lookup cache not purged: candidate filtering verifies each candidate via CheckRelation
 	for _, r := range remoteChanges.Resources {
-		pc.removeDirectRelationByResource(ctx, resource(r))
+		pc.removeDirectRelationsByResource(ctx, resource(r))
 	}
 	for _, t := range remoteChanges.Targets {
-		pc.removeDirectRelationByTarget(ctx, target(t))
+		pc.removeDirectRelationsByTarget(ctx, target(t))
 	}
 }
 
@@ -451,17 +452,12 @@ func (pc *projectAuthzCache) addIndirectRelation(ctx context.Context, r *descope
 	pc.indirectRelationCache.Add(ctx, key, grant)
 }
 
-func (pc *projectAuthzCache) removeDirectRelation(ctx context.Context, r *descope.FGARelation) {
-	key := key(r)
-	pc.directRelationCache.Remove(ctx, key)
-	resource := resource(r.Resource)
-	target := target(r.Target)
-	pc.removeKeyFromResourceIndex(resource, target, key)
-	pc.removeKeyFromTargetIndex(resource, target, key)
-	delete(pc.directKeyComponents, key)
+func (pc *projectAuthzCache) removeDirectRelationsByResourceAndTarget(ctx context.Context, r *descope.FGARelation) {
+	pc.removeDirectRelationsByResource(ctx, resource(r.Resource))
+	pc.removeDirectRelationsByTarget(ctx, target(r.Target))
 }
 
-func (pc *projectAuthzCache) removeDirectRelationByResource(ctx context.Context, r resource) {
+func (pc *projectAuthzCache) removeDirectRelationsByResource(ctx context.Context, r resource) {
 	targetsToKeys := pc.directResourcesIndex[r]
 	for _, keys := range targetsToKeys {
 		for _, k := range keys {
@@ -471,7 +467,7 @@ func (pc *projectAuthzCache) removeDirectRelationByResource(ctx context.Context,
 	delete(pc.directResourcesIndex, r)
 }
 
-func (pc *projectAuthzCache) removeDirectRelationByTarget(ctx context.Context, t target) {
+func (pc *projectAuthzCache) removeDirectRelationsByTarget(ctx context.Context, t target) {
 	resourcesToKeys := pc.directTargetsIndex[t]
 	for _, keys := range resourcesToKeys {
 		for _, k := range keys {

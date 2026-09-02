@@ -39,6 +39,16 @@ func checkRelation(ctx context.Context, cache ProjectAuthzCache, r *descope.FGAR
 	return check.Allowed, check.Info.Direct, true
 }
 
+// reports whether r is swept by a write to any of the written relations
+func sharesResourceOrTarget(r *descope.FGARelation, written ...*descope.FGARelation) bool {
+	for _, w := range written {
+		if r.Resource == w.Resource || r.Target == w.Target {
+			return true
+		}
+	}
+	return false
+}
+
 // helper struct to hold a cached relation and its expected allowed value
 type cachedRelation struct {
 	allowed bool
@@ -112,9 +122,9 @@ func TestUpdateCacheWithAddedRelations(t *testing.T) {
 		{Resource: "p1:file1", Target: "user4", Relation: "owner"},
 	}
 	cache.UpdateCacheWithAddedRelations(ctx, newRelations)
-	// direct old relations should still be there, indirect should now be removed
+	// indirect relations are all removed; direct ones survive unless swept by a written resource or target
 	for _, old := range oldRelations {
-		expectedToRemainInCache := old.direct // non direct relations should have been removed, direct should still be there
+		expectedToRemainInCache := old.direct && !sharesResourceOrTarget(old.r, newRelations...)
 		allowed, _, ok := checkRelation(ctx, cache, old.r)
 		assert.Equal(t, expectedToRemainInCache, ok)
 		expectedAllowed := expectedToRemainInCache && old.allowed
@@ -138,10 +148,10 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 	cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{toDelete.r})
 	// verify that:
 	// 1. deleted relation is not in the cache anymore
-	// 2. all other direct relations are still in the cache
+	// 2. direct relations sharing its resource or target are gone too
 	// 3. all indirect relations are removed
 	for _, old := range oldRelations {
-		expectedToRemainInCache := old.direct && old.r != toDelete.r
+		expectedToRemainInCache := old.direct && !sharesResourceOrTarget(old.r, toDelete.r)
 		allowed, _, ok := checkRelation(ctx, cache, old.r)
 		assert.Equal(t, expectedToRemainInCache, ok)
 		expectedAllowed := expectedToRemainInCache && old.allowed
@@ -158,6 +168,32 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 	// verify that indices are now empty
 	assert.Equal(t, 0, len(cache.directResourcesIndex), "%v", cache.directResourcesIndex)
 	assert.Equal(t, 0, len(cache.directTargetsIndex), "%v", cache.directTargetsIndex)
+}
+
+func TestUpdateCacheWithDeletedRelations_SweepsDerivedDirectKeys(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	owner := &descope.FGARelation{Resource: "folder1", Target: "u1", Relation: "owner"}
+	canEdit := &descope.FGARelation{Resource: "folder1", Target: "u1", Relation: "can_edit"}
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: owner, Info: &descope.FGACheckInfo{Direct: true}},
+		{Allowed: true, Relation: canEdit, Info: &descope.FGACheckInfo{Direct: true}},
+	})
+	cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{owner})
+	_, _, ok := checkRelation(ctx, cache, canEdit)
+	assert.False(t, ok, "a permission derived from the deleted relation must not stay cached")
+}
+
+func TestUpdateCacheWithAddedRelations_DropsStaleDenial(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	rel := &descope.FGARelation{Resource: "doc1", Target: "u1", Relation: "viewer"}
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: false, Relation: rel, Info: &descope.FGACheckInfo{Direct: true}},
+	})
+	cache.UpdateCacheWithAddedRelations(ctx, []*descope.FGARelation{rel})
+	_, _, ok := checkRelation(ctx, cache, rel)
+	assert.False(t, ok, "a cached denial must not survive the create that grants it")
 }
 
 func TestUpdateCacheWithAddedRelations_AddsToLookupCache(t *testing.T) {
@@ -877,8 +913,10 @@ func TestUnderstandEvictionCallback(t *testing.T) {
 	require.Equal(t, 3, cbCallCount) // purge also calls the evict CB
 }
 
-func TestDirectIndices(t *testing.T) {
+func TestRemoveIndexOnEviction(t *testing.T) {
 	ctx := context.TODO()
+	// set cache size to 2 so that 3rd addition triggers an eviction
+	t.Setenv(config.ConfigKeyDirectRelationCacheSizePerProject, "2")
 	cache, _ := setup(t)
 	// add 2 direct relations
 	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"}, &cachedGrant{allowed: true})
@@ -894,39 +932,6 @@ func TestDirectIndices(t *testing.T) {
 	assert.Equal(t, 2, len(cache.directTargetsIndex))
 	assert.Equal(t, 1, len(cache.directTargetsIndex["t1"]))
 	assert.Equal(t, 1, len(cache.directTargetsIndex["t2"]))
-	// remove 1st relation
-	cache.removeDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})
-	// assert that the removed relation is not in the indices, but the other one is
-	_, ok := cache.directResourcesIndex["r1"]["t1"]
-	assert.False(t, ok)
-	_, ok = cache.directTargetsIndex["t1"]["r1"]
-	assert.False(t, ok)
-	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t2"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
-	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
-	// remove 2nd relation
-	cache.removeDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})
-	// assert that both indexes are now empty
-	assert.Equal(t, 0, len(cache.directResourcesIndex["r1"]))
-	assert.Equal(t, 0, len(cache.directTargetsIndex["t1"]))
-	assert.Equal(t, 0, len(cache.directTargetsIndex["t2"]))
-	// test removal of elements which are not in the cache (don't panic)
-	cache.removeDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})
-	cache.removeDirectRelation(ctx, &descope.FGARelation{Resource: uuid.NewString(), Target: uuid.NewString(), Relation: uuid.NewString()})
-}
-
-func TestRemoveIndexOnEviction(t *testing.T) {
-	ctx := context.TODO()
-	// set cache size to 2 so that 3rd addition triggers an eviction
-	t.Setenv(config.ConfigKeyDirectRelationCacheSizePerProject, "2")
-	cache, _ := setup(t)
-	// add 2 direct relations
-	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"}, &cachedGrant{allowed: true})
-	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"}, &cachedGrant{allowed: true})
-	// assert all indices created and added
-	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t1"], key(&descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})))
-	assert.True(t, slices.Contains(cache.directResourcesIndex["r1"]["t2"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
-	assert.True(t, slices.Contains(cache.directTargetsIndex["t1"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t1", Relation: "owner"})))
-	assert.True(t, slices.Contains(cache.directTargetsIndex["t2"]["r1"], key(&descope.FGARelation{Resource: "r1", Target: "t2", Relation: "owner"})))
 	// add 3rd relation (this should trigger an eviction)
 	cache.addDirectRelation(ctx, &descope.FGARelation{Resource: "r1", Target: "t3", Relation: "owner"}, &cachedGrant{allowed: true})
 	// assert that the 1st relation was evicted from the cache and the indices
@@ -1054,9 +1059,9 @@ func BenchmarkCheckRelation(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			j := i % 1_000_000
 			if i%2 == 0 {
-				cache.removeDirectRelationByResource(ctx, resource(resources[j]))
+				cache.removeDirectRelationsByResource(ctx, resource(resources[j]))
 			} else {
-				cache.removeDirectRelationByTarget(ctx, target(targets[j]))
+				cache.removeDirectRelationsByTarget(ctx, target(targets[j]))
 			}
 		}
 	})
@@ -1065,9 +1070,9 @@ func BenchmarkCheckRelation(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			if i%2 == 0 {
-				cache.removeDirectRelationByResource(ctx, resource(uuid.NewString()))
+				cache.removeDirectRelationsByResource(ctx, resource(uuid.NewString()))
 			} else {
-				cache.removeDirectRelationByTarget(ctx, target(uuid.NewString()))
+				cache.removeDirectRelationsByTarget(ctx, target(uuid.NewString()))
 			}
 		}
 	})
