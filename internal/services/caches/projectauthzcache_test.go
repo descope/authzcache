@@ -902,7 +902,7 @@ func TestMonitoredLRURemoveFiresEvictionCallback(t *testing.T) {
 	require.NoError(t, err)
 	c.Add(ctx, "a", 1)
 	require.True(t, c.Remove(ctx, "a"))
-	require.Equal(t, 1, evicted, "removeDirectRelationBy* relies on this to clean the indexes")
+	require.Equal(t, 1, evicted, "removeDirectRelationsBy* relies on this to clean the indexes")
 }
 
 func TestUnderstandEvictionCallback(t *testing.T) {
@@ -1072,9 +1072,9 @@ func BenchmarkCheckRelation(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			j := i % 1_000_000
 			if i%2 == 0 {
-				cache.removeDirectRelationByResource(ctx, resource(resources[j]))
+				cache.removeDirectRelationsByResource(ctx, resource(resources[j]))
 			} else {
-				cache.removeDirectRelationByTarget(ctx, target(targets[j]))
+				cache.removeDirectRelationsByTarget(ctx, target(targets[j]))
 			}
 		}
 	})
@@ -1083,9 +1083,9 @@ func BenchmarkCheckRelation(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			if i%2 == 0 {
-				cache.removeDirectRelationByResource(ctx, resource(uuid.NewString()))
+				cache.removeDirectRelationsByResource(ctx, resource(uuid.NewString()))
 			} else {
-				cache.removeDirectRelationByTarget(ctx, target(uuid.NewString()))
+				cache.removeDirectRelationsByTarget(ctx, target(uuid.NewString()))
 			}
 		}
 	})
