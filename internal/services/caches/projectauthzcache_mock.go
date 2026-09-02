@@ -22,14 +22,6 @@ type ProjectAuthzCacheMock struct {
 	GetWhatCanTargetAccessCachedFunc    func(ctx context.Context, target string) ([]*descope.AuthzRelation, bool)
 	SetWhatCanTargetAccessCachedFunc    func(ctx context.Context, target string, relations []*descope.AuthzRelation)
 	InvalidateLookupCacheFunc           func(ctx context.Context)
-	StatsFunc                           func(ctx context.Context) Stats
-}
-
-func (m *ProjectAuthzCacheMock) Stats(ctx context.Context) Stats {
-	if m.StatsFunc != nil {
-		return m.StatsFunc(ctx)
-	}
-	return Stats{}
 }
 
 func (m *ProjectAuthzCacheMock) GetSchema() *descope.FGASchema {

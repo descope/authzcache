@@ -20,7 +20,6 @@ type AuthzCache interface {
 	Check(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error)
 	WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string, extraContext map[string]any) ([]string, error)
 	WhatCanTargetAccess(ctx context.Context, target string, extraContext map[string]any) ([]*descope.AuthzRelation, error)
-	CacheStats(ctx context.Context) map[string]caches.Stats
 }
 
 type RemoteClientCreator func(projectID string, logger logger.LoggerInterface) (sdk.Management, error)
@@ -111,11 +110,10 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	}
 	// check all relations against cache in one read-lock; cached conditional grants are re-evaluated against extraContext inside CheckRelations
 	cachedChecks, toCheckViaSDK, indexToCachedChecks := projectCache.CheckRelations(ctx, relations, extraContext)
-	hits := classifyHits(cachedChecks, len(toCheckViaSDK))
 	// if all relations were found in cache, return
 	if len(toCheckViaSDK) == 0 {
 		// candidatesCount = 0 (nothing sent to SDK); filteredCount = 0 (Check doesn't filter, every relation gets an answer)
-		a.recordMetric(ctx, metrics.APICheck, true, 0, 0, len(cachedChecks), hits, start)
+		a.recordMetric(ctx, metrics.APICheck, true, 0, 0, len(cachedChecks), start)
 		return cachedChecks, nil
 	}
 	// fetch missing relations from sdk
@@ -140,7 +138,7 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 		}
 	}
 	// candidatesCount = relations sent to SDK (not in cache); filteredCount = 0 (Check doesn't filter, every relation gets an answer)
-	a.recordMetric(ctx, metrics.APICheck, false, len(toCheckViaSDK), 0, len(result), hits, start)
+	a.recordMetric(ctx, metrics.APICheck, false, len(toCheckViaSDK), 0, len(result), start)
 	return result, nil
 }
 
@@ -166,7 +164,7 @@ func hasCacheableConditional(checks []*descope.FGACheck) bool {
 	return false
 }
 
-func (a *authzCache) recordMetric(ctx context.Context, api metrics.APIName, cacheHit bool, candidatesCount, filteredCount, resultSize int, relations metrics.RelationCounts, start time.Time) {
+func (a *authzCache) recordMetric(ctx context.Context, api metrics.APIName, cacheHit bool, candidatesCount, filteredCount, resultSize int, start time.Time) {
 	if a.metricsCollector == nil {
 		return
 	}
@@ -176,33 +174,7 @@ func (a *authzCache) recordMetric(ctx context.Context, api metrics.APIName, cach
 		FilteredCount:   filteredCount,
 		ResultSize:      resultSize,
 		DurationMs:      time.Since(start).Milliseconds(),
-		Relations:       relations,
 	})
-}
-
-func (a *authzCache) CacheStats(ctx context.Context) map[string]caches.Stats {
-	stats := map[string]caches.Stats{}
-	a.projects.Range(func(key, value any) bool {
-		stats[key.(string)] = value.(project).cache.Stats(ctx)
-		return true
-	})
-	return stats
-}
-
-// Mirrors the Info CheckRelations synthesizes: Conditional wins, so conditional hits aren't split.
-func classifyHits(cachedChecks []*descope.FGACheck, misses int) metrics.RelationCounts {
-	rc := metrics.RelationCounts{Misses: int64(misses)}
-	for _, c := range cachedChecks {
-		switch {
-		case c.Info.Conditional:
-			rc.HitsConditional++
-		case c.Info.Direct:
-			rc.HitsDirect++
-		default:
-			rc.HitsIndirect++
-		}
-	}
-	return rc
 }
 
 func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string, extraContext map[string]any) ([]string, error) {
@@ -222,7 +194,7 @@ func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinit
 			Int("candidates", len(candidates)).
 			Int("verified", len(verified)).
 			Msg("WhoCanAccess cache hit with candidate filtering")
-		a.recordMetric(ctx, metrics.APIWhoCanAccess, true, len(candidates), len(candidates)-len(verified), len(verified), metrics.RelationCounts{}, start)
+		a.recordMetric(ctx, metrics.APIWhoCanAccess, true, len(candidates), len(candidates)-len(verified), len(verified), start)
 		return verified, nil
 	}
 	targets, err := mgmtSDK.Authz().WhoCanAccess(ctx, resource, relationDefinition, namespace)
@@ -230,7 +202,7 @@ func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinit
 		return nil, err // notest
 	}
 	projectCache.SetWhoCanAccessCached(ctx, resource, relationDefinition, namespace, targets)
-	a.recordMetric(ctx, metrics.APIWhoCanAccess, false, 0, 0, len(targets), metrics.RelationCounts{}, start)
+	a.recordMetric(ctx, metrics.APIWhoCanAccess, false, 0, 0, len(targets), start)
 	return targets, nil
 }
 
@@ -275,7 +247,7 @@ func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string, ext
 			Int("candidates", len(candidates)).
 			Int("verified", len(verified)).
 			Msg("WhatCanTargetAccess cache hit with candidate filtering")
-		a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, true, len(candidates), len(candidates)-len(verified), len(verified), metrics.RelationCounts{}, start)
+		a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, true, len(candidates), len(candidates)-len(verified), len(verified), start)
 		return verified, nil
 	}
 	relations, err := mgmtSDK.Authz().WhatCanTargetAccess(ctx, target)
@@ -283,7 +255,7 @@ func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string, ext
 		return nil, err // notest
 	}
 	projectCache.SetWhatCanTargetAccessCached(ctx, target, relations)
-	a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, false, 0, 0, len(relations), metrics.RelationCounts{}, start)
+	a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, false, 0, 0, len(relations), start)
 	return relations, nil
 }
 

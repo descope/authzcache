@@ -171,25 +171,6 @@ func TestUpdateCacheWithDeletedRelations(t *testing.T) {
 	assert.Equal(t, 0, len(cache.directTargetsIndex), "%v", cache.directTargetsIndex)
 }
 
-func TestStats(t *testing.T) {
-	ctx := context.TODO()
-	cache, _ := setup(t)
-	assert.Equal(t, Stats{}, cache.Stats(ctx))
-
-	direct := &descope.FGARelation{Resource: "folder1", Target: "u1", Relation: "owner"}
-	indirect := &descope.FGARelation{Resource: "folder2", Target: "u2", Relation: "can_edit"}
-	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
-		{Allowed: true, Relation: direct, Info: &descope.FGACheckInfo{Direct: true}},
-		{Allowed: true, Relation: indirect, Info: &descope.FGACheckInfo{Direct: false}},
-	})
-
-	s := cache.Stats(ctx)
-	assert.Equal(t, 1, s.DirectEntries)
-	assert.Equal(t, 1, s.IndirectEntries)
-	assert.Equal(t, 2, s.IndexEntries, "one direct key appears once in each of the two indexes")
-	assert.Equal(t, int64(len(key(direct))), s.DirectKeyBytes)
-}
-
 func TestUpdateCacheWithDeletedRelations_SweepsDerivedDirectKeys(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)

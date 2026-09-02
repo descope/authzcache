@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/backend/common/pkg/common/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,13 +32,7 @@ func TestReporterPostsMetrics(t *testing.T) {
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: false, CandidatesCount: 0, FilteredCount: 0, ResultSize: 3, DurationMs: 30})
 
 	reporter := NewReporter(collector, srv.URL, "mgmt-key", 1, true)
-	called := 0
-	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
-		called++
-		return map[string]caches.Stats{"proj1": {DirectEntries: 2, IndexEntries: 4, DirectKeyBytes: 40}}
-	})
 	reporter.report(context.Background())
-	require.Equal(t, 1, called, "sizes are read once per reporting window")
 
 	require.Equal(t, "Bearer proj1:mgmt-key", receivedAuth)
 	require.Len(t, receivedBody.Metrics, 1)

@@ -65,18 +65,6 @@ type cachedGrant struct {
 	cond    *conditionalCert
 }
 
-// Stats reports only what can be counted exactly, so callers can derive per-entry cost from a real
-// heap reading rather than from assumed struct overheads.
-type Stats struct {
-	DirectEntries   int
-	IndirectEntries int
-	LookupEntries   int
-	// IndexEntries counts key appearances across both direct indexes, which each hold every key once.
-	IndexEntries int
-	// DirectKeyBytes is the data-dependent part of the direct cache: the key strings themselves.
-	DirectKeyBytes int64
-}
-
 type projectAuthzCache struct {
 	schemaCache *descope.FGASchema // schema
 
@@ -117,7 +105,6 @@ type ProjectAuthzCache interface {
 	GetWhatCanTargetAccessCached(ctx context.Context, target string) (relations []*descope.AuthzRelation, ok bool)
 	SetWhatCanTargetAccessCached(ctx context.Context, target string, relations []*descope.AuthzRelation)
 	InvalidateLookupCache(ctx context.Context)
-	Stats(ctx context.Context) Stats
 }
 
 var _ ProjectAuthzCache = &projectAuthzCache{} // ensure projectAuthzCache implements ProjectAuthzCache
@@ -704,25 +691,6 @@ func (pc *projectAuthzCache) SetWhatCanTargetAccessCached(ctx context.Context, t
 		CachedAt:  now,
 		ExpiresAt: now.Add(pc.lookupCacheTTL),
 	})
-}
-
-// Stats walks directKeyComponents for the key bytes, which allocates nothing but is O(entries), so it
-// belongs on the reporting interval rather than anywhere near a request.
-func (pc *projectAuthzCache) Stats(ctx context.Context) Stats {
-	pc.mutex.RLock()
-	defer pc.mutex.RUnlock()
-	s := Stats{
-		DirectEntries:   pc.directRelationCache.Len(ctx),
-		IndirectEntries: pc.indirectRelationCache.Len(ctx),
-		IndexEntries:    2 * len(pc.directKeyComponents), // one appearance per index
-	}
-	if pc.lookupCache != nil {
-		s.LookupEntries = pc.lookupCache.Len(ctx)
-	}
-	for k := range pc.directKeyComponents {
-		s.DirectKeyBytes += int64(len(k))
-	}
-	return s
 }
 
 func (pc *projectAuthzCache) InvalidateLookupCache(ctx context.Context) {
