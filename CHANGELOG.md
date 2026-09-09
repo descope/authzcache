@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.3](https://github.com/descope/authzcache/compare/v1.2.2...v1.2.3) (2026-09-09)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/stretchr/testify to v1.12.1 ([#912](https://github.com/descope/authzcache/issues/912)) ([8727d72](https://github.com/descope/authzcache/commit/8727d72e8788c5b3e21ceb9be236570be97fcab5))
+* **deps:** update module google.golang.org/grpc to v1.83.2 [security] ([#914](https://github.com/descope/authzcache/issues/914)) ([0fa3159](https://github.com/descope/authzcache/commit/0fa31593f7fa642dcf22b031420fb8ef9dd921c0))
+
 ## [1.2.2](https://github.com/descope/authzcache/compare/v1.2.1...v1.2.2) (2026-09-02)
 
 
