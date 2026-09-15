@@ -1,13 +1,19 @@
 package main
 
 import (
+	"context"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/descope/authzcache/internal/config"
+	se "github.com/descope/authzcache/pkg/authzcache/errors"
 	cconfig "github.com/descope/backend/common/pkg/common/config"
+	"github.com/descope/go-sdk/descope"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc/metadata"
 )
 
 func TestGetGatewayWriteTimeoutInSeconds(t *testing.T) {
@@ -23,6 +29,35 @@ func TestGetGatewayWriteTimeoutInSeconds(t *testing.T) {
 		t.Setenv(cconfig.ConfigKeyHTTPWriteTimeout, "15")
 		t.Setenv(config.ConfigKeyGatewayWriteTimeoutInSeconds, "40")
 		assert.Equal(t, 40, config.GetGatewayWriteTimeoutInSeconds())
+	})
+}
+
+func TestErrorHandlerWithRetryAfter(t *testing.T) {
+	handle := func(ctx context.Context) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1/check", nil)
+		sdkErr := &descope.Error{
+			Code:        "E170429",
+			Description: "Rate limit exceeded for API endpoint",
+			Info: map[string]any{
+				descope.ErrorInfoKeys.HTTPResponseStatusCode:      http.StatusTooManyRequests,
+				descope.ErrorInfoKeys.RateLimitExceededRetryAfter: 30,
+			},
+		}
+		errorHandlerWithRetryAfter(ctx, runtime.NewServeMux(), &runtime.JSONPb{}, w, r, se.ServiceErrorFromSdkError(ctx, sdkErr))
+		return w
+	}
+
+	t.Run("relays the header set by the grpc handler", func(t *testing.T) {
+		md := runtime.ServerMetadata{HeaderMD: metadata.Pairs(se.RetryAfterHeader, "30")}
+		res := handle(runtime.NewServerMetadataContext(context.Background(), md))
+		assert.Equal(t, http.StatusTooManyRequests, res.Code)
+		assert.Equal(t, "30", res.Header().Get(se.RetryAfterHeader))
+	})
+	t.Run("omits the header when the metadata is absent", func(t *testing.T) {
+		res := handle(context.Background())
+		assert.Equal(t, http.StatusTooManyRequests, res.Code)
+		assert.Empty(t, res.Header().Get(se.RetryAfterHeader))
 	})
 }
 
