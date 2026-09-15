@@ -12,9 +12,11 @@ import (
 	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/authzcache/internal/services/metrics"
 	"github.com/descope/authzcache/internal/services/remote"
+	se "github.com/descope/authzcache/pkg/authzcache/errors"
 	authzcv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
 	cconfig "github.com/descope/backend/common/pkg/common/config"
 	cctx "github.com/descope/backend/common/pkg/common/context"
+	"github.com/descope/backend/common/pkg/common/grpc/httpgateway"
 	"github.com/descope/backend/common/pkg/common/grpc/server"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
@@ -66,12 +68,23 @@ func serve() {
 			ServiceMiddlewares: []func(context.Context) func(h http.Handler) http.Handler{
 				middlewares.ProjectIDParser,
 			},
+			HTTPGatewayServerOptions:   []runtime.ServeMuxOption{runtime.WithErrorHandler(errorHandlerWithRetryAfter)},
 			SkipInitCommonProjectCache: true,
 		})
 
 	if err != nil {
 		cctx.Logger(ctx).Fatal().Str(config.MetricsKeyResourceServiceName, cconfig.GetServiceName()).Err(err).Msg("Failed to start server")
 	}
+}
+
+// errorHandlerWithRetryAfter relays Descope's Retry-After onto the HTTP error response, the common handler drops grpc header metadata
+func errorHandlerWithRetryAfter(ctx context.Context, mux *runtime.ServeMux, marshaler runtime.Marshaler, w http.ResponseWriter, r *http.Request, err error) {
+	if md, ok := runtime.ServerMetadataFromContext(ctx); ok {
+		if values := md.HeaderMD.Get(se.RetryAfterHeader); len(values) > 0 {
+			w.Header().Set(se.RetryAfterHeader, values[0])
+		}
+	}
+	httpgateway.HTTPErrorHandler(ctx, mux, marshaler, w, r, err)
 }
 
 // setGatewayWriteTimeout applies the configured gateway write timeout so a slow backend call returns via the cache instead of resetting the connection
