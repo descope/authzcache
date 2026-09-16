@@ -21,6 +21,9 @@ func NewDescopeClientWithProjectID(projectID string, loggerInstance logger.Logge
 	if projectID == "" {
 		return nil, ae.UnknownProject.New(context.Background(), "projectID is empty")
 	}
+	if fake, ok := fakeClient(projectID); ok {
+		return fake, nil
+	}
 	descopeClient, err := client.NewWithConfig(&client.Config{
 		ProjectID:            projectID,
 		SessionJWTViaCookie:  true,
