@@ -13,14 +13,18 @@ import { check } from 'k6';
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8189';
 const PROJECT_ID = __ENV.PROJECT_ID || 'P2loadtest0000000000000000000';
-const NEW_RATIO = Number(__ENV.NEW_RATIO || 0.5);
+const SCENARIO = __ENV.SCENARIO || 'ramp';
+// fill exists to grow the cache, so it is all-new unless explicitly overridden.
+const NEW_RATIO = Number(__ENV.NEW_RATIO || (SCENARIO === 'fill' ? 1 : 0.5));
 const RES_CARD = Number(__ENV.RESOURCE_CARDINALITY || 0);
 const TGT_CARD = Number(__ENV.TARGET_CARDINALITY || 0);
 const TUPLES = Number(__ENV.TUPLES_PER_REQ || 1);
 const FILL_ENTRIES = Number(__ENV.FILL_ENTRIES || 1000000);
 const FILL_RPS = Number(__ENV.FILL_RPS || 5000);
 const VERIFY = (__ENV.VERIFY_BODIES || 'false') === 'true';
-const SCENARIO = __ENV.SCENARIO || 'ramp';
+// Ids restart at 0 every k6 run, so a second run against a warm cache would re-request keys that
+// are already cached and its "miss" tag would lie. Offset each run past the previous one's range.
+const ID_OFFSET = Number(__ENV.ID_OFFSET || 0);
 
 // A "hit" never targets an id inserted within the last SAFETY iterations, which may still be in flight.
 const SAFETY = 5000;
@@ -120,10 +124,11 @@ export default function () {
 
   let baseID;
   if (isNew) {
-    baseID = created * TUPLES;
+    baseID = ID_OFFSET + created * TUPLES;
   } else {
+    // Hits stay inside this run's own range, so they are known-cached even at ID_OFFSET 0.
     const ceiling = Math.max(0, created * TUPLES - SAFETY);
-    baseID = ceiling > 0 ? Math.floor(Math.random() * ceiling) : 0;
+    baseID = ID_OFFSET + (ceiling > 0 ? Math.floor(Math.random() * ceiling) : 0);
   }
 
   const tuples = [];

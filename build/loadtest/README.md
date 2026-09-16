@@ -23,7 +23,7 @@ docker info --format '{{.NCPU}} cpus, {{.MemTotal}} bytes'
 ```
 
 A stock 4-CPU / 8 GB VM is not enough: authzcache pinned to 2 CPUs and k6 to 4 already oversubscribe
-it, and 5M cache entries at ~500 B each will not fit. Raise Docker Desktop to at least 10 CPUs and
+it, and 5M cache entries at the measured ~1.7 KB each will not fit. Raise Docker Desktop to at least 10 CPUs and
 24 GB (Settings -> Resources), and **stop the `euw1` dev-env stack while measuring** — ~45 idling
 service containers still burn enough CPU to move the knee.
 
@@ -53,10 +53,17 @@ cache size at the same time gives two confounded variables and an uninterpretabl
 
 ## Knobs
 
-Container (compose env): `AC_CPUS` (2), `AC_MEM` (8g), `AC_DIRECT_CACHE_SIZE` (20,000,000).
+Container (compose env): `AC_CPUS` (2), `AC_MEM` (4g), `AC_DIRECT_CACHE_SIZE` (5,000,000),
+`AC_GOGC` (100), `AC_GOMEMLIMIT` (3500MiB).
 
-k6: `NEW_RATIO` (0.5), `TUPLES_PER_REQ` (1), `RESOURCE_CARDINALITY` / `TARGET_CARDINALITY` (0 =
-unbounded), `FILL_ENTRIES`, `FILL_RPS`, `VERIFY_BODIES`.
+k6: `NEW_RATIO` (0.5, forced to 1 for `fill`), `TUPLES_PER_REQ` (1), `RESOURCE_CARDINALITY` /
+`TARGET_CARDINALITY` (0 = unbounded), `FILL_ENTRIES`, `FILL_RPS`, `ID_OFFSET`, `SMOKE_RPS`,
+`SMOKE_DURATION`, `VERIFY_BODIES`.
+
+**`ID_OFFSET` matters across runs.** Keys are derived from the iteration counter, which restarts at
+0 every k6 run. A second run against a warm cache would re-request keys the first run already
+cached, and its `miss` tag would be a lie. After a `fill` of N entries, run `ramp` with
+`ID_OFFSET=N`.
 
 Cardinality shapes the memory cost per entry. `addDirectRelation` writes four structures per key:
 the LRU plus `directKeyComponents`, `directResourcesIndex` and `directTargetsIndex`. The default
@@ -117,19 +124,43 @@ also run a control with `NEW_RATIO=0.1` to separate "cache is big" from "cache i
 the LRU sits at its cap and every insert triggers `removeIndexOnCacheEviction` under the write
 lock. Comparing against the uncapped 1M run isolates the eviction cost a real customer at cap pays.
 
-## Where the ceiling is expected to be
+## First measurements
 
-Three serialization points, all confirmed by reading the code, none yet by measurement:
+Caveat: taken on a 4-CPU / 8 GB Docker VM with the `euw1` dev-env stack co-resident and k6 sharing
+the same CPUs. Treat the RPS as a lower bound; the *profiles* are the useful part, since the
+proportions hold regardless of how much CPU there is.
 
-1. **hashicorp LRU `Get` takes an exclusive lock** (`golang-lru/v2/lru.go:95`) because a read moves
-   the entry to the front of the recency list. `CheckRelations` holds only `pc.mutex.RLock()`, so
-   every cache read still serializes on one mutex per project. Prime suspect.
-2. `UpdateCacheWithChecks` takes `pc.mutex.Lock()` — a full write lock on ~50% of requests here.
-3. `metrics.Collector.Record` takes a per-project mutex on **every** request
-   (`internal/services/metrics/collector.go`). `AUTHZCACHE_METRICS_REPORT_ENABLED=FALSE` stops the
-   reporting, not the collection — the mutex is still taken.
+**Lock contention** (`/debug/pprof/mutex`, 4000 RPS, 50/50, ~150k entries) — the write lock
+dominates, not the LRU read lock:
 
-Settle it with the profiles, while holding the last good step:
+| Site | Share of lock delay |
+|---|---|
+| `UpdateCacheWithChecks` (`pc.mutex.Lock()`, miss path) | 47% |
+| `middlewares.ProjectIDParser` | 10% |
+| `CheckRelations` (RLock + LRU `Get`) | 8% |
+
+**CPU** (`/debug/pprof/profile`) — GC is ~35-40% of CPU (`scanSpan` 21%, `tryDeferToSpanScan` 16%,
+`scanObjectSmall` 11%, `mallocgc` 8%), against 18% in network syscalls. Because GC scan cost scales
+with live heap, **throughput falls as the cache grows** — which is exactly the curve this harness
+is built to plot. `AC_GOGC` is the lever for quantifying how much of the ceiling is GC.
+
+**Memory** (`/debug/pprof/heap`, inuse_space, ~150k entries, default unbounded cardinality) —
+~1.7 KB live per entry, roughly 3.4x the 500 B the high-level design assumes. The breakdown says
+why: the two secondary indexes cost ~6x the cache itself.
+
+| Allocation site | Share of live heap |
+|---|---|
+| `addKeyToDirectResourceIndex` | 35% |
+| `addKeyToDirectTargetIndex` | 33% |
+| the LRU itself (`insertValue`, `Add`, `key`) | 11% |
+
+At the 1M-entry product default that extrapolates to ~1.7 GB live and ~3.4 GB RSS at `GOGC=100`.
+Worth re-running with `RESOURCE_CARDINALITY=1000` — the indexes should collapse, since they stop
+allocating a nested map per key.
+
+## Reproducing the profiles
+
+While holding the last good step:
 
 ```bash
 go tool pprof -http=: http://localhost:6060/debug/pprof/profile?seconds=30   # CPU
