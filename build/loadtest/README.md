@@ -124,39 +124,83 @@ also run a control with `NEW_RATIO=0.1` to separate "cache is big" from "cache i
 the LRU sits at its cap and every insert triggers `removeIndexOnCacheEviction` under the write
 lock. Comparing against the uncapped 1M run isolates the eviction cost a real customer at cap pays.
 
-## First measurements
+## Baseline results
 
-Caveat: taken on a 4-CPU / 8 GB Docker VM with the `euw1` dev-env stack co-resident and k6 sharing
-the same CPUs. Treat the RPS as a lower bound; the *profiles* are the useful part, since the
-proportions hold regardless of how much CPU there is.
+Config: `AC_CPUS=2`, `AC_MEM=4g`, `AC_DIRECT_CACHE_SIZE=5000000`, `GOGC=100`. Each rate is a fresh
+container, filled to 150k entries, then 120s of constant 50/50 load with `ID_OFFSET` past the fill.
+The `euw1` dev-env stack was co-resident on a 4-CPU / 8GB VM, so treat these as a floor.
 
-**Lock contention** (`/debug/pprof/mutex`, 4000 RPS, 50/50, ~150k entries) — the write lock
-dominates, not the LRU read lock:
+| Target RPS | Achieved | Dropped | hit p50 | hit p95 | hit p99 | miss p99 | RSS | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| 2000 | 1999/s | 0 | 257us | 1.26ms | 4.2ms | 51ms | - | clean |
+| 5000 | 4998/s | 0 | 337us | 3.93ms | 19.4ms | 57ms | - | clean |
+| **6000** | **5997/s** | **0** | **374us** | **10.5ms** | **49ms** | **81ms** | **983MB** | **max sustained** |
+| 8000 | 7984/s | 1107 | 529us | 64.9ms | 128ms | 162ms | 1.27GB | degrading |
+| 10000 | 9858/s | 16239 | 919us | 133ms | 199ms | 249ms | 1.72GB | saturated |
+| 12000 | 11404/s | 69735 | 5.5ms | 196ms | 251ms | 302ms | 2.10GB | saturated |
+
+**Max sustained: ~6000 RPS** (3000 per CPU) at a 50/50 new/cached mix. The knee is between 6000
+and 8000.
+
+### Why that is the limit
+
+It is not CPU. The container sat at ~92-100% — roughly **one** core of its two — across the whole
+6000-to-12000 range, while latency exploded. A CPU-bound service pins its full allocation; this one
+cannot, because it has no second core's worth of parallel work available to it.
+
+It is the write lock. Total lock delay by rate:
+
+| Rate | Total lock delay | vs 6000 |
+|---|---|---|
+| 6000 | 1.82s | 1x |
+| 8000 | 69.4s | 38x |
+| 12000 | 380.7s | 209x |
+
+A 38x jump in contention for a 1.33x rise in throughput is the knee. At 12000 RPS the attribution
+is unambiguous:
 
 | Site | Share of lock delay |
 |---|---|
-| `UpdateCacheWithChecks` (`pc.mutex.Lock()`, miss path) | 47% |
-| `middlewares.ProjectIDParser` | 10% |
-| `CheckRelations` (RLock + LRU `Get`) | 8% |
+| `UpdateCacheWithChecks` (`pc.mutex.Lock()`) | **96.3%** |
+| `CheckRelations` (read path, RLock + LRU `Get`) | 0.55% |
+| `metrics.Collector.Record` | 0.0009% |
 
-**CPU** (`/debug/pprof/profile`) — GC is ~35-40% of CPU (`scanSpan` 21%, `tryDeferToSpanScan` 16%,
-`scanObjectSmall` 11%, `mallocgc` 8%), against 18% in network syscalls. Because GC scan cost scales
-with live heap, **throughput falls as the cache grows** — which is exactly the curve this harness
-is built to plot. `AC_GOGC` is the lever for quantifying how much of the ceiling is GC.
+Every miss serializes behind one `sync.RWMutex` per project while it performs four writes — the LRU
+add plus `directKeyComponents`, `directResourcesIndex` and `directTargetsIndex`. With a 50/50 mix,
+half of all traffic funnels through it, and **it does not scale with cores**.
 
-**Memory** (`/debug/pprof/heap`, inuse_space, ~150k entries, default unbounded cardinality) —
-~1.7 KB live per entry, roughly 3.4x the 500 B the high-level design assumes. The breakdown says
-why: the two secondary indexes cost ~6x the cache itself.
+The latency shape agrees: at 12000 the hit p50 is 5.5ms while p95 is 196ms. A low median with an
+exploded tail is queueing, not steady slowdown.
 
-| Allocation site | Share of live heap |
-|---|---|
-| `addKeyToDirectResourceIndex` | 35% |
-| `addKeyToDirectTargetIndex` | 33% |
-| the LRU itself (`insertValue`, `Add`, `key`) | 11% |
+Two earlier hypotheses were wrong and are recorded here so nobody re-derives them. The hashicorp
+LRU's exclusive `Get` lock looked like the obvious suspect since every cache *read* takes it — it is
+0.55%. The per-project metrics mutex, taken on every request, is 0.0009%. Neither is worth touching.
 
-At the 1M-entry product default that extrapolates to ~1.7 GB live and ~3.4 GB RSS at `GOGC=100`.
-Worth re-running with `RESOURCE_CARDINALITY=1000` — the indexes should collapse, since they stop
-allocating a nested map per key.
+### Secondary: GC scales with cache size
+
+GC is 35-40% of CPU (`scanSpan` 21%, `tryDeferToSpanScan` 16%, `scanObjectSmall` 11%, `mallocgc` 8%)
+against 18% in network syscalls. Scan cost is proportional to live heap and the cache *is* the live
+heap, so throughput falls as entries accumulate — RSS climbed 983MB to 2.10GB across the runs above
+purely from cache growth during the test.
+
+Live heap is ~1.7KB per entry at default (unbounded) cardinality, about 3.4x the 500B the high-level
+design assumes. 68% of it is `addKeyToDirectResourceIndex` plus `addKeyToDirectTargetIndex`; the LRU
+itself is 11%. At the 1M-entry product default that extrapolates to ~1.7GB live, ~3.4GB RSS.
+
+### Measurement traps this harness already hit
+
+Three separate runs produced plausible-looking knees that were all artifacts of the load generator:
+
+- `preAllocatedVUs` hardcoded at 100 (sized for the 500 RPS correctness run) starved k6 above
+  ~1500 RPS. A cold cache serves an all-miss burst at ~30ms each, so the VU requirement at startup
+  is `rate x 60ms`.
+- Even rate-sized, k6 allocates VUs lazily and drops iterations while doing so. `vus_max` exceeded
+  `preAllocatedVUs` in every run. `preAllocatedVUs === maxVUs` is now mandatory for the probe.
+- `ABORT_ON_FAIL` and `SMOKE_RPS` were not listed in the compose `environment` block, so they never
+  reached the container and the runs silently used defaults.
+
+In all three cases `http_req_failed` stayed at 0.00% while `dropped_iterations` climbed — that
+combination means the generator, not the server. Check it before believing any knee.
 
 ## Reproducing the profiles
 

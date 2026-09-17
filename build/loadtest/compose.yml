@@ -47,6 +47,8 @@ services:
       FILL_RPS: ${FILL_RPS:-5000}
       ID_OFFSET: ${ID_OFFSET:-0}
       SMOKE_RPS: ${SMOKE_RPS:-500}
+      SMOKE_VUS: ${SMOKE_VUS:-}
+      ABORT_ON_FAIL: ${ABORT_ON_FAIL:-true}
       SMOKE_DURATION: ${SMOKE_DURATION:-30s}
       VERIFY_BODIES: ${VERIFY_BODIES:-false}
       K6_WEB_DASHBOARD: "true"

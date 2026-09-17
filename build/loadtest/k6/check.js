@@ -1,8 +1,9 @@
 // Stress test for the authzcache edge container running the `loadtest` build (fake backend).
 //
-// Two scenarios, picked with SCENARIO=ramp|fill:
-//   ramp — ramping-arrival-rate, step-and-hold, finds the max sustained RPS.
-//   fill — constant-arrival-rate, 100% new keys, grows the cache to FILL_ENTRIES.
+// Three scenarios, picked with SCENARIO=ramp|fill|smoke:
+//   ramp  — ramping-arrival-rate, step-and-hold, finds the max sustained RPS.
+//   fill  — constant-arrival-rate, 100% new keys, grows the cache to FILL_ENTRIES.
+//   smoke — constant-arrival-rate at SMOKE_RPS; correctness at 500, knee bisection above that.
 //
 // Run `fill` first to reach a cache size, then `ramp` against that warm cache. Ramping RPS and
 // cache size at the same time gives two confounded variables and an uninterpretable curve.
@@ -25,6 +26,8 @@ const VERIFY = (__ENV.VERIFY_BODIES || 'false') === 'true';
 // Ids restart at 0 every k6 run, so a second run against a warm cache would re-request keys that
 // are already cached and its "miss" tag would lie. Offset each run past the previous one's range.
 const ID_OFFSET = Number(__ENV.ID_OFFSET || 0);
+// Set ABORT_ON_FAIL=false to let a saturated run finish, so the full latency curve is readable.
+const ABORT = (__ENV.ABORT_ON_FAIL || 'true') === 'true';
 
 // A "hit" never targets an id inserted within the last SAFETY iterations, which may still be in flight.
 const SAFETY = 5000;
@@ -63,14 +66,20 @@ const fillScenario = {
   maxVUs: 4000,
 };
 
-// Short correctness run: confirms the 50/50 split and that the fake answers allowed+direct.
+// Correctness run at 500 RPS, and the fixed-rate probe used to bisect the knee at higher SMOKE_RPS.
+const SMOKE_RPS = Number(__ENV.SMOKE_RPS || 500);
+// preAllocatedVUs === maxVUs on purpose. k6 allocates VUs lazily and drops iterations while it
+// does, and those drops are indistinguishable from server saturation — they sank two bisect
+// attempts. A fixed pool sized well above need means no allocation ever happens mid-run, so
+// dropped_iterations only fires when the pool is genuinely exhausted by a slow server.
+const SMOKE_VUS = Number(__ENV.SMOKE_VUS || Math.ceil(SMOKE_RPS * 0.15) + 200);
 const smokeScenario = {
   executor: 'constant-arrival-rate',
-  rate: Number(__ENV.SMOKE_RPS || 500),
+  rate: SMOKE_RPS,
   timeUnit: '1s',
   duration: __ENV.SMOKE_DURATION || '30s',
-  preAllocatedVUs: 100,
-  maxVUs: 500,
+  preAllocatedVUs: SMOKE_VUS,
+  maxVUs: SMOKE_VUS,
 };
 
 const scenarios = { ramp: rampScenario, fill: fillScenario, smoke: smokeScenario };
@@ -81,9 +90,9 @@ export const options = {
   // Do one VERIFY_BODIES=true run to confirm correctness, then leave it off.
   discardResponseBodies: !VERIFY,
   thresholds: {
-    http_req_failed: [{ threshold: 'rate<0.01', abortOnFail: true }],
-    // The unambiguous "you exceeded capacity" signal — watch this above all else.
-    dropped_iterations: [{ threshold: 'count<100', abortOnFail: true }],
+    http_req_failed: [{ threshold: 'rate<0.01', abortOnFail: ABORT }],
+    // The capacity signal, but only trustworthy with a fixed VU pool — see SMOKE_VUS.
+    dropped_iterations: [{ threshold: 'count<100', abortOnFail: ABORT }],
     // The edge's true serving cost. The miss path carries a synthetic 10-50ms floor, so a
     // blended p95 is pinned near 50ms no matter how the edge behaves and tells you nothing.
     'http_req_duration{path:hit}': ['p(95)<25', 'p(99)<50'],
