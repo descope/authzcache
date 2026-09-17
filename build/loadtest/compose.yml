@@ -1,0 +1,56 @@
+# k6 runs container-to-container over the bridge: on macOS a published port goes through Docker
+# Desktop's userland proxy, which caps around a few thousand RPS and would be what we measure.
+name: authzcache-loadtest
+
+services:
+  authzcache:
+    image: authzcache:loadtest
+    cpus: ${AC_CPUS:-2}
+    mem_limit: ${AC_MEM:-4g}
+    logging:
+      driver: none # a json-file write per log line is its own throughput ceiling
+    ports:
+      - "6060:6060" # pprof only; load never traverses a published port
+    environment:
+      HTTP_HOST: 0.0.0.0
+      CONTAINER_HTTP_PORT: "8189"
+      LOG_LEVEL: error # the controller logs an Info line per request
+      DESCOPE_MANAGEMENT_KEY: unused-in-loadtest
+      AUTHZCACHE_METRICS_REPORT_ENABLED: "FALSE"
+      AUTHZCACHE_LOOKUP_CACHE_ENABLED: "FALSE"
+      # Raised well above the 1M product default so the LRU never caps and memory grows with keys.
+      # ~1.7KB live per entry measured at default cardinality, so keep it under mem_limit;
+      # set to 1000000 for the eviction control run.
+      AUTHZCACHE_DIRECT_RELATION_CACHE_SIZE_PER_PROJECT: ${AC_DIRECT_CACHE_SIZE:-5000000}
+      AUTHZCACHE_REMOTE_POLLING_INTERVAL_IN_MILLIS: "15000"
+      # GC is ~35-40% of CPU under load (the index maps are large and pointer-heavy).
+      # Raise GOGC to trade memory for throughput and quantify how much of the ceiling is GC.
+      GOGC: ${AC_GOGC:-100}
+      GOMEMLIMIT: ${AC_GOMEMLIMIT:-3500MiB}
+
+  k6:
+    image: grafana/k6:latest
+    cpus: ${K6_CPUS:-4}
+    depends_on: [authzcache]
+    profiles: [k6] # only starts on `--profile k6 run k6`
+    volumes:
+      - ./k6:/scripts
+      - ./out:/out
+    environment:
+      BASE_URL: http://authzcache:8189
+      SCENARIO: ${SCENARIO:-ramp}
+      NEW_RATIO: ${NEW_RATIO:-0.5}
+      RESOURCE_CARDINALITY: ${RESOURCE_CARDINALITY:-0}
+      TARGET_CARDINALITY: ${TARGET_CARDINALITY:-0}
+      TUPLES_PER_REQ: ${TUPLES_PER_REQ:-1}
+      FILL_ENTRIES: ${FILL_ENTRIES:-1000000}
+      FILL_RPS: ${FILL_RPS:-5000}
+      ID_OFFSET: ${ID_OFFSET:-0}
+      SMOKE_RPS: ${SMOKE_RPS:-500}
+      SMOKE_VUS: ${SMOKE_VUS:-}
+      ABORT_ON_FAIL: ${ABORT_ON_FAIL:-true}
+      SMOKE_DURATION: ${SMOKE_DURATION:-30s}
+      VERIFY_BODIES: ${VERIFY_BODIES:-false}
+      K6_WEB_DASHBOARD: "true"
+      K6_WEB_DASHBOARD_EXPORT: /out/report.html
+    entrypoint: ["k6", "run", "--summary-export=/out/summary.json", "/scripts/check.js"]
