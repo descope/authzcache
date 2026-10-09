@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.4](https://github.com/descope/authzcache/compare/v1.2.3...v1.2.4) (2026-10-09)
+
+
+### Bug Fixes
+
+* **deps:** update module google.golang.org/grpc to v1.84.0 ([#926](https://github.com/descope/authzcache/issues/926)) ([71ba786](https://github.com/descope/authzcache/commit/71ba786abe55a36e9cce9d42d26decd65f0c8a61))
+
 ## [1.2.3](https://github.com/descope/authzcache/compare/v1.2.2...v1.2.3) (2026-09-15)
 
 
