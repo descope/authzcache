@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.2.4](https://github.com/descope/authzcache/compare/v1.2.3...v1.2.4) (2026-10-17)
+
+
+### Bug Fixes
+
+* **deps:** update backend to pick up the request interceptor fix ([#930](https://github.com/descope/authzcache/issues/930)) ([b0f6a54](https://github.com/descope/authzcache/commit/b0f6a54155404bdcc21ef923de00d63d0e75aed6))
+* **deps:** update github.com/descope dependendies ([#880](https://github.com/descope/authzcache/issues/880)) ([800fe64](https://github.com/descope/authzcache/commit/800fe64ca27d06934581f6767d8d6fd12e45b15a))
+* **deps:** update github.com/descope/backend digest to 3108710 ([#937](https://github.com/descope/authzcache/issues/937)) ([483cc6a](https://github.com/descope/authzcache/commit/483cc6acd4b15a904a7a9922f6244df33cff50ce))
+* **deps:** update github.com/descope/backend digest to 45f23c2 ([#932](https://github.com/descope/authzcache/issues/932)) ([0dbd154](https://github.com/descope/authzcache/commit/0dbd15462510b55d097e122e87f9c08474b0d82b))
+* **deps:** update github.com/descope/backend digest to 8b6067a ([#934](https://github.com/descope/authzcache/issues/934)) ([cf0e9a4](https://github.com/descope/authzcache/commit/cf0e9a487f507251f54119fb0dba6c7bc0559a71))
+* **deps:** update github.com/descope/backend digest to baf00dc ([#933](https://github.com/descope/authzcache/issues/933)) ([606629f](https://github.com/descope/authzcache/commit/606629ffddf5dec0dda993113fe8009a5c879b65))
+* **deps:** update github.com/descope/backend digest to bfe91b9 ([#935](https://github.com/descope/authzcache/issues/935)) ([bd41c0b](https://github.com/descope/authzcache/commit/bd41c0b40e566fb4f1ae685d30e924b08f9d18ab))
+* **deps:** update github.com/descope/backend digest to bff22ea ([#931](https://github.com/descope/authzcache/issues/931)) ([492fcd9](https://github.com/descope/authzcache/commit/492fcd94278eff3c89ce8179a2bf99a1d94342cb))
+* **deps:** update module github.com/grpc-ecosystem/grpc-gateway/v2 to v2.31.0 ([#936](https://github.com/descope/authzcache/issues/936)) ([d08fc03](https://github.com/descope/authzcache/commit/d08fc037ce872fa23149ed33630944c534bda784))
+* **deps:** update module google.golang.org/grpc to v1.84.0 ([#926](https://github.com/descope/authzcache/issues/926)) ([71ba786](https://github.com/descope/authzcache/commit/71ba786abe55a36e9cce9d42d26decd65f0c8a61))
+
 ## [1.2.3](https://github.com/descope/authzcache/compare/v1.2.2...v1.2.3) (2026-09-15)
 
 
