@@ -101,8 +101,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 h1:5RVFMOWjMyRy8cARdy79nAmgYw3hK/4HUq48LQ6Wwqo=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
-github.com/descope/backend v0.0.0-20261021132545-345961f83748 h1:d7zPMhR5NzEuvJu0WUqTMvZDKEBvhdtoqFH2VRD9j6s=
-github.com/descope/backend v0.0.0-20261021132545-345961f83748/go.mod h1:l3WcpIqD1TXO7xMRScpBXfjz/8ld5lLW/x3Xsxwp6AY=
+github.com/descope/backend v0.0.0-20261021134507-6de5c0f71975 h1:G1ZXmanvEk2idRjcDOZumHOw+xLjSBjTTtZdoZNuj80=
+github.com/descope/backend v0.0.0-20261021134507-6de5c0f71975/go.mod h1:l3WcpIqD1TXO7xMRScpBXfjz/8ld5lLW/x3Xsxwp6AY=
 github.com/descope/go-sdk v1.38.0 h1:Fnw0iDeU0PgDnPmYvNzDAIPa0r85gbR2UNHUvnvBRMo=
 github.com/descope/go-sdk v1.38.0/go.mod h1:Y/0H3cz3rQ4H76z55vQwLq97bsu4KunddboLzsioIHk=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=
