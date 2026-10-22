@@ -1372,3 +1372,42 @@ func TestUpdateCacheWithAddedRelations_DoesNotPreCacheDirect(t *testing.T) {
 	assert.Empty(t, checks, "created tuple must not be served as a direct grant")
 	assert.Len(t, unchecked, 1)
 }
+
+func TestCheckRelationsKeyedByTargetType(t *testing.T) {
+	ctx := context.TODO()
+	rel := func(targetType string) *descope.FGARelation {
+		return &descope.FGARelation{Resource: "doc1", ResourceType: "doc", Relation: "human", Target: "u1", TargetType: targetType}
+	}
+	tests := []struct {
+		name        string
+		cachedType  string
+		cachedAllow bool
+		direct      bool
+		queryType   string
+		wantHit     bool
+	}{
+		{name: "deny cached without type not served to typed check", cachedType: "", cachedAllow: false, direct: false, queryType: "User", wantHit: false},
+		{name: "deny cached for one type not served to another", cachedType: "Bot", cachedAllow: false, direct: false, queryType: "User", wantHit: false},
+		{name: "allow cached for one type not served to another", cachedType: "User", cachedAllow: true, direct: false, queryType: "Bot", wantHit: false},
+		{name: "direct grant cached for one type not served to another", cachedType: "User", cachedAllow: true, direct: true, queryType: "", wantHit: false},
+		{name: "same type is served", cachedType: "User", cachedAllow: false, direct: false, queryType: "User", wantHit: true},
+		{name: "same empty type is served", cachedType: "", cachedAllow: true, direct: true, queryType: "", wantHit: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache, _ := setup(t)
+			cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+				{Allowed: tt.cachedAllow, Relation: rel(tt.cachedType), Info: &descope.FGACheckInfo{Direct: tt.direct}},
+			})
+			checks, unchecked, _ := cache.CheckRelations(ctx, []*descope.FGARelation{rel(tt.queryType)}, nil)
+			if tt.wantHit {
+				require.Len(t, checks, 1)
+				assert.Empty(t, unchecked)
+				assert.Equal(t, tt.cachedAllow, checks[0].Allowed)
+				return
+			}
+			assert.Empty(t, checks)
+			assert.Len(t, unchecked, 1)
+		})
+	}
+}
