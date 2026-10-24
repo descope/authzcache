@@ -1,3 +1,5 @@
+cel.dev/cel-go v0.32.0 h1:irvpFKr5EuGPyxeME03ERh0rii1TX+BDAnB9eL3IvNk=
+cel.dev/cel-go v0.32.0/go.mod h1:DnVip7tpJSsgZymwfT+m1tnEVy3ivAjSMXPx12YrMkU=
 cel.dev/expr v0.25.2 h1:K6j46C81hXtZQfuX60cVWQFBJahKSE2gfRbNuvr5bFs=
 cel.dev/expr v0.25.2/go.mod h1:hrXvqGP6G6gyx8UAHSHJ5RGk//1Oj5nXQ2NI02Nrsg4=
 cloud.google.com/go v0.123.0 h1:2NAUJwPR47q+E35uaJeYoNhuNEM9kM8SjgRgdeOJUSE=
@@ -101,8 +103,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 h1:5RVFMOWjMyRy8cARdy79nAmgYw3hK/4HUq48LQ6Wwqo=
 github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1/go.mod h1:ZXNYxsqcloTdSy/rNShjYzMhyjf0LaoftYK0p+A3h40=
-github.com/descope/backend v0.0.0-20261022120048-92064af09524 h1:/XO1PzIZ32kwXMosO7JoyfKOKwfmHN4il5t68L+gfug=
-github.com/descope/backend v0.0.0-20261022120048-92064af09524/go.mod h1:QaHhoqd+68XVa0c2hsljFtvvluK7dPE6M2F5uElMa7Q=
+github.com/descope/backend v0.0.0-20261024181212-21b1e0a539f8 h1:Cqi5GNQ/MxjjAvs6brf78i9KMZWh7NsLuA0wM7o3JWI=
+github.com/descope/backend v0.0.0-20261024181212-21b1e0a539f8/go.mod h1:YR3ATEhG0EO+G/22v2S3tEQQGidx10ZEYOcHCyfuU1M=
 github.com/descope/go-sdk v1.38.0 h1:Fnw0iDeU0PgDnPmYvNzDAIPa0r85gbR2UNHUvnvBRMo=
 github.com/descope/go-sdk v1.38.0/go.mod h1:Y/0H3cz3rQ4H76z55vQwLq97bsu4KunddboLzsioIHk=
 github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14 h1:PbCbVsG2ZDPxQkg8WvTZHhOPEwncozXvMjdmFotuljk=

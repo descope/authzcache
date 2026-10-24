@@ -3,7 +3,7 @@ module github.com/descope/authzcache
 go 1.26.10
 
 require (
-	github.com/descope/backend v0.0.0-20261022120048-92064af09524
+	github.com/descope/backend v0.0.0-20261024181212-21b1e0a539f8
 	github.com/descope/go-sdk v1.38.0
 	github.com/descope/golang-lru v0.5.5-0.20220516120313-0c580df2ac14
 	github.com/descope/protoc-gen-mocker v1.0.1-0.20260929164446-b3a708c6375f
@@ -19,6 +19,7 @@ require (
 )
 
 require (
+	cel.dev/cel-go v0.32.0 // indirect
 	cel.dev/expr v0.25.2 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/DataDog/datadog-go/v5 v5.9.1 // indirect
