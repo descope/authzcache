@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/descope/authzcache/internal/services"
-	authzv1 "github.com/descope/backend/authzservice/pkg/authzservice/proto/v1"
+	authczv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
 	"github.com/descope/go-sdk/descope"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,7 +26,7 @@ func TestCreateFGASchema(t *testing.T) {
 		return nil
 	}
 
-	req := &authzv1.SaveDSLSchemaRequest{Dsl: "test-dsl"}
+	req := &authczv1.SaveDSLSchemaRequest{Dsl: "test-dsl"}
 	resp, err := controller.CreateFGASchema(context.Background(), req)
 
 	assert.NoError(t, err)
@@ -40,7 +40,7 @@ func TestCreateFGASchemaError(t *testing.T) {
 		return assert.AnError
 	}
 
-	req := &authzv1.SaveDSLSchemaRequest{Dsl: "test-dsl"}
+	req := &authczv1.SaveDSLSchemaRequest{Dsl: "test-dsl"}
 	resp, err := controller.CreateFGASchema(context.Background(), req)
 
 	assert.Error(t, err)
@@ -50,7 +50,7 @@ func TestCreateFGASchemaError(t *testing.T) {
 func TestCreateFGARelations(t *testing.T) {
 	controller, mockAuthzCache := setup()
 	var authzCalled bool
-	tuples := []*authzv1.Tuple{
+	tuples := []*authczv1.Tuple{
 		{Resource: "testR", Target: "testT", ResourceType: "testRT", Relation: "testRel", TargetType: "testTT"},
 	}
 	mockAuthzCache.CreateFGARelationsFunc = func(_ context.Context, relations []*descope.FGARelation) error {
@@ -64,7 +64,7 @@ func TestCreateFGARelations(t *testing.T) {
 		return nil
 	}
 
-	req := &authzv1.CreateTuplesRequest{Tuples: tuples}
+	req := &authczv1.CreateTuplesRequest{Tuples: tuples}
 	resp, err := controller.CreateFGARelations(context.Background(), req)
 
 	assert.NoError(t, err)
@@ -78,7 +78,7 @@ func TestCreateFGARelationsError(t *testing.T) {
 		return assert.AnError
 	}
 
-	req := &authzv1.CreateTuplesRequest{Tuples: []*authzv1.Tuple{}}
+	req := &authczv1.CreateTuplesRequest{Tuples: []*authczv1.Tuple{}}
 	resp, err := controller.CreateFGARelations(context.Background(), req)
 
 	assert.Error(t, err)
@@ -88,7 +88,7 @@ func TestCreateFGARelationsError(t *testing.T) {
 func TestDeleteFGARelations(t *testing.T) {
 	controller, mockAuthzCache := setup()
 	var authzCalled bool
-	tuples := []*authzv1.Tuple{
+	tuples := []*authczv1.Tuple{
 		{Resource: "testR", Target: "testT", ResourceType: "testRT", Relation: "testRel", TargetType: "testTT"},
 	}
 	mockAuthzCache.DeleteFGARelationsFunc = func(_ context.Context, relations []*descope.FGARelation) error {
@@ -102,7 +102,7 @@ func TestDeleteFGARelations(t *testing.T) {
 		return nil
 	}
 
-	req := &authzv1.DeleteTuplesRequest{Tuples: tuples}
+	req := &authczv1.DeleteTuplesRequest{Tuples: tuples}
 	resp, err := controller.DeleteFGARelations(context.Background(), req)
 
 	assert.NoError(t, err)
@@ -116,7 +116,7 @@ func TestDeleteFGARelationsError(t *testing.T) {
 		return assert.AnError
 	}
 
-	req := &authzv1.DeleteTuplesRequest{Tuples: []*authzv1.Tuple{}}
+	req := &authczv1.DeleteTuplesRequest{Tuples: []*authczv1.Tuple{}}
 	resp, err := controller.DeleteFGARelations(context.Background(), req)
 
 	assert.Error(t, err)
@@ -126,7 +126,7 @@ func TestDeleteFGARelationsError(t *testing.T) {
 func TestCheck(t *testing.T) {
 	controller, mockAuthzCache := setup()
 	var authzCalled bool
-	tuples := []*authzv1.Tuple{
+	tuples := []*authczv1.Tuple{
 		{Resource: "testR", Target: "testT", ResourceType: "testRT", Relation: "testRel", TargetType: "testTT"},
 	}
 	mockAuthzCache.CheckFunc = func(_ context.Context, relations []*descope.FGARelation, _ map[string]any) ([]*descope.FGACheck, error) {
@@ -142,7 +142,7 @@ func TestCheck(t *testing.T) {
 		}, nil
 	}
 
-	req := &authzv1.CheckRequest{Tuples: tuples}
+	req := &authczv1.CheckRequest{Tuples: tuples}
 	resp, err := controller.Check(context.Background(), req)
 
 	assert.NoError(t, err)
@@ -164,7 +164,7 @@ func TestCheckError(t *testing.T) {
 		return nil, assert.AnError
 	}
 
-	req := &authzv1.CheckRequest{Tuples: []*authzv1.Tuple{}}
+	req := &authczv1.CheckRequest{Tuples: []*authczv1.Tuple{}}
 	resp, err := controller.Check(context.Background(), req)
 
 	assert.Error(t, err)
@@ -182,7 +182,7 @@ func TestWhoCanAccess(t *testing.T) {
 		return []string{"user1", "user2"}, nil
 	}
 
-	req := &authzv1.WhoCanAccessRequest{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs"}
+	req := &authczv1.WhoCanAccessRequest{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs"}
 	resp, err := controller.WhoCanAccess(context.Background(), req)
 
 	assert.NoError(t, err)
@@ -197,7 +197,7 @@ func TestWhoCanAccessError(t *testing.T) {
 		return nil, assert.AnError
 	}
 
-	req := &authzv1.WhoCanAccessRequest{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs"}
+	req := &authczv1.WhoCanAccessRequest{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs"}
 	resp, err := controller.WhoCanAccess(context.Background(), req)
 
 	assert.Error(t, err)
@@ -223,7 +223,7 @@ func TestWhatCanTargetAccess(t *testing.T) {
 		}, nil
 	}
 
-	req := &authzv1.WhatCanTargetAccessRequest{Target: "user1"}
+	req := &authczv1.WhatCanTargetAccessRequest{Target: "user1"}
 	resp, err := controller.WhatCanTargetAccess(context.Background(), req)
 
 	assert.NoError(t, err)
@@ -245,7 +245,7 @@ func TestWhatCanTargetAccessError(t *testing.T) {
 		return nil, assert.AnError
 	}
 
-	req := &authzv1.WhatCanTargetAccessRequest{Target: "user1"}
+	req := &authczv1.WhatCanTargetAccessRequest{Target: "user1"}
 	resp, err := controller.WhatCanTargetAccess(context.Background(), req)
 
 	assert.Error(t, err)
@@ -254,7 +254,7 @@ func TestWhatCanTargetAccessError(t *testing.T) {
 
 func TestCheckWithContextForwarding(t *testing.T) {
 	controller, mockAuthzCache := setup()
-	tuples := []*authzv1.Tuple{
+	tuples := []*authczv1.Tuple{
 		{Resource: "testR", Target: "testT", ResourceType: "testRT", Relation: "testRel", TargetType: "testTT"},
 	}
 	wantCtx := map[string]any{"role": "admin"}
@@ -267,7 +267,7 @@ func TestCheckWithContextForwarding(t *testing.T) {
 	}
 	ctxStruct, err := structpb.NewStruct(wantCtx)
 	require.NoError(t, err)
-	req := &authzv1.CheckRequest{Tuples: tuples, Context: ctxStruct}
+	req := &authczv1.CheckRequest{Tuples: tuples, Context: ctxStruct}
 	resp, err := controller.Check(context.Background(), req)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -276,7 +276,7 @@ func TestCheckWithContextForwarding(t *testing.T) {
 
 func TestCheckResponseInfoConditionalFields(t *testing.T) {
 	controller, mockAuthzCache := setup()
-	tuples := []*authzv1.Tuple{
+	tuples := []*authczv1.Tuple{
 		{Resource: "testR", Target: "testT", ResourceType: "testRT", Relation: "testRel", TargetType: "testTT"},
 	}
 	mockAuthzCache.CheckFunc = func(_ context.Context, relations []*descope.FGARelation, _ map[string]any) ([]*descope.FGACheck, error) {
@@ -292,7 +292,7 @@ func TestCheckResponseInfoConditionalFields(t *testing.T) {
 			},
 		}, nil
 	}
-	req := &authzv1.CheckRequest{Tuples: tuples}
+	req := &authczv1.CheckRequest{Tuples: tuples}
 	resp, err := controller.Check(context.Background(), req)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
