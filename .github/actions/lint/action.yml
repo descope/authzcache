@@ -28,23 +28,21 @@ runs:
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@9fae48acfc02a90574d7c304a1758ef9895495fa # v7.0.1
       with:
-        version: v1.64.8
+        version: v2.15.0
         install-mode: goinstall
         args: --config=./scripts/lint/.golangci.yml
+
+    - name: Check gofmt and goimports
+      run: |
+        diff=$(golangci-lint fmt --diff --config=./scripts/lint/.golangci.yml)
+        if [ -n "$diff" ]; then
+          printf '%s\n' "$diff"
+          exit 1
+        fi
+      shell: bash
 
     - name: Run go vet
       env:
         GOPRIVATE: github.com/descope/*
       run: go vet ./...
-      shell: bash
-
-    - name: Check formatting
-      env:
-        GOPRIVATE: github.com/descope/*
-      run: |
-        if [ "$(gofmt -l . | wc -l)" -gt 0 ]; then
-          echo "Files not formatted properly:"
-          gofmt -l .
-          exit 1
-        fi
       shell: bash
