@@ -78,16 +78,16 @@ lint_go_build() {
 lint_run_golangci() {
 	echo "- Running golangci-lint"
 	# renovate: datasource=github-releases depName=golangci/golangci-lint
-	GOLANG_CI_SUPPORTED_VERSION="1.64.8"
+	GOLANG_CI_SUPPORTED_VERSION="2.15.0"
 	INSTALLED_GOLANG_CLI_VERSION="$(golangci-lint --version 2>/dev/null)"
 	if [[ $INSTALLED_GOLANG_CLI_VERSION != *"$GOLANG_CI_SUPPORTED_VERSION"* ]]; then
 		echo "Installing golangci-lint from source (to match current Go version)..."
-		go install github.com/golangci/golangci-lint/cmd/golangci-lint@v${GOLANG_CI_SUPPORTED_VERSION}
+		go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v${GOLANG_CI_SUPPORTED_VERSION}
 		echo "Done installing golangci-lint"
 	fi
 
 	local golang_cli_config="${1:-"${CURRENT_DIR}/.golangci.yml"}" # get first argument and set "cmd" to be default
-	lintresult=$(golangci-lint --config ${golang_cli_config} --out-format colored-line-number run)
+	lintresult=$(golangci-lint run --config "${golang_cli_config}")
 	lintcode=$?
 	if [ $lintcode -ne 0 ]; then
 		echo "golangci-lint failed to run with exit code $lintcode"
@@ -97,6 +97,11 @@ lint_run_golangci() {
 
 	if [[ -n $lintresult ]]; then
 		echo "Some files aren't passing lint, please run 'golangci-lint run' to see the errors it flags and correct your source code before committing"
+		echo "$lintresult"
+		exit 1
+	fi
+	lintresult=$(golangci-lint fmt --diff --config "${golang_cli_config}")
+	if [[ -n $lintresult ]]; then
 		echo "$lintresult"
 		exit 1
 	fi
