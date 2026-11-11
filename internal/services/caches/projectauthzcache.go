@@ -85,6 +85,7 @@ type projectAuthzCache struct {
 	directResourcesIndex  map[resource]map[target][]resourceTargetRelation
 	directTargetsIndex    map[target]map[resource][]resourceTargetRelation
 	directKeyComponents   map[resourceTargetRelation]keyComponents
+	directKeyBytes        int64 // sum of directKeyComponents key lengths
 	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, *cachedGrant]
 
 	// edge CEL evaluation
@@ -437,9 +438,13 @@ func (pc *projectAuthzCache) fetchRemoteChanges(ctx context.Context) (*descope.A
 func (pc *projectAuthzCache) addDirectRelation(ctx context.Context, r *descope.FGARelation, grant *cachedGrant) {
 	key := key(r)
 	pc.directRelationCache.Add(ctx, key, grant)
+	if _, ok := pc.directKeyComponents[key]; ok {
+		return // already indexed
+	}
 	resource := resource(r.Resource)
 	target := target(r.Target)
 	pc.directKeyComponents[key] = keyComponents{r: resource, t: target}
+	pc.directKeyBytes += int64(len(key))
 	pc.addKeyToDirectResourceIndex(key, resource, target)
 	pc.addKeyToDirectTargetIndex(key, resource, target)
 }
@@ -543,6 +548,7 @@ func (pc *projectAuthzCache) removeIndexOnCacheEviction(key resourceTargetRelati
 	pc.removeKeyFromResourceIndex(components.r, components.t, key)
 	pc.removeKeyFromTargetIndex(components.r, components.t, key)
 	delete(pc.directKeyComponents, key)
+	pc.directKeyBytes -= int64(len(key))
 }
 
 // must be called while holding the mutex
@@ -557,6 +563,7 @@ func (pc *projectAuthzCache) purgeRelationCaches(ctx context.Context) {
 	pc.directResourcesIndex = make(map[resource]map[target][]resourceTargetRelation)
 	pc.directTargetsIndex = make(map[target]map[resource][]resourceTargetRelation)
 	pc.directKeyComponents = make(map[resourceTargetRelation]keyComponents)
+	pc.directKeyBytes = 0
 	pc.directRelationCache.Purge(ctx)
 	pc.indirectRelationCache.Purge(ctx)
 	if pc.lookupCache != nil {
@@ -705,8 +712,7 @@ func (pc *projectAuthzCache) SetWhatCanTargetAccessCached(ctx context.Context, t
 	})
 }
 
-// Stats walks directKeyComponents for the key bytes, which allocates nothing but is O(entries), so it
-// belongs on the reporting interval rather than anywhere near a request.
+// Stats is O(1) so it never stalls requests on the lock.
 func (pc *projectAuthzCache) Stats(ctx context.Context) Stats {
 	pc.mutex.RLock()
 	defer pc.mutex.RUnlock()
@@ -714,12 +720,10 @@ func (pc *projectAuthzCache) Stats(ctx context.Context) Stats {
 		DirectEntries:   pc.directRelationCache.Len(ctx),
 		IndirectEntries: pc.indirectRelationCache.Len(ctx),
 		IndexEntries:    2 * len(pc.directKeyComponents), // one appearance per index
+		DirectKeyBytes:  pc.directKeyBytes,
 	}
 	if pc.lookupCache != nil {
 		s.LookupEntries = pc.lookupCache.Len(ctx)
-	}
-	for k := range pc.directKeyComponents {
-		s.DirectKeyBytes += int64(len(k))
 	}
 	return s
 }
