@@ -83,7 +83,7 @@ func registerCacheGauges(meter metric.Meter, cacheStats func() map[string]caches
 	_, err = meter.RegisterCallback(func(_ context.Context, o metric.Observer) error {
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
-		o.ObserveInt64(heap, int64(m.HeapInuse))
+		o.ObserveInt64(heap, int64(m.HeapInuse)) //nolint:gosec // heap stays far below MaxInt64
 		for projectID, s := range cacheStats() {
 			p := attribute.String("project_id", projectID)
 			for cache, n := range map[string]int{"direct": s.DirectEntries, "indirect": s.IndirectEntries, "lookup": s.LookupEntries, "index": s.IndexEntries} {
