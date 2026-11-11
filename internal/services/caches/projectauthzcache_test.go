@@ -213,6 +213,15 @@ func TestStats(t *testing.T) {
 	assert.Equal(t, 1, s.IndirectEntries)
 	assert.Equal(t, 2, s.IndexEntries, "one direct key appears once in each of the two indexes")
 	assert.Equal(t, int64(len(key(direct))), s.DirectKeyBytes)
+
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: true, Relation: direct, Info: &descope.FGACheckInfo{Direct: true}}})
+	assert.Len(t, cache.directResourcesIndex["folder1"]["u1"], 1, "re-adding a key must not duplicate it in the index")
+	assert.Equal(t, s, cache.Stats(ctx))
+
+	cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{direct})
+	s = cache.Stats(ctx)
+	assert.Equal(t, 0, s.DirectEntries)
+	assert.Equal(t, int64(0), s.DirectKeyBytes)
 }
 
 func TestUpdateCacheWithAddedRelations_AddsToLookupCache(t *testing.T) {
