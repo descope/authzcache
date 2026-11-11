@@ -83,11 +83,8 @@ func NewReporter(collector *Collector, baseURL, managementKey string, intervalSe
 	}
 }
 
-// Start launches the background reporting goroutine.
+// Start launches the background reporting goroutine; when disabled it only logs.
 func (r *Reporter) Start(ctx context.Context) {
-	if !r.enabled {
-		return
-	}
 	cctx.Go(ctx, r.run)
 }
 
@@ -151,7 +148,7 @@ func (r *Reporter) report(ctx context.Context) {
 			}
 			payloads = append(payloads, buildPayload(api, agg))
 		}
-		if len(payloads) == 0 {
+		if len(payloads) == 0 || !r.enabled {
 			continue
 		}
 		if err := r.post(ctx, projectID, payloads); err != nil {
