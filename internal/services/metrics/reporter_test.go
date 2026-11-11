@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/backend/common/pkg/common/utils"
@@ -72,12 +71,16 @@ func TestReporterDisabled(t *testing.T) {
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
 
 	reporter := NewReporter(collector, srv.URL, "key", 1, false)
-	ctx, cancel := context.WithCancel(context.Background())
-	reporter.Start(ctx)
-	cancel()
-	time.Sleep(50 * time.Millisecond)
+	statsRead := false
+	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
+		statsRead = true
+		return nil
+	})
+	reporter.report(context.Background())
 
 	require.False(t, called, "disabled reporter should not post")
+	require.True(t, statsRead, "disabled reporter still logs sizes")
+	require.Empty(t, collector.SnapshotAndReset(), "window is drained even when not posted")
 }
 
 func TestReporterHandlesHTTPError(t *testing.T) {
