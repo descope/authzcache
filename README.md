@@ -50,6 +50,17 @@ The check cache is kept fresh both by remote polling and by pass-through request
 
 New entries, however, do not appear until the TTL expires. A relation granted after a lookup result was cached is not part of that cached result, so a `WhoCanAccess` / `WhatCanTargetAccess` call keeps omitting the newly authorized entry until the result's TTL (`AUTHZCACHE_LOOKUP_CACHE_TTL_IN_SECONDS`) expires and the result is refetched from the backend.
 
+### OpenTelemetry metrics
+
+Set `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`) to export metrics to your own collector over OTLP/HTTP. Export is off when neither is set or `OTEL_SDK_DISABLED=true`. The other standard `OTEL_*` variables apply, e.g. `OTEL_EXPORTER_OTLP_HEADERS`, `OTEL_METRIC_EXPORT_INTERVAL` (default 60s) and `OTEL_SERVICE_NAME` (default `authzcache`). Use an `http://` endpoint or `OTEL_EXPORTER_OTLP_INSECURE=true` for a collector without TLS.
+
+| Metric | Type | Attributes |
+|---|---|---|
+| `authzcache.cache.entries` | gauge | `project_id`, `cache` (`direct`, `indirect`, `lookup`, `index`) |
+| `authzcache.cache.direct_key_bytes` | gauge | `project_id` |
+| `authzcache.process.heap_inuse` | gauge, bytes | none |
+| `authzcache.check.relations` | counter | `project_id`, `api`, `outcome` (`hit_direct`, `hit_indirect`, `hit_conditional`, `miss`) |
+
 ## Ports
 
 - **8189** - HTTP REST API endpoint

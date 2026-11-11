@@ -23,6 +23,11 @@ const (
 	ConfigKeyMetricsReportEnabled           = "AUTHZCACHE_METRICS_REPORT_ENABLED"             // TRUE/FALSE, default is TRUE
 	ConfigKeyMetricsReportIntervalInSeconds = "AUTHZCACHE_METRICS_REPORT_INTERVAL_IN_SECONDS" // interval in seconds, default is 60, min is 10
 
+	// Standard OTel env vars; the exporter reads the rest itself
+	ConfigKeyOTelExporterEndpoint        = "OTEL_EXPORTER_OTLP_ENDPOINT"
+	ConfigKeyOTelExporterMetricsEndpoint = "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"
+	ConfigKeyOTelSDKDisabled             = "OTEL_SDK_DISABLED"
+
 	// HTTP gateway configuration
 	ConfigKeyGatewayWriteTimeoutInSeconds = "AUTHZCACHE_HTTP_WRITE_TIMEOUT_IN_SECONDS" // gateway response-write timeout; default 30, the node-sdk cache-abort ceiling
 )
@@ -73,6 +78,15 @@ func GetMetricsReportEnabled() bool {
 
 func GetMetricsReportIntervalInSeconds() int {
 	return max(10, cconfig.GetIntOrProvidedLocal(ConfigKeyMetricsReportIntervalInSeconds, 60))
+}
+
+// OTel export is opt-in: on only when an OTLP endpoint is configured
+func GetOTelMetricsEnabled() bool {
+	if cconfig.GetBoolOrProvidedLocal(ConfigKeyOTelSDKDisabled, false) {
+		return false
+	}
+	return cconfig.GetStringOrProvidedLocal(ConfigKeyOTelExporterEndpoint, "") != "" ||
+		cconfig.GetStringOrProvidedLocal(ConfigKeyOTelExporterMetricsEndpoint, "") != ""
 }
 
 func GetGatewayWriteTimeoutInSeconds() int {

@@ -53,8 +53,13 @@ func serve() {
 					return err
 				}
 				// provider set before Start: the reporting goroutine reads it
-				reporter.SetCacheStatsProvider(func() map[string]caches.Stats { return as.CacheStats(ctx) })
+				cacheStats := func() map[string]caches.Stats { return as.CacheStats(ctx) }
+				reporter.SetCacheStatsProvider(cacheStats)
 				reporter.Start(ctx)
+				// metrics export must not block serving
+				if err := metrics.StartOTel(ctx, cacheStats); err != nil {
+					cctx.Logger(ctx).Error().Err(err).Msg("Failed starting OTel metrics export")
+				}
 				ctrl := controllers.New(as)
 				authzcv1.RegisterAuthzCacheServer(s, ctrl)
 				return nil
