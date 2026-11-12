@@ -196,6 +196,21 @@ func TestUpdateCacheWithAddedRelations_DropsStaleDenial(t *testing.T) {
 	assert.False(t, ok, "a cached denial must not survive the create that grants it")
 }
 
+func TestUpdateCacheWithDeletedRelations_CollidingKeys(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	first := &descope.FGARelation{Resource: "org:r1", Target: "user:t1", Relation: "owner"}
+	second := &descope.FGARelation{Resource: "org", Target: "r1:user:t1", Relation: "owner"}
+	require.Equal(t, key(first), key(second))
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: first, Info: &descope.FGACheckInfo{Direct: true}},
+		{Allowed: true, Relation: second, Info: &descope.FGACheckInfo{Direct: true}},
+	})
+	cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{second})
+	_, _, ok := checkRelation(ctx, cache, second)
+	assert.False(t, ok, "a deleted relation must not stay cached under a colliding key")
+}
+
 func TestStats(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)
