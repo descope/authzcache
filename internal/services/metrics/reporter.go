@@ -52,8 +52,21 @@ type APIMetricsPayload struct {
 	MaxDurationMissMs int64   `json:"max_duration_miss_ms"`
 }
 
+// SizesPayload is a point-in-time reading; the heap fields are per process, so they repeat across projects.
+type SizesPayload struct {
+	DirectEntries        int   `json:"direct_entries"`
+	IndirectEntries      int   `json:"indirect_entries"`
+	LookupEntries        int   `json:"lookup_entries"`
+	IndexEntries         int   `json:"index_entries"`
+	DirectKeyBytes       int64 `json:"direct_key_bytes"`
+	HeapInuseBytes       int64 `json:"heap_inuse_bytes"`
+	HeapAllocBytes       int64 `json:"heap_alloc_bytes"`
+	ProcessCachedAnswers int64 `json:"process_cached_answers"`
+}
+
 type metricsRequest struct {
 	Metrics []APIMetricsPayload `json:"metrics"`
+	Sizes   *SizesPayload       `json:"sizes,omitempty"`
 }
 
 // Reporter is a background goroutine that periodically snapshots metrics and POSTs them.
@@ -105,14 +118,15 @@ func (r *Reporter) run(ctx context.Context) {
 // of a measurement rather than estimated from assumed per-entry overheads. The denominator is cached
 // answers only, so whole-process heap — the indexes included — is charged to the answers that caused
 // it. That keeps index growth visible in the ratio instead of deflating it.
-func (r *Reporter) logCacheSizes(ctx context.Context) {
+func (r *Reporter) logCacheSizes(ctx context.Context) map[string]*SizesPayload {
 	if r.cacheStats == nil {
-		return
+		return nil
 	}
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	var cachedAnswers int64
-	for projectID, s := range r.cacheStats() {
+	stats := r.cacheStats()
+	for projectID, s := range stats {
 		cachedAnswers += int64(s.DirectEntries + s.IndirectEntries + s.LookupEntries)
 		cctx.Logger(ctx).Info().
 			Str("project_id", projectID).
@@ -131,15 +145,35 @@ func (r *Reporter) logCacheSizes(ctx context.Context) {
 		event = event.Float64("heap_bytes_per_answer_max", float64(m.HeapInuse)/float64(cachedAnswers))
 	}
 	event.Msg("FGA cache process memory")
+	sizes := make(map[string]*SizesPayload, len(stats))
+	for projectID, s := range stats {
+		sizes[projectID] = &SizesPayload{
+			DirectEntries:        s.DirectEntries,
+			IndirectEntries:      s.IndirectEntries,
+			LookupEntries:        s.LookupEntries,
+			IndexEntries:         s.IndexEntries,
+			DirectKeyBytes:       s.DirectKeyBytes,
+			HeapInuseBytes:       int64(m.HeapInuse), //nolint:gosec // heap stays far below MaxInt64
+			HeapAllocBytes:       int64(m.HeapAlloc), //nolint:gosec // heap stays far below MaxInt64
+			ProcessCachedAnswers: cachedAnswers,
+		}
+	}
+	return sizes
 }
 
 func (r *Reporter) report(ctx context.Context) {
-	r.logCacheSizes(ctx)
+	sizes := r.logCacheSizes(ctx)
 	snapshot := r.collector.SnapshotAndReset()
-	for projectID, byAPI := range snapshot {
-		if len(byAPI) == 0 {
-			continue
-		}
+	// idle projects still report their sizes
+	projectIDs := make(map[string]struct{}, len(snapshot)+len(sizes))
+	for projectID := range snapshot {
+		projectIDs[projectID] = struct{}{}
+	}
+	for projectID := range sizes {
+		projectIDs[projectID] = struct{}{}
+	}
+	for projectID := range projectIDs {
+		byAPI := snapshot[projectID]
 		payloads := make([]APIMetricsPayload, 0, len(byAPI))
 		for api, agg := range byAPI {
 			logRelationCounts(ctx, projectID, api, agg) // above the guard: an upstream error leaves counts with no call
@@ -148,16 +182,17 @@ func (r *Reporter) report(ctx context.Context) {
 			}
 			payloads = append(payloads, buildPayload(api, agg))
 		}
-		if len(payloads) == 0 || !r.enabled {
+		body := metricsRequest{Metrics: payloads, Sizes: sizes[projectID]}
+		if !r.enabled || (len(body.Metrics) == 0 && body.Sizes == nil) {
 			continue
 		}
-		if err := r.post(ctx, projectID, payloads); err != nil {
+		if err := r.post(ctx, projectID, body); err != nil {
 			cctx.Logger(ctx).Error().Err(err).Str("project_id", projectID).Msg("Failed to report FGA cache metrics; metrics for this window are lost")
 		}
 	}
 }
 
-// Logged rather than reported: the metrics endpoint's proto does not accept these fields yet.
+// Logs the direct/indirect/conditional split; the POST carries only the totals.
 func logRelationCounts(ctx context.Context, projectID string, api APIName, agg *AggregatedMetrics) {
 	if agg.Relations == (RelationCounts{}) {
 		return
@@ -178,6 +213,11 @@ func buildPayload(api APIName, agg *AggregatedMetrics) APIMetricsPayload {
 		HitCount:   agg.HitCount,
 		MissCount:  agg.MissCount,
 		TotalCalls: agg.TotalCalls,
+	}
+	if api == APICheck {
+		// per relation: a batch with one miss out of fifty is 49 hits and 1 miss
+		p.HitCount = agg.Relations.HitsDirect + agg.Relations.HitsIndirect + agg.Relations.HitsConditional
+		p.MissCount = agg.Relations.Misses
 	}
 
 	if agg.TotalCalls > 0 {
@@ -218,8 +258,8 @@ func buildPayload(api APIName, agg *AggregatedMetrics) APIMetricsPayload {
 	return p
 }
 
-func (r *Reporter) post(ctx context.Context, projectID string, payloads []APIMetricsPayload) error {
-	body, err := utils.Marshal(metricsRequest{Metrics: payloads})
+func (r *Reporter) post(ctx context.Context, projectID string, payload metricsRequest) error {
+	body, err := utils.Marshal(payload)
 	if err != nil {
 		return err
 	}

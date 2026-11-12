@@ -58,6 +58,57 @@ func TestReporterPostsMetrics(t *testing.T) {
 	require.Equal(t, int64(30), m.MaxDurationMissMs)
 	require.Equal(t, int64(5), m.MinDurationMs)
 	require.Equal(t, int64(30), m.MaxDurationMs)
+
+	require.NotNil(t, receivedBody.Sizes)
+	require.Equal(t, 2, receivedBody.Sizes.DirectEntries)
+	require.Equal(t, 4, receivedBody.Sizes.IndexEntries)
+	require.Equal(t, int64(40), receivedBody.Sizes.DirectKeyBytes)
+	require.Equal(t, int64(2), receivedBody.Sizes.ProcessCachedAnswers)
+	require.Positive(t, receivedBody.Sizes.HeapInuseBytes)
+}
+
+func TestReporterCountsCheckPerRelation(t *testing.T) {
+	var receivedBody metricsRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = utils.Unmarshal(body, &receivedBody)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	collector := NewCollector()
+	collector.Record("proj1", APICheck, CallMetrics{CacheHit: true, DurationMs: 2, Relations: RelationCounts{HitsDirect: 10, HitsIndirect: 40}})
+	collector.Record("proj1", APICheck, CallMetrics{CacheHit: false, DurationMs: 40, Relations: RelationCounts{HitsIndirect: 47, HitsConditional: 2, Misses: 1}})
+
+	NewReporter(collector, srv.URL, "key", 1, true).report(context.Background())
+
+	require.Len(t, receivedBody.Metrics, 1)
+	m := receivedBody.Metrics[0]
+	require.Equal(t, int64(2), m.TotalCalls)
+	require.Equal(t, int64(99), m.HitCount, "one miss out of fifty is 49 hits, not a missed call")
+	require.Equal(t, int64(1), m.MissCount)
+	require.Equal(t, int64(2), m.AvgDurationHitMs, "durations stay per call")
+	require.Equal(t, int64(40), m.AvgDurationMissMs)
+}
+
+func TestReporterPostsSizesForIdleProject(t *testing.T) {
+	var receivedBody metricsRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = utils.Unmarshal(body, &receivedBody)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	reporter := NewReporter(NewCollector(), srv.URL, "key", 1, true)
+	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
+		return map[string]caches.Stats{"proj1": {IndirectEntries: 7}}
+	})
+	reporter.report(context.Background())
+
+	require.Empty(t, receivedBody.Metrics)
+	require.NotNil(t, receivedBody.Sizes)
+	require.Equal(t, 7, receivedBody.Sizes.IndirectEntries)
 }
 
 func TestReporterDisabled(t *testing.T) {
