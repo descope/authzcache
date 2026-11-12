@@ -24,6 +24,9 @@ var relationsCounter, _ = otel.Meter(meterName).Int64Counter("authzcache.check.r
 
 func recordRelationsOTel(projectID string, api APIName, rc RelationCounts) {
 	ctx := context.Background()
+	if !relationsCounter.Enabled(ctx) {
+		return // no attribute allocations while export is off
+	}
 	add := func(n int64, outcome string) {
 		if n > 0 {
 			relationsCounter.Add(ctx, n, metric.WithAttributes(
