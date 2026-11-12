@@ -176,7 +176,7 @@ func (r *Reporter) report(ctx context.Context) {
 		byAPI := snapshot[projectID]
 		payloads := make([]APIMetricsPayload, 0, len(byAPI))
 		for api, agg := range byAPI {
-			logRelationCounts(ctx, projectID, api, agg) // above the guard: an upstream error leaves counts with no call
+			logRelationCounts(ctx, projectID, api, agg)
 			if agg.TotalCalls == 0 {
 				continue
 			}

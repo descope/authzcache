@@ -438,13 +438,17 @@ func (pc *projectAuthzCache) fetchRemoteChanges(ctx context.Context) (*descope.A
 func (pc *projectAuthzCache) addDirectRelation(ctx context.Context, r *descope.FGARelation, grant *cachedGrant) {
 	key := key(r)
 	pc.directRelationCache.Add(ctx, key, grant)
-	if _, ok := pc.directKeyComponents[key]; ok {
-		return // already indexed
-	}
 	resource := resource(r.Resource)
 	target := target(r.Target)
+	prev, indexed := pc.directKeyComponents[key]
+	if indexed && prev.r == resource && prev.t == target {
+		return // already indexed under these components
+	}
+	// colliding keys (":" in IDs) get indexed under every relation's buckets so invalidation still finds them
 	pc.directKeyComponents[key] = keyComponents{r: resource, t: target}
-	pc.directKeyBytes += int64(len(key))
+	if !indexed {
+		pc.directKeyBytes += int64(len(key))
+	}
 	pc.addKeyToDirectResourceIndex(key, resource, target)
 	pc.addKeyToDirectTargetIndex(key, resource, target)
 }
