@@ -65,6 +65,18 @@ type cachedGrant struct {
 	cond    *conditionalCert
 }
 
+// Stats reports only what can be counted exactly, so callers can derive per-entry cost from a real
+// heap reading rather than from assumed struct overheads.
+type Stats struct {
+	DirectEntries   int
+	IndirectEntries int
+	LookupEntries   int
+	// IndexEntries counts key appearances across both direct indexes, which each hold every key once.
+	IndexEntries int
+	// DirectKeyBytes is the data-dependent part of the direct cache: the key strings themselves.
+	DirectKeyBytes int64
+}
+
 type projectAuthzCache struct {
 	schemaCache *descope.FGASchema // schema
 
@@ -73,6 +85,7 @@ type projectAuthzCache struct {
 	directResourcesIndex  map[resource]map[target][]resourceTargetRelation
 	directTargetsIndex    map[target]map[resource][]resourceTargetRelation
 	directKeyComponents   map[resourceTargetRelation]keyComponents
+	directKeyBytes        int64 // sum of directKeyComponents key lengths
 	indirectRelationCache *lru.MonitoredLRUCache[resourceTargetRelation, *cachedGrant]
 
 	// edge CEL evaluation
@@ -105,6 +118,7 @@ type ProjectAuthzCache interface {
 	GetWhatCanTargetAccessCached(ctx context.Context, target string) (relations []*descope.AuthzRelation, ok bool)
 	SetWhatCanTargetAccessCached(ctx context.Context, target string, relations []*descope.AuthzRelation)
 	InvalidateLookupCache(ctx context.Context)
+	Stats(ctx context.Context) Stats
 }
 
 var _ ProjectAuthzCache = &projectAuthzCache{} // ensure projectAuthzCache implements ProjectAuthzCache
@@ -426,7 +440,15 @@ func (pc *projectAuthzCache) addDirectRelation(ctx context.Context, r *descope.F
 	pc.directRelationCache.Add(ctx, key, grant)
 	resource := resource(r.Resource)
 	target := target(r.Target)
+	prev, indexed := pc.directKeyComponents[key]
+	if indexed && prev.r == resource && prev.t == target {
+		return // already indexed under these components
+	}
+	// colliding keys (":" in IDs) get indexed under every relation's buckets so invalidation still finds them
 	pc.directKeyComponents[key] = keyComponents{r: resource, t: target}
+	if !indexed {
+		pc.directKeyBytes += int64(len(key))
+	}
 	pc.addKeyToDirectResourceIndex(key, resource, target)
 	pc.addKeyToDirectTargetIndex(key, resource, target)
 }
@@ -530,6 +552,7 @@ func (pc *projectAuthzCache) removeIndexOnCacheEviction(key resourceTargetRelati
 	pc.removeKeyFromResourceIndex(components.r, components.t, key)
 	pc.removeKeyFromTargetIndex(components.r, components.t, key)
 	delete(pc.directKeyComponents, key)
+	pc.directKeyBytes -= int64(len(key))
 }
 
 // must be called while holding the mutex
@@ -544,6 +567,7 @@ func (pc *projectAuthzCache) purgeRelationCaches(ctx context.Context) {
 	pc.directResourcesIndex = make(map[resource]map[target][]resourceTargetRelation)
 	pc.directTargetsIndex = make(map[target]map[resource][]resourceTargetRelation)
 	pc.directKeyComponents = make(map[resourceTargetRelation]keyComponents)
+	pc.directKeyBytes = 0
 	pc.directRelationCache.Purge(ctx)
 	pc.indirectRelationCache.Purge(ctx)
 	if pc.lookupCache != nil {
@@ -690,6 +714,22 @@ func (pc *projectAuthzCache) SetWhatCanTargetAccessCached(ctx context.Context, t
 		CachedAt:  now,
 		ExpiresAt: now.Add(pc.lookupCacheTTL),
 	})
+}
+
+// Stats is O(1) so it never stalls requests on the lock.
+func (pc *projectAuthzCache) Stats(ctx context.Context) Stats {
+	pc.mutex.RLock()
+	defer pc.mutex.RUnlock()
+	s := Stats{
+		DirectEntries:   pc.directRelationCache.Len(ctx),
+		IndirectEntries: pc.indirectRelationCache.Len(ctx),
+		IndexEntries:    2 * len(pc.directKeyComponents), // one appearance per index
+		DirectKeyBytes:  pc.directKeyBytes,
+	}
+	if pc.lookupCache != nil {
+		s.LookupEntries = pc.lookupCache.Len(ctx)
+	}
+	return s
 }
 
 func (pc *projectAuthzCache) InvalidateLookupCache(ctx context.Context) {
