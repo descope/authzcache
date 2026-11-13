@@ -518,7 +518,7 @@ func (pc *projectAuthzCache) removeKeyFromTargetIndex(r resource, t target, keyT
 }
 
 func key(r *descope.FGARelation) resourceTargetRelation {
-	return resourceTargetRelation(r.Resource + ":" + r.Target + ":" + r.Relation)
+	return resourceTargetRelation(r.Resource + ":" + r.Target + ":" + r.Relation + ":" + r.TargetType)
 }
 
 func (pc *projectAuthzCache) removeIndexOnCacheEviction(key resourceTargetRelation, _ *cachedGrant) {
