@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.5](https://github.com/descope/authzcache/compare/v1.2.4...v1.2.5) (2026-11-13)
+
+
+### Bug Fixes
+
+* **deps:** update github.com/descope/backend digest to 92064af ([#1004](https://github.com/descope/authzcache/issues/1004)) ([5633f35](https://github.com/descope/authzcache/commit/5633f359f0a712209f8cdd8334d20437aa8e9bc9))
+* **deps:** update module github.com/grpc-ecosystem/grpc-gateway/v2 to v2.32.0 ([#999](https://github.com/descope/authzcache/issues/999)) ([34d993c](https://github.com/descope/authzcache/commit/34d993c5bac51982fea5bfa183c0eb77409ed4f0))
+
 ## [1.2.4](https://github.com/descope/authzcache/compare/v1.2.3...v1.2.4) (2026-10-22)
 
 
