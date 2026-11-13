@@ -71,6 +71,7 @@ func NewCollector() *Collector {
 
 // Record atomically accumulates metrics from a single call.
 func (c *Collector) Record(projectID string, api APIName, m CallMetrics) {
+	recordRelationsOTel(projectID, api, m.Relations)
 	pm := c.getOrCreateProjectMetrics(projectID)
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
