@@ -30,6 +30,7 @@ paths:
                 - AuthProjectIdMgmtKey: []
             x-publishYaml: fga
             x-order: 6
+            x-sdk: true
     /v1/mgmt/authz/re/who:
         post:
             tags:
@@ -54,6 +55,7 @@ paths:
                 - AuthProjectIdMgmtKey: []
             x-publishYaml: fga
             x-order: 5
+            x-sdk: true
     /v1/mgmt/fga/check:
         post:
             tags:
@@ -78,6 +80,7 @@ paths:
                 - AuthProjectIdMgmtKey: []
             x-publishYaml: fga
             x-order: 3
+            x-sdk: true
     /v1/mgmt/fga/relations:
         post:
             tags:
@@ -102,6 +105,7 @@ paths:
                 - AuthProjectIdMgmtKey: []
             x-publishYaml: fga
             x-order: 2
+            x-sdk: true
     /v1/mgmt/fga/relations/delete:
         post:
             tags:
@@ -126,6 +130,7 @@ paths:
                 - AuthProjectIdMgmtKey: []
             x-publishYaml: fga
             x-order: 3
+            x-sdk: true
     /v1/mgmt/fga/schema:
         post:
             tags:
@@ -150,6 +155,7 @@ paths:
                 - AuthProjectIdMgmtKey: []
             x-publishYaml: fga
             x-order: 1
+            x-sdk: true
 components:
     schemas:
         authzv1.CheckPath:
@@ -163,7 +169,11 @@ components:
             type: object
             properties:
                 stepType:
-                    type: integer
+                    enum:
+                        - UNKNOWN
+                        - RELATION
+                        - INTERSECTION
+                    type: string
                     format: enum
                 tuple:
                     $ref: '#/components/schemas/authzv1.Tuple'
@@ -277,6 +287,8 @@ components:
             description: |-
                 A tuple paired with an optional per-tuple ABAC context, for Check requests that need a distinct
                  context per tuple. When context is unset, the request-level CheckRequest.context applies.
+            required:
+                - tuple
         authzv1.CreateTuplesRequest:
             type: object
             properties:
@@ -303,38 +315,57 @@ components:
                 resource:
                     type: string
                     description: Relation is defined on the resource
+                    minLength: 1
+                    maxLength: 1000
                 relationDefinition:
                     type: string
                     description: The name of the relation definition
+                    minLength: 1
+                    maxLength: 100
                 namespace:
                     type: string
                     description: The namespace of the relation definition
+                    minLength: 1
+                    maxLength: 100
                 target:
                     type: string
                     description: The target for given the relation
+                    maxLength: 1000
                 targetNamespace:
                     type: string
                     description: The target namespace for the relation
+                    maxLength: 100
                 targetSetResource:
                     type: string
                     description: The targetSet target resource for the relation
+                    maxLength: 1000
                 targetSetRelationDefinition:
                     type: string
                     description: The targetSet target relation definition for the relation
+                    maxLength: 100
                 targetSetRelationDefinitionNamespace:
                     type: string
                     description: The targetSet target relation definition namespace for the relation
+                    maxLength: 100
                 query:
                     allOf:
                         - $ref: '#/components/schemas/authzv1.UserQuery'
                     description: User query for a list of users target
             description: Relation is specified between resource and target where target can be direct target (user or related resource), targetSet (anyone who has another relation), and list of users matching query
+            required:
+                - resource
+                - relationDefinition
+                - namespace
         authzv1.SaveDSLSchemaRequest:
             type: object
             properties:
                 dsl:
                     type: string
+                    minLength: 1
+                    maxLength: 100000
             description: New API
+            required:
+                - dsl
         authzv1.SaveDSLSchemaResponse:
             type: object
             properties: {}
@@ -343,14 +374,28 @@ components:
             properties:
                 resource:
                     type: string
+                    minLength: 1
+                    maxLength: 1000
                 resourceType:
                     type: string
+                    minLength: 1
+                    maxLength: 100
                 relation:
                     type: string
+                    minLength: 1
+                    maxLength: 100
                 target:
                     type: string
+                    minLength: 1
+                    maxLength: 1000
                 targetType:
                     type: string
+                    maxLength: 100
+            required:
+                - resource
+                - resourceType
+                - relation
+                - target
         authzv1.UserQuery:
             type: object
             properties:
@@ -363,14 +408,17 @@ components:
                     type: array
                     items:
                         type: string
+                        maxLength: 254
                     description: If not empty then users must have one of the specified roles
                 text:
                     type: string
                     description: Full text search across relevant columns (displayName, email, tenants, status)
+                    maxLength: 100
                 statuses:
                     type: array
                     items:
                         type: string
+                        maxLength: 254
                     description: If not empty then users must be in one of the given statuses
                 ssoOnly:
                     type: boolean
@@ -386,11 +434,15 @@ components:
             properties:
                 target:
                     type: string
+                    minLength: 1
+                    maxLength: 1000
                 context:
                     type: object
                     description: |-
                         Optional flat key-value context for evaluating ABAC conditions and facts. Relations gated by a
                          condition are returned only when this context satisfies it (same semantics as Check).
+            required:
+                - target
         authzv1.WhatCanTargetAccessResponse:
             type: object
             properties:
@@ -403,19 +455,30 @@ components:
             properties:
                 resource:
                     type: string
+                    minLength: 1
+                    maxLength: 1000
                 relationDefinition:
                     type: string
+                    minLength: 1
+                    maxLength: 100
                 namespace:
                     type: string
+                    minLength: 1
+                    maxLength: 100
                 targetType:
                     type: string
                     description: 'Optional: when set, only targets of this type (namespace) are returned. Empty returns all targets.'
+                    maxLength: 100
                 context:
                     type: object
                     description: |-
                         Optional flat key-value context for evaluating ABAC conditions and facts. Targets whose relation
                          is gated by a condition are returned only when this context satisfies it (same semantics as Check).
             description: Query the list of users who have the relation to the resource
+            required:
+                - resource
+                - relationDefinition
+                - namespace
         authzv1.WhoCanAccessResponse:
             type: object
             properties:
