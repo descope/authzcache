@@ -68,7 +68,10 @@ func serve() {
 			ServiceMiddlewares: []func(context.Context) func(h http.Handler) http.Handler{
 				middlewares.ProjectIDParser,
 			},
-			HTTPGatewayServerOptions:   []runtime.ServeMuxOption{runtime.WithErrorHandler(errorHandlerWithRetryAfter)},
+			HTTPGatewayServerOptions: []runtime.ServeMuxOption{
+				runtime.WithErrorHandler(errorHandlerWithRetryAfter),
+				runtime.WithIncomingHeaderMatcher(middlewares.ProjectIDHeaderMatcher),
+			},
 			SkipInitCommonProjectCache: true,
 		})
 
