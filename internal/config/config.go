@@ -2,6 +2,7 @@ package config
 
 import (
 	cconfig "github.com/descope/backend/common/pkg/common/config"
+	"github.com/descope/backend/common/pkg/common/featureflags"
 )
 
 const (
@@ -25,7 +26,22 @@ const (
 
 	// HTTP gateway configuration
 	ConfigKeyGatewayWriteTimeoutInSeconds = "AUTHZCACHE_HTTP_WRITE_TIMEOUT_IN_SECONDS" // gateway response-write timeout; default 30, the node-sdk cache-abort ceiling
+
+	// Caller key verification configuration
+	ConfigKeyCallerKeyRevalidationIntervalInSeconds = "AUTHZCACHE_CALLER_KEY_REVALIDATION_INTERVAL_IN_SECONDS" // default 60, min 10
 )
+
+// VerifyCallerKeyOnCacheHit is read from the env var of the same name, or from remote feature flags where enabled
+var VerifyCallerKeyOnCacheHit = &featureflags.FeatureFlag{
+	Flag:        "AUTHZCACHE_VERIFY_CALLER_KEY_ON_CACHE_HIT",
+	DefaultVal:  true,
+	Description: "Verify the caller's management key with Descope before serving an answer from the cache",
+	Expiration:  featureflags.Never,
+}
+
+func GetCallerKeyRevalidationIntervalInSeconds() int {
+	return max(10, cconfig.GetIntOrProvidedLocal(ConfigKeyCallerKeyRevalidationIntervalInSeconds, 60))
+}
 
 func GetDirectRelationCacheSizePerProject() int {
 	return cconfig.GetIntOrProvidedLocal(ConfigKeyDirectRelationCacheSizePerProject, 1_000_000)
