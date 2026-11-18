@@ -42,7 +42,7 @@ func newHTTPClient(projectID string) *http.Client {
 	t.MaxConnsPerHost = 100
 	t.MaxIdleConnsPerHost = 100
 	if t.TLSClientConfig == nil {
-		t.TLSClientConfig = &tls.Config{} // notest
+		t.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12} // notest
 	}
 	// an empty base URL resolves to a production Descope URL, always verified
 	t.TLSClientConfig.InsecureSkipVerify = baseURL != "" && api.CertificateVerifyAutomatic.SkipVerifyValue(baseURL) //nolint:gosec
