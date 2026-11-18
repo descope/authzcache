@@ -147,6 +147,9 @@ func (r *Reporter) logCacheSizes(ctx context.Context) map[string]*SizesPayload {
 	event.Msg("FGA cache process memory")
 	sizes := make(map[string]*SizesPayload, len(stats))
 	for projectID, s := range stats {
+		if s == (caches.Stats{}) {
+			continue // nothing cached, nothing to report
+		}
 		sizes[projectID] = &SizesPayload{
 			DirectEntries:        s.DirectEntries,
 			IndirectEntries:      s.IndirectEntries,

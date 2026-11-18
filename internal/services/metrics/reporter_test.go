@@ -111,6 +111,22 @@ func TestReporterPostsSizesForIdleProject(t *testing.T) {
 	require.Equal(t, 7, receivedBody.Sizes.IndirectEntries)
 }
 
+func TestReporterSkipsEmptySizes(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called = true
+	}))
+	defer srv.Close()
+
+	reporter := NewReporter(NewCollector(), srv.URL, "key", 1, true)
+	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
+		return map[string]caches.Stats{"proj1": {}}
+	})
+	reporter.report(context.Background())
+
+	require.False(t, called, "an idle project with nothing cached should not post")
+}
+
 func TestReporterDisabled(t *testing.T) {
 	called := false
 	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
