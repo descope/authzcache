@@ -2,14 +2,31 @@ package controllers
 
 import (
 	"context"
+	"strings"
 
 	"github.com/descope/authzcache/internal/services"
+	"github.com/descope/authzcache/internal/services/remote"
 	se "github.com/descope/authzcache/pkg/authzcache/errors"
 	authczv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
 	authzv1 "github.com/descope/backend/authzservice/pkg/authzservice/proto/v1"
 	cctx "github.com/descope/backend/common/pkg/common/context"
+	ce "github.com/descope/backend/common/pkg/common/errors"
 	"github.com/descope/go-sdk/descope"
+	"google.golang.org/grpc/metadata"
 )
+
+const bearerPrefix = "Bearer "
+
+// withCallerKey sets the caller's management key on ctx, so callers never act with the cache's own key
+func withCallerKey(ctx context.Context) (context.Context, error) {
+	md, _ := metadata.FromIncomingContext(ctx)
+	for _, v := range md.Get("authorization") {
+		if _, key, ok := strings.Cut(strings.TrimPrefix(v, bearerPrefix), ":"); ok && key != "" {
+			return remote.WithCallerKey(ctx, key), nil
+		}
+	}
+	return ctx, ce.MissingAuthorization.New(ctx)
+}
 
 type authzController struct {
 	authzCache services.AuthzCache
@@ -23,7 +40,11 @@ func New(authzCache services.AuthzCache) *authzController {
 func (ac *authzController) CreateFGASchema(ctx context.Context, req *authzv1.SaveDSLSchemaRequest) (*authzv1.SaveDSLSchemaResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Saving authz DSL schema")
 
-	err := ac.authzCache.CreateFGASchema(ctx, req.Dsl)
+	ctx, err := withCallerKey(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = ac.authzCache.CreateFGASchema(ctx, req.Dsl)
 
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
@@ -35,7 +56,11 @@ func (ac *authzController) CreateFGARelations(ctx context.Context, req *authzv1.
 	cctx.Logger(ctx).Info().Msg("Creating authz tuples")
 	relations := relationsFromTuples(req.Tuples)
 
-	err := ac.authzCache.CreateFGARelations(ctx, relations)
+	ctx, err := withCallerKey(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = ac.authzCache.CreateFGARelations(ctx, relations)
 
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
@@ -47,7 +72,11 @@ func (ac *authzController) DeleteFGARelations(ctx context.Context, req *authzv1.
 	cctx.Logger(ctx).Info().Msg("Deleting authz tuples")
 	relations := relationsFromTuples(req.Tuples)
 
-	err := ac.authzCache.DeleteFGARelations(ctx, relations)
+	ctx, err := withCallerKey(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = ac.authzCache.DeleteFGARelations(ctx, relations)
 
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
@@ -63,6 +92,10 @@ func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest)
 		extraContext = req.Context.AsMap()
 	}
 
+	ctx, err := withCallerKey(ctx)
+	if err != nil {
+		return nil, err
+	}
 	checks, err := ac.authzCache.Check(ctx, relations, extraContext)
 
 	if err != nil {
@@ -98,6 +131,10 @@ func (ac *authzController) WhoCanAccess(ctx context.Context, req *authzv1.WhoCan
 	if req.Context != nil {
 		extraContext = req.Context.AsMap()
 	}
+	ctx, err := withCallerKey(ctx)
+	if err != nil {
+		return nil, err
+	}
 	targets, err := ac.authzCache.WhoCanAccess(ctx, req.Resource, req.RelationDefinition, req.Namespace, extraContext)
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
@@ -110,6 +147,10 @@ func (ac *authzController) WhatCanTargetAccess(ctx context.Context, req *authzv1
 	var extraContext map[string]any
 	if req.Context != nil {
 		extraContext = req.Context.AsMap()
+	}
+	ctx, err := withCallerKey(ctx)
+	if err != nil {
+		return nil, err
 	}
 	relations, err := ac.authzCache.WhatCanTargetAccess(ctx, req.Target, extraContext)
 	if err != nil {

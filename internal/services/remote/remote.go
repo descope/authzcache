@@ -28,6 +28,7 @@ func NewDescopeClientWithProjectID(projectID string, loggerInstance logger.Logge
 		LogLevel:             getLogLevel(),
 		Logger:               loggerInstance,
 		ManagementKey:        managementKey,
+		DefaultClient:        newHTTPClient(projectID),
 		CustomDefaultHeaders: map[string]string{cconfig.HeaderAuthzCacheGitSha: cconfig.GetGitSha()},
 	})
 	if err != nil {

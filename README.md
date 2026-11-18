@@ -23,7 +23,7 @@ docker run -d \
 
 ### Required Environment Variables
 
-- `DESCOPE_MANAGEMENT_KEY` - Your Descope management key for authentication, required (and recommended) scope is "FGA read/write" permissions.
+- `DESCOPE_MANAGEMENT_KEY` - The cache's own Descope management key, required (and recommended) scope is "FGA read/write" permissions. It is used only for background work (polling for remote changes and reporting metrics), never for requests sent by callers.
 
 ### Optional Environment Variables
 
@@ -40,6 +40,8 @@ docker run -d \
 - `AUTHZCACHE_LOOKUP_CACHE_MAX_RESULT_SIZE` - Skip caching lookup results larger than this size (default: 1,000)
 - `AUTHZCACHE_METRICS_REPORT_ENABLED` - Whether to periodically report aggregated cache performance metrics (hit/miss rates, latency) to Descope (TRUE/FALSE, default: TRUE)
 - `AUTHZCACHE_METRICS_REPORT_INTERVAL_IN_SECONDS` - How often to report metrics, in seconds (default: 60, minimum: 10)
+- `AUTHZCACHE_VERIFY_CALLER_KEY_ON_CACHE_HIT` - Verify the caller's management key with Descope before answering from the cache (TRUE/FALSE, default: TRUE). See [Caller authentication](#caller-authentication).
+- `AUTHZCACHE_CALLER_KEY_REVALIDATION_INTERVAL_IN_SECONDS` - How often verified caller keys are re-checked with Descope, so revoked or expired keys stop being served (default: 60, minimum: 10)
 - `AUTHZCACHE_HTTP_WRITE_TIMEOUT_IN_SECONDS` - Max seconds the gateway will spend producing a response before it closes the connection and returns a "socket hang up" (default: 30). Takes precedence over the generic `HTTP_GATEWAY_WRITE_TIMEOUT`, which is still honored when this is unset.
 
 ### How the lookup cache uses TTL
@@ -49,6 +51,16 @@ The lookup caches for `WhoCanAccess` and `WhatCanTargetAccess` use their TTL dif
 The check cache is kept fresh both by remote polling and by pass-through requests, so it tracks the current state of relations. A lookup result is re-verified against the check cache on every call, so an entry whose access has been removed is dropped from the result.
 
 New entries, however, do not appear until the TTL expires. A relation granted after a lookup result was cached is not part of that cached result, so a `WhoCanAccess` / `WhatCanTargetAccess` call keeps omitting the newly authorized entry until the result's TTL (`AUTHZCACHE_LOOKUP_CACHE_TTL_IN_SECONDS`) expires and the result is refetched from the backend.
+
+### Caller authentication
+
+Every request must carry the caller's own management key (`Authorization: Bearer <projectID>:<managementKey>`), as the Descope SDKs send it. Requests without one are rejected.
+
+Requests the cache cannot answer are forwarded to Descope with the caller's key, so Descope enforces the key's validity and scope, for writes as well as reads.
+
+Answers served from the cache are given only after the caller's key was accepted by Descope for that project, either by an earlier forwarded request or by a lightweight FGA read the cache makes with the key on first use. Accepted keys are re-checked every `AUTHZCACHE_CALLER_KEY_REVALIDATION_INTERVAL_IN_SECONDS`, and dropped once Descope rejects them. A temporary Descope outage does not drop keys that were already accepted.
+
+Turning `AUTHZCACHE_VERIFY_CALLER_KEY_ON_CACHE_HIT` off skips this check on cache hits, for a small latency gain, so any caller that can reach the cache can read its cached answers. Keep it on unless the cache is only reachable by trusted callers.
 
 ## Ports
 

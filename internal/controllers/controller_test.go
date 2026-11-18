@@ -27,7 +27,7 @@ func TestCreateFGASchema(t *testing.T) {
 	}
 
 	req := &authzv1.SaveDSLSchemaRequest{Dsl: "test-dsl"}
-	resp, err := controller.CreateFGASchema(context.Background(), req)
+	resp, err := controller.CreateFGASchema(keyCtx(), req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
@@ -41,7 +41,7 @@ func TestCreateFGASchemaError(t *testing.T) {
 	}
 
 	req := &authzv1.SaveDSLSchemaRequest{Dsl: "test-dsl"}
-	resp, err := controller.CreateFGASchema(context.Background(), req)
+	resp, err := controller.CreateFGASchema(keyCtx(), req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
@@ -65,7 +65,7 @@ func TestCreateFGARelations(t *testing.T) {
 	}
 
 	req := &authzv1.CreateTuplesRequest{Tuples: tuples}
-	resp, err := controller.CreateFGARelations(context.Background(), req)
+	resp, err := controller.CreateFGARelations(keyCtx(), req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
@@ -79,7 +79,7 @@ func TestCreateFGARelationsError(t *testing.T) {
 	}
 
 	req := &authzv1.CreateTuplesRequest{Tuples: []*authzv1.Tuple{}}
-	resp, err := controller.CreateFGARelations(context.Background(), req)
+	resp, err := controller.CreateFGARelations(keyCtx(), req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
@@ -103,7 +103,7 @@ func TestDeleteFGARelations(t *testing.T) {
 	}
 
 	req := &authzv1.DeleteTuplesRequest{Tuples: tuples}
-	resp, err := controller.DeleteFGARelations(context.Background(), req)
+	resp, err := controller.DeleteFGARelations(keyCtx(), req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
@@ -117,7 +117,7 @@ func TestDeleteFGARelationsError(t *testing.T) {
 	}
 
 	req := &authzv1.DeleteTuplesRequest{Tuples: []*authzv1.Tuple{}}
-	resp, err := controller.DeleteFGARelations(context.Background(), req)
+	resp, err := controller.DeleteFGARelations(keyCtx(), req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
@@ -143,7 +143,7 @@ func TestCheck(t *testing.T) {
 	}
 
 	req := &authzv1.CheckRequest{Tuples: tuples}
-	resp, err := controller.Check(context.Background(), req)
+	resp, err := controller.Check(keyCtx(), req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
@@ -165,7 +165,7 @@ func TestCheckError(t *testing.T) {
 	}
 
 	req := &authzv1.CheckRequest{Tuples: []*authzv1.Tuple{}}
-	resp, err := controller.Check(context.Background(), req)
+	resp, err := controller.Check(keyCtx(), req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
@@ -183,7 +183,7 @@ func TestWhoCanAccess(t *testing.T) {
 	}
 
 	req := &authzv1.WhoCanAccessRequest{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs"}
-	resp, err := controller.WhoCanAccess(context.Background(), req)
+	resp, err := controller.WhoCanAccess(keyCtx(), req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
@@ -198,7 +198,7 @@ func TestWhoCanAccessError(t *testing.T) {
 	}
 
 	req := &authzv1.WhoCanAccessRequest{Resource: "doc1", RelationDefinition: "viewer", Namespace: "docs"}
-	resp, err := controller.WhoCanAccess(context.Background(), req)
+	resp, err := controller.WhoCanAccess(keyCtx(), req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
@@ -224,7 +224,7 @@ func TestWhatCanTargetAccess(t *testing.T) {
 	}
 
 	req := &authzv1.WhatCanTargetAccessRequest{Target: "user1"}
-	resp, err := controller.WhatCanTargetAccess(context.Background(), req)
+	resp, err := controller.WhatCanTargetAccess(keyCtx(), req)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
@@ -246,7 +246,7 @@ func TestWhatCanTargetAccessError(t *testing.T) {
 	}
 
 	req := &authzv1.WhatCanTargetAccessRequest{Target: "user1"}
-	resp, err := controller.WhatCanTargetAccess(context.Background(), req)
+	resp, err := controller.WhatCanTargetAccess(keyCtx(), req)
 
 	assert.Error(t, err)
 	assert.Nil(t, resp)
@@ -268,7 +268,7 @@ func TestCheckWithContextForwarding(t *testing.T) {
 	ctxStruct, err := structpb.NewStruct(wantCtx)
 	require.NoError(t, err)
 	req := &authzv1.CheckRequest{Tuples: tuples, Context: ctxStruct}
-	resp, err := controller.Check(context.Background(), req)
+	resp, err := controller.Check(keyCtx(), req)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.Equal(t, wantCtx, gotCtx)
@@ -293,7 +293,7 @@ func TestCheckResponseInfoConditionalFields(t *testing.T) {
 		}, nil
 	}
 	req := &authzv1.CheckRequest{Tuples: tuples}
-	resp, err := controller.Check(context.Background(), req)
+	resp, err := controller.Check(keyCtx(), req)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	require.Len(t, resp.Tuples, 1)

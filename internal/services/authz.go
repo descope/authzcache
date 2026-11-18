@@ -5,9 +5,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/descope/authzcache/internal/config"
 	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/authzcache/internal/services/metrics"
+	"github.com/descope/authzcache/internal/services/remote"
 	cctx "github.com/descope/backend/common/pkg/common/context"
+	ce "github.com/descope/backend/common/pkg/common/errors"
 	"github.com/descope/go-sdk/descope"
 	"github.com/descope/go-sdk/descope/logger"
 	"github.com/descope/go-sdk/descope/sdk"
@@ -35,6 +38,7 @@ type authzCache struct {
 	projectCacheCreator ProjectAuthzCacheCreator
 	remoteClientCreator RemoteClientCreator
 	metricsCollector    *metrics.Collector
+	callerKeys          *keyVerifier
 }
 
 var _ AuthzCache = &authzCache{} // validate interface implementation
@@ -42,6 +46,8 @@ var _ AuthzCache = &authzCache{} // validate interface implementation
 func New(ctx context.Context, projectCacheCreator ProjectAuthzCacheCreator, remoteClientCreator RemoteClientCreator, collector *metrics.Collector) (AuthzCache, error) {
 	cctx.Logger(ctx).Info().Msg("Starting new authz cache")
 	ac := &authzCache{projectCacheCreator: projectCacheCreator, remoteClientCreator: remoteClientCreator, metricsCollector: collector}
+	ac.callerKeys = &keyVerifier{verify: ac.verifyCallerKey}
+	ac.callerKeys.startRevalidation(ctx, time.Duration(config.GetCallerKeyRevalidationIntervalInSeconds())*time.Second)
 	return ac, nil
 }
 
@@ -112,6 +118,9 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	cachedChecks, toCheckViaSDK, indexToCachedChecks := projectCache.CheckRelations(ctx, relations, extraContext)
 	// if all relations were found in cache, return
 	if len(toCheckViaSDK) == 0 {
+		if err := a.authorizeCacheHit(ctx); err != nil {
+			return nil, err
+		}
 		// candidatesCount = 0 (nothing sent to SDK); filteredCount = 0 (Check doesn't filter, every relation gets an answer)
 		a.recordMetric(ctx, metrics.APICheck, true, 0, 0, len(cachedChecks), start)
 		return cachedChecks, nil
@@ -121,6 +130,7 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	if err != nil {
 		return nil, err // notest
 	}
+	a.markCallerKeyVerified(ctx)
 	// if a cacheable conditional appeared, load the schema's conditions so the edge can re-evaluate them later
 	if hasCacheableConditional(sdkChecks) {
 		a.ensureSchemaLoaded(ctx, projectCache, mgmtSDK)
@@ -201,6 +211,7 @@ func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinit
 	if err != nil {
 		return nil, err // notest
 	}
+	a.markCallerKeyVerified(ctx)
 	projectCache.SetWhoCanAccessCached(ctx, resource, relationDefinition, namespace, targets)
 	a.recordMetric(ctx, metrics.APIWhoCanAccess, false, 0, 0, len(targets), start)
 	return targets, nil
@@ -254,6 +265,7 @@ func (a *authzCache) WhatCanTargetAccess(ctx context.Context, target string, ext
 	if err != nil {
 		return nil, err // notest
 	}
+	a.markCallerKeyVerified(ctx)
 	projectCache.SetWhatCanTargetAccessCached(ctx, target, relations)
 	a.recordMetric(ctx, metrics.APIWhatCanTargetAccess, false, 0, 0, len(relations), start)
 	return relations, nil
@@ -297,7 +309,36 @@ func (a *authzCache) getOrCreateProjectCache(ctx context.Context) (caches.Projec
 	if err != nil {
 		return nil, nil, err // notest
 	}
-	projectCache.StartRemoteChangesPolling(ctx)
+	// polling runs with the cache's own key, never the caller's
+	projectCache.StartRemoteChangesPolling(remote.WithCallerKey(ctx, ""))
 	a.projects.Store(projectID, project{cache: projectCache, mgmtSDK: projectMgmtSDK})
 	return projectCache, projectMgmtSDK, nil
+}
+
+// authorizeCacheHit makes sure the caller's key is valid for the project before answering from the cache
+func (a *authzCache) authorizeCacheHit(ctx context.Context) error {
+	if !config.VerifyCallerKeyOnCacheHit.Get(ctx) {
+		return nil
+	}
+	key := remote.CallerKey(ctx)
+	if key == "" {
+		return ce.MissingAuthorization.New(ctx)
+	}
+	return a.callerKeys.ensure(ctx, cctx.ProjectID(ctx), key)
+}
+
+func (a *authzCache) markCallerKeyVerified(ctx context.Context) {
+	if key := remote.CallerKey(ctx); key != "" {
+		a.callerKeys.markVerified(cctx.ProjectID(ctx), key)
+	}
+}
+
+// verifyCallerKey makes a cheap FGA read with the caller's key; success proves it valid for the project
+func (a *authzCache) verifyCallerKey(ctx context.Context, projectID, key string) error {
+	p, ok := a.projects.Load(projectID)
+	if !ok {
+		return ce.ProjectNotFound.New(ctx) // notest
+	}
+	_, err := p.(project).mgmtSDK.Authz().GetModified(remote.WithCallerKey(ctx, key), time.Now())
+	return err
 }
