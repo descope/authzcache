@@ -59,11 +59,11 @@ With `AUTHZCACHE_METRICS_ENDPOINT_ENABLED=TRUE`, the metrics are served at `GET 
 
 | Metric | Type | Labels |
 |---|---|---|
-| `authzcache_calls_total` | counter | `project_id`, `api`, `cache` (`hit`, `miss`) |
-| `authzcache_call_duration_seconds` | histogram | `project_id`, `api`, `cache` |
-| `authzcache_call_candidates_total` | counter | `project_id`, `api`, `cache` |
-| `authzcache_call_filtered_total` | counter | `project_id`, `api`, `cache` |
-| `authzcache_call_results_total` | counter | `project_id`, `api`, `cache` |
+| `authzcache_calls_total` | counter | `project_id`, `api`, `result` (`hit`, `miss`) |
+| `authzcache_call_duration_seconds` | histogram | `project_id`, `api`, `result` |
+| `authzcache_call_candidates_total` | counter | `project_id`, `api`, `result` |
+| `authzcache_call_filtered_total` | counter | `project_id`, `api`, `result` |
+| `authzcache_call_results_total` | counter | `project_id`, `api`, `result` |
 | `authzcache_cache_entries` | gauge | `project_id`, `cache` (`direct`, `indirect`, `lookup`) |
 
 ## Ports

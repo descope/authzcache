@@ -4,6 +4,7 @@ import (
 	"math"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type APIName string
@@ -21,6 +22,7 @@ type CallMetrics struct {
 	FilteredCount   int
 	ResultSize      int
 	DurationMs      int64
+	Duration        time.Duration // exact; DurationMs truncates sub-millisecond cache hits to 0
 }
 
 // AggregatedMetrics accumulates data across many calls.

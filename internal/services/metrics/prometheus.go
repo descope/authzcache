@@ -23,13 +23,13 @@ type promMetrics struct {
 }
 
 func (pm *promMetrics) record(projectID string, api APIName, m CallMetrics) {
-	cache := "miss"
+	result := "miss"
 	if m.CacheHit {
-		cache = "hit"
+		result = "hit"
 	}
-	labels := []string{projectID, string(api), cache}
+	labels := []string{projectID, string(api), result}
 	pm.calls.WithLabelValues(labels...).Inc()
-	pm.duration.WithLabelValues(labels...).Observe(float64(m.DurationMs) / 1000)
+	pm.duration.WithLabelValues(labels...).Observe(m.Duration.Seconds())
 	pm.candidates.WithLabelValues(labels...).Add(float64(m.CandidatesCount))
 	pm.filtered.WithLabelValues(labels...).Add(float64(m.FilteredCount))
 	pm.results.WithLabelValues(labels...).Add(float64(m.ResultSize))
@@ -53,13 +53,13 @@ func (c cacheEntries) Collect(ch chan<- prometheus.Metric) {
 
 // newPrometheusHandler starts recording calls into collector and returns the scrape handler.
 func newPrometheusHandler(collector *Collector, cacheStats func() map[string]caches.Stats) http.Handler {
-	labels := []string{"project_id", "api", "cache"}
+	labels := []string{"project_id", "api", "result"}
 	counter := func(name, help string) *prometheus.CounterVec {
 		return prometheus.NewCounterVec(prometheus.CounterOpts{Name: name, Help: help}, labels)
 	}
 	pm := &promMetrics{
 		calls:      counter("authzcache_calls_total", "API calls by cache outcome."),
-		duration:   prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "authzcache_call_duration_seconds", Help: "API call duration.", Buckets: prometheus.DefBuckets}, labels),
+		duration:   prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "authzcache_call_duration_seconds", Help: "API call duration.", Buckets: prometheus.ExponentialBuckets(0.0001, 4, 10)}, labels),
 		candidates: counter("authzcache_call_candidates_total", "Candidates across API calls, as summed in the Descope report."),
 		filtered:   counter("authzcache_call_filtered_total", "Candidates filtered out across API calls."),
 		results:    counter("authzcache_call_results_total", "Results returned across API calls."),
