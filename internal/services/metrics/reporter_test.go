@@ -124,6 +124,24 @@ func TestReporterDisabled(t *testing.T) {
 	require.Empty(t, collector.SnapshotAndReset(), "window is drained even when not posted")
 }
 
+func TestReporterLogsOnly(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called = true
+	}))
+	defer srv.Close()
+
+	collector := NewCollector()
+	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
+	reporter := NewReporter(collector, srv.URL, "key", 1, false, true)
+	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
+		return map[string]caches.Stats{"proj1": {DirectEntries: 2}}
+	})
+	reporter.report(context.Background())
+
+	require.False(t, called, "logs-only mode must not post")
+}
+
 func TestReporterHandlesHTTPError(t *testing.T) {
 	callCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

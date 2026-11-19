@@ -116,8 +116,7 @@ func (r *Reporter) run(ctx context.Context) {
 	}
 }
 
-// Heap per cached answer is an upper bound: the heap covers the whole process.
-func (r *Reporter) cacheSizes(ctx context.Context) map[string]*SizesPayload {
+func (r *Reporter) cacheSizes() map[string]*SizesPayload {
 	if r.cacheStats == nil {
 		return nil
 	}
@@ -125,27 +124,8 @@ func (r *Reporter) cacheSizes(ctx context.Context) map[string]*SizesPayload {
 	runtime.ReadMemStats(&m)
 	var cachedAnswers int64
 	stats := r.cacheStats()
-	for projectID, s := range stats {
+	for _, s := range stats {
 		cachedAnswers += int64(s.DirectEntries + s.IndirectEntries + s.LookupEntries)
-		if !r.logsEnabled {
-			continue
-		}
-		cctx.Logger(ctx).Info().
-			Str("project_id", projectID).
-			Int("direct_entries", s.DirectEntries).
-			Int("indirect_entries", s.IndirectEntries).
-			Int("lookup_entries", s.LookupEntries).
-			Msg("FGA cache sizes")
-	}
-	if r.logsEnabled {
-		event := cctx.Logger(ctx).Info().
-			Float64("heap_inuse_mb", float64(m.HeapInuse)/(1<<20)).
-			Float64("heap_alloc_mb", float64(m.HeapAlloc)/(1<<20)).
-			Int64("cached_answers", cachedAnswers)
-		if cachedAnswers > 0 {
-			event = event.Float64("heap_bytes_per_answer_max", float64(m.HeapInuse)/float64(cachedAnswers))
-		}
-		event.Msg("FGA cache process memory")
 	}
 	sizes := make(map[string]*SizesPayload, len(stats))
 	for projectID, s := range stats {
@@ -165,7 +145,7 @@ func (r *Reporter) cacheSizes(ctx context.Context) map[string]*SizesPayload {
 }
 
 func (r *Reporter) report(ctx context.Context) {
-	sizes := r.cacheSizes(ctx)
+	sizes := r.cacheSizes()
 	snapshot := r.collector.SnapshotAndReset()
 	// idle projects still report their sizes
 	projectIDs := make(map[string]struct{}, len(snapshot)+len(sizes))
@@ -182,14 +162,16 @@ func (r *Reporter) report(ctx context.Context) {
 			if agg.TotalCalls == 0 {
 				continue
 			}
-			p := buildPayload(api, agg)
-			if r.logsEnabled {
-				cctx.Logger(ctx).Info().Str("project_id", projectID).Interface("metrics", p).Msg("FGA cache API metrics")
-			}
-			payloads = append(payloads, p)
+			payloads = append(payloads, buildPayload(api, agg))
 		}
 		body := metricsRequest{Metrics: payloads, Sizes: sizes[projectID]}
-		if !r.enabled || (len(body.Metrics) == 0 && body.Sizes == nil) {
+		if len(body.Metrics) == 0 && body.Sizes == nil {
+			continue
+		}
+		if r.logsEnabled {
+			cctx.Logger(ctx).Info().Str("project_id", projectID).Interface("report", body).Msg("FGA cache metrics report")
+		}
+		if !r.enabled {
 			continue
 		}
 		if err := r.post(ctx, projectID, body); err != nil {
