@@ -54,12 +54,11 @@ type APIMetricsPayload struct {
 
 // SizesPayload is a point-in-time reading; the heap fields are per process, so they repeat across projects.
 type SizesPayload struct {
-	DirectEntries        int   `json:"direct_entries"`
-	IndirectEntries      int   `json:"indirect_entries"`
-	LookupEntries        int   `json:"lookup_entries"`
-	HeapInuseBytes       int64 `json:"heap_inuse_bytes"`
-	HeapAllocBytes       int64 `json:"heap_alloc_bytes"`
-	ProcessCachedAnswers int64 `json:"process_cached_answers"`
+	DirectEntries   int   `json:"direct_entries"`
+	IndirectEntries int   `json:"indirect_entries"`
+	LookupEntries   int   `json:"lookup_entries"`
+	HeapInuseBytes  int64 `json:"heap_inuse_bytes"`
+	HeapAllocBytes  int64 `json:"heap_alloc_bytes"`
 }
 
 type metricsRequest struct {
@@ -122,23 +121,18 @@ func (r *Reporter) cacheSizes() map[string]*SizesPayload {
 	}
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	var cachedAnswers int64
 	stats := r.cacheStats()
-	for _, s := range stats {
-		cachedAnswers += int64(s.DirectEntries + s.IndirectEntries + s.LookupEntries)
-	}
 	sizes := make(map[string]*SizesPayload, len(stats))
 	for projectID, s := range stats {
 		if s == (caches.Stats{}) {
 			continue // nothing cached, nothing to report
 		}
 		sizes[projectID] = &SizesPayload{
-			DirectEntries:        s.DirectEntries,
-			IndirectEntries:      s.IndirectEntries,
-			LookupEntries:        s.LookupEntries,
-			HeapInuseBytes:       int64(m.HeapInuse), //nolint:gosec // heap stays far below MaxInt64
-			HeapAllocBytes:       int64(m.HeapAlloc), //nolint:gosec // heap stays far below MaxInt64
-			ProcessCachedAnswers: cachedAnswers,
+			DirectEntries:   s.DirectEntries,
+			IndirectEntries: s.IndirectEntries,
+			LookupEntries:   s.LookupEntries,
+			HeapInuseBytes:  int64(m.HeapInuse), //nolint:gosec // heap stays far below MaxInt64
+			HeapAllocBytes:  int64(m.HeapAlloc), //nolint:gosec // heap stays far below MaxInt64
 		}
 	}
 	return sizes
