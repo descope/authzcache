@@ -62,7 +62,7 @@ type metricsRequest struct {
 	Sizes   *SizesPayload       `json:"sizes,omitempty"`
 }
 
-// Reporter is a background goroutine that periodically snapshots metrics and POSTs them.
+// Reporter is a background goroutine that periodically snapshots metrics, then POSTs and/or logs them.
 type Reporter struct {
 	collector     *Collector
 	customBaseURL string

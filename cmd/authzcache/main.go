@@ -53,7 +53,6 @@ func serve() {
 					cctx.Logger(ctx).Err(err).Msg("Failed creating authz cache")
 					return err
 				}
-				// provider set before Start: the reporting goroutine reads it
 				reporter.SetCacheStatsProvider(func() map[string]caches.Stats { return as.CacheStats(ctx) })
 				reporter.Start(ctx)
 				ctrl := controllers.New(as)
