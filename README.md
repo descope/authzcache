@@ -40,6 +40,8 @@ docker run -d \
 - `AUTHZCACHE_LOOKUP_CACHE_MAX_RESULT_SIZE` - Skip caching lookup results larger than this size (default: 1,000)
 - `AUTHZCACHE_METRICS_REPORT_ENABLED` - Periodically send cache metrics (hit/miss counts, latency, cache entry counts) to Descope (TRUE/FALSE, default: TRUE)
 - `AUTHZCACHE_METRICS_LOGS_ENABLED` - Periodically write cache metrics (hit/miss counts, latency, cache entry counts) to the local container log (TRUE/FALSE, default: FALSE)
+- `AUTHZCACHE_METRICS_ENDPOINT_ENABLED` - Serve cache metrics (hit/miss counts, latency, cache entry counts) in Prometheus format at `GET /metrics` on a separate port (TRUE/FALSE, default: FALSE)
+- `AUTHZCACHE_METRICS_ENDPOINT_PORT` - Port of the Prometheus metrics endpoint (default: 9189)
 - `AUTHZCACHE_METRICS_REPORT_INTERVAL_IN_SECONDS` - How often to report or log metrics, in seconds (default: 60, minimum: 10)
 - `AUTHZCACHE_HTTP_WRITE_TIMEOUT_IN_SECONDS` - Max seconds the gateway will spend producing a response before it closes the connection and returns a "socket hang up" (default: 30). Takes precedence over the generic `HTTP_GATEWAY_WRITE_TIMEOUT`, which is still honored when this is unset.
 
@@ -51,9 +53,20 @@ The check cache is kept fresh both by remote polling and by pass-through request
 
 New entries, however, do not appear until the TTL expires. A relation granted after a lookup result was cached is not part of that cached result, so a `WhoCanAccess` / `WhatCanTargetAccess` call keeps omitting the newly authorized entry until the result's TTL (`AUTHZCACHE_LOOKUP_CACHE_TTL_IN_SECONDS`) expires and the result is refetched from the backend.
 
+### Prometheus metrics
+
+With `AUTHZCACHE_METRICS_ENDPOINT_ENABLED=TRUE`, the metrics are served at `GET /metrics` on `AUTHZCACHE_METRICS_ENDPOINT_PORT`, separate from the API port. The endpoint has no authentication, so don't expose that port outside the cluster. Counters accumulate from startup.
+
+| Metric | Type | Labels |
+|---|---|---|
+| `authzcache_calls_total` | counter | `project_id`, `api`, `result` (`hit`, `miss`) |
+| `authzcache_call_duration_seconds` | histogram | `project_id`, `api`, `result` |
+| `authzcache_cache_entries` | gauge | `project_id`, `cache` (`direct`, `indirect`, `lookup`) |
+
 ## Ports
 
 - **8189** - HTTP REST API endpoint
+- **9189** - Prometheus metrics endpoint, when `AUTHZCACHE_METRICS_ENDPOINT_ENABLED` is set
 
 ## Health Check
 

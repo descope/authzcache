@@ -169,12 +169,14 @@ func (a *authzCache) recordMetric(ctx context.Context, api metrics.APIName, cach
 	if a.metricsCollector == nil {
 		return
 	}
+	elapsed := time.Since(start)
 	a.metricsCollector.Record(cctx.ProjectID(ctx), api, metrics.CallMetrics{
 		CacheHit:        cacheHit,
 		CandidatesCount: candidatesCount,
 		FilteredCount:   filteredCount,
 		ResultSize:      resultSize,
-		DurationMs:      time.Since(start).Milliseconds(),
+		DurationMs:      elapsed.Milliseconds(),
+		Duration:        elapsed,
 	})
 }
 
