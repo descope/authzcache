@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/backend/common/pkg/common/utils"
@@ -138,6 +140,31 @@ func TestReporterLogsOnly(t *testing.T) {
 	reporter.report(context.Background())
 
 	require.False(t, called, "logs-only mode must not post")
+}
+
+func TestReporterLogsAndReportingDisabled(t *testing.T) {
+	var called, statsRead atomic.Bool
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called.Store(true)
+	}))
+	defer srv.Close()
+
+	collector := NewCollector()
+	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
+	reporter := NewReporter(collector, srv.URL, "key", 1, false, false)
+	reporter.interval = 10 * time.Millisecond
+	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
+		statsRead.Store(true)
+		return nil
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	reporter.Start(ctx)
+	time.Sleep(50 * time.Millisecond)
+
+	require.False(t, called.Load(), "nothing is posted")
+	require.False(t, statsRead.Load(), "the reporting loop does not run")
+	require.NotEmpty(t, collector.SnapshotAndReset(), "the window is never drained")
 }
 
 func TestReporterHandlesHTTPError(t *testing.T) {
