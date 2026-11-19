@@ -173,7 +173,6 @@ func (r *Reporter) report(ctx context.Context) {
 		byAPI := snapshot[projectID]
 		payloads := make([]APIMetricsPayload, 0, len(byAPI))
 		for api, agg := range byAPI {
-			logRelationCounts(ctx, projectID, api, agg)
 			if agg.TotalCalls == 0 {
 				continue
 			}
@@ -189,32 +188,12 @@ func (r *Reporter) report(ctx context.Context) {
 	}
 }
 
-// Logs the direct/indirect/conditional split; the POST carries only the totals.
-func logRelationCounts(ctx context.Context, projectID string, api APIName, agg *AggregatedMetrics) {
-	if agg.Relations == (RelationCounts{}) {
-		return
-	}
-	cctx.Logger(ctx).Info().
-		Str("project_id", projectID).
-		Str("api", string(api)).
-		Int64("relation_hits_direct", agg.Relations.HitsDirect).
-		Int64("relation_hits_indirect", agg.Relations.HitsIndirect).
-		Int64("relation_hits_conditional", agg.Relations.HitsConditional).
-		Int64("relation_misses", agg.Relations.Misses).
-		Msg("FGA cache relation-level counters")
-}
-
 func buildPayload(api APIName, agg *AggregatedMetrics) APIMetricsPayload {
 	p := APIMetricsPayload{
 		API:        string(api),
 		HitCount:   agg.HitCount,
 		MissCount:  agg.MissCount,
 		TotalCalls: agg.TotalCalls,
-	}
-	if api == APICheck {
-		// per relation: a batch with one miss out of fifty is 49 hits and 1 miss
-		p.HitCount = agg.Relations.HitsDirect + agg.Relations.HitsIndirect + agg.Relations.HitsConditional
-		p.MissCount = agg.Relations.Misses
 	}
 
 	if agg.TotalCalls > 0 {

@@ -65,30 +65,6 @@ func TestReporterPostsMetrics(t *testing.T) {
 	require.Positive(t, receivedBody.Sizes.HeapInuseBytes)
 }
 
-func TestReporterCountsCheckPerRelation(t *testing.T) {
-	var receivedBody metricsRequest
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		_ = utils.Unmarshal(body, &receivedBody)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	collector := NewCollector()
-	collector.Record("proj1", APICheck, CallMetrics{CacheHit: true, DurationMs: 2, Relations: RelationCounts{HitsDirect: 10, HitsIndirect: 40}})
-	collector.Record("proj1", APICheck, CallMetrics{CacheHit: false, DurationMs: 40, Relations: RelationCounts{HitsIndirect: 47, HitsConditional: 2, Misses: 1}})
-
-	NewReporter(collector, srv.URL, "key", 1, true).report(context.Background())
-
-	require.Len(t, receivedBody.Metrics, 1)
-	m := receivedBody.Metrics[0]
-	require.Equal(t, int64(2), m.TotalCalls)
-	require.Equal(t, int64(99), m.HitCount, "one miss out of fifty is 49 hits, not a missed call")
-	require.Equal(t, int64(1), m.MissCount)
-	require.Equal(t, int64(2), m.AvgDurationHitMs, "durations stay per call")
-	require.Equal(t, int64(40), m.AvgDurationMissMs)
-}
-
 func TestReporterPostsSizesForIdleProject(t *testing.T) {
 	var receivedBody metricsRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
