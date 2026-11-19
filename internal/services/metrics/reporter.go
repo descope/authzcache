@@ -5,7 +5,6 @@ import (
 	"context"
 	"math"
 	"net/http"
-	"runtime"
 	"strings"
 	"time"
 
@@ -52,12 +51,10 @@ type APIMetricsPayload struct {
 	MaxDurationMissMs int64   `json:"max_duration_miss_ms"`
 }
 
-// SizesPayload is a point-in-time reading; the heap fields are per process, so they repeat across projects.
 type SizesPayload struct {
-	DirectEntries   int   `json:"direct_entries"`
-	IndirectEntries int   `json:"indirect_entries"`
-	LookupEntries   int   `json:"lookup_entries"`
-	HeapInuseBytes  int64 `json:"heap_inuse_bytes"`
+	DirectEntries   int `json:"direct_entries"`
+	IndirectEntries int `json:"indirect_entries"`
+	LookupEntries   int `json:"lookup_entries"`
 }
 
 type metricsRequest struct {
@@ -118,9 +115,6 @@ func (r *Reporter) cacheSizes() map[string]*SizesPayload {
 	if r.cacheStats == nil {
 		return nil
 	}
-	var m runtime.MemStats
-	// stops the world (https://github.com/golang/go/blob/go1.26.10/src/runtime/mstats.go#L358); fine once per interval
-	runtime.ReadMemStats(&m)
 	stats := r.cacheStats()
 	sizes := make(map[string]*SizesPayload, len(stats))
 	for projectID, s := range stats {
@@ -131,7 +125,6 @@ func (r *Reporter) cacheSizes() map[string]*SizesPayload {
 			DirectEntries:   s.DirectEntries,
 			IndirectEntries: s.IndirectEntries,
 			LookupEntries:   s.LookupEntries,
-			HeapInuseBytes:  int64(m.HeapInuse), //nolint:gosec // heap stays far below MaxInt64
 		}
 	}
 	return sizes

@@ -61,7 +61,6 @@ func TestReporterPostsMetrics(t *testing.T) {
 
 	require.NotNil(t, receivedBody.Sizes)
 	require.Equal(t, 2, receivedBody.Sizes.DirectEntries)
-	require.Positive(t, receivedBody.Sizes.HeapInuseBytes)
 }
 
 func TestReporterPostsSizesForIdleProject(t *testing.T) {

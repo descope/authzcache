@@ -38,8 +38,8 @@ docker run -d \
 - `AUTHZCACHE_LOOKUP_CACHE_SIZE_PER_PROJECT` - Max number of lookup cache entries per project (default: 10,000)
 - `AUTHZCACHE_LOOKUP_CACHE_TTL_IN_SECONDS` - TTL in seconds for lookup cache entries (default: 60, minimum: 1)
 - `AUTHZCACHE_LOOKUP_CACHE_MAX_RESULT_SIZE` - Skip caching lookup results larger than this size (default: 1,000)
-- `AUTHZCACHE_METRICS_REPORT_ENABLED` - Periodically send cache metrics (hit/miss counts, latency, cache entry counts, heap size) to Descope (TRUE/FALSE, default: TRUE)
-- `AUTHZCACHE_METRICS_LOGS_ENABLED` - Periodically write cache metrics (hit/miss counts, latency, cache entry counts, heap size) to the local container log (TRUE/FALSE, default: FALSE)
+- `AUTHZCACHE_METRICS_REPORT_ENABLED` - Periodically send cache metrics (hit/miss counts, latency, cache entry counts) to Descope (TRUE/FALSE, default: TRUE)
+- `AUTHZCACHE_METRICS_LOGS_ENABLED` - Periodically write cache metrics (hit/miss counts, latency, cache entry counts) to the local container log (TRUE/FALSE, default: FALSE)
 - `AUTHZCACHE_METRICS_REPORT_INTERVAL_IN_SECONDS` - How often to report or log metrics, in seconds (default: 60, minimum: 10)
 - `AUTHZCACHE_HTTP_WRITE_TIMEOUT_IN_SECONDS` - Max seconds the gateway will spend producing a response before it closes the connection and returns a "socket hang up" (default: 30). Takes precedence over the generic `HTTP_GATEWAY_WRITE_TIMEOUT`, which is still honored when this is unset.
 
