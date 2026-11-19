@@ -57,8 +57,6 @@ type SizesPayload struct {
 	DirectEntries        int   `json:"direct_entries"`
 	IndirectEntries      int   `json:"indirect_entries"`
 	LookupEntries        int   `json:"lookup_entries"`
-	IndexEntries         int   `json:"index_entries"`
-	DirectKeyBytes       int64 `json:"direct_key_bytes"`
 	HeapInuseBytes       int64 `json:"heap_inuse_bytes"`
 	HeapAllocBytes       int64 `json:"heap_alloc_bytes"`
 	ProcessCachedAnswers int64 `json:"process_cached_answers"`
@@ -133,8 +131,6 @@ func (r *Reporter) logCacheSizes(ctx context.Context) map[string]*SizesPayload {
 			Int("direct_entries", s.DirectEntries).
 			Int("indirect_entries", s.IndirectEntries).
 			Int("lookup_entries", s.LookupEntries).
-			Int("index_entries", s.IndexEntries).
-			Int64("direct_key_bytes", s.DirectKeyBytes).
 			Msg("FGA cache sizes")
 	}
 	event := cctx.Logger(ctx).Info().
@@ -154,8 +150,6 @@ func (r *Reporter) logCacheSizes(ctx context.Context) map[string]*SizesPayload {
 			DirectEntries:        s.DirectEntries,
 			IndirectEntries:      s.IndirectEntries,
 			LookupEntries:        s.LookupEntries,
-			IndexEntries:         s.IndexEntries,
-			DirectKeyBytes:       s.DirectKeyBytes,
 			HeapInuseBytes:       int64(m.HeapInuse), //nolint:gosec // heap stays far below MaxInt64
 			HeapAllocBytes:       int64(m.HeapAlloc), //nolint:gosec // heap stays far below MaxInt64
 			ProcessCachedAnswers: cachedAnswers,

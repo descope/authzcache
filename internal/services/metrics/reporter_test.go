@@ -35,7 +35,7 @@ func TestReporterPostsMetrics(t *testing.T) {
 	called := 0
 	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
 		called++
-		return map[string]caches.Stats{"proj1": {DirectEntries: 2, IndexEntries: 4, DirectKeyBytes: 40}}
+		return map[string]caches.Stats{"proj1": {DirectEntries: 2}}
 	})
 	reporter.report(context.Background())
 	require.Equal(t, 1, called, "sizes are read once per reporting window")
@@ -61,8 +61,6 @@ func TestReporterPostsMetrics(t *testing.T) {
 
 	require.NotNil(t, receivedBody.Sizes)
 	require.Equal(t, 2, receivedBody.Sizes.DirectEntries)
-	require.Equal(t, 4, receivedBody.Sizes.IndexEntries)
-	require.Equal(t, int64(40), receivedBody.Sizes.DirectKeyBytes)
 	require.Equal(t, int64(2), receivedBody.Sizes.ProcessCachedAnswers)
 	require.Positive(t, receivedBody.Sizes.HeapInuseBytes)
 }
