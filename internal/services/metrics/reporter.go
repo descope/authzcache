@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/descope/authzcache/internal/config"
 	"github.com/descope/authzcache/internal/services/caches"
 	cconfig "github.com/descope/backend/common/pkg/common/config"
 	cctx "github.com/descope/backend/common/pkg/common/context"
@@ -71,22 +72,16 @@ type Reporter struct {
 	enabled       bool
 	logsEnabled   bool
 	httpClient    *http.Client
-	cacheStats    func() map[string]caches.Stats
 }
 
-// SetCacheStatsProvider must be called before Start, since the reporting goroutine reads the field.
-func (r *Reporter) SetCacheStatsProvider(f func() map[string]caches.Stats) {
-	r.cacheStats = f
-}
-
-func NewReporter(collector *Collector, baseURL, managementKey string, intervalSeconds int, enabled, logsEnabled bool) *Reporter {
+func NewReporter(collector *Collector, baseURL, managementKey string, intervalSeconds int, enabled bool) *Reporter {
 	return &Reporter{
 		collector:     collector,
 		customBaseURL: baseURL,
 		managementKey: managementKey,
 		interval:      time.Duration(intervalSeconds) * time.Second,
 		enabled:       enabled,
-		logsEnabled:   logsEnabled,
+		logsEnabled:   config.GetMetricsLogsEnabled(),
 		httpClient:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
@@ -111,27 +106,20 @@ func (r *Reporter) run(ctx context.Context) {
 	}
 }
 
-func (r *Reporter) cacheSizes() map[string]*SizesPayload {
-	if r.cacheStats == nil {
-		return nil
-	}
-	stats := r.cacheStats()
-	sizes := make(map[string]*SizesPayload, len(stats))
-	for projectID, s := range stats {
-		if s == (caches.Stats{}) {
-			continue // nothing cached, nothing to report
+func (r *Reporter) cacheSizes(ctx context.Context) map[string]*SizesPayload {
+	sizes := map[string]*SizesPayload{}
+	r.collector.projectCaches.Range(func(key, value any) bool {
+		s := value.(caches.ProjectAuthzCache).Stats(ctx)
+		if s != (caches.Stats{}) {
+			sizes[key.(string)] = &SizesPayload{DirectEntries: s.DirectEntries, IndirectEntries: s.IndirectEntries, LookupEntries: s.LookupEntries}
 		}
-		sizes[projectID] = &SizesPayload{
-			DirectEntries:   s.DirectEntries,
-			IndirectEntries: s.IndirectEntries,
-			LookupEntries:   s.LookupEntries,
-		}
-	}
+		return true
+	})
 	return sizes
 }
 
 func (r *Reporter) report(ctx context.Context) {
-	sizes := r.cacheSizes()
+	sizes := r.cacheSizes(ctx)
 	snapshot := r.collector.SnapshotAndReset()
 	// idle projects still report their sizes
 	projectIDs := make(map[string]struct{}, len(snapshot)+len(sizes))

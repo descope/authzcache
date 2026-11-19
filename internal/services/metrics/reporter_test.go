@@ -31,12 +31,9 @@ func TestReporterPostsMetrics(t *testing.T) {
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, CandidatesCount: 10, FilteredCount: 2, ResultSize: 8, DurationMs: 5})
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: false, CandidatesCount: 0, FilteredCount: 0, ResultSize: 3, DurationMs: 30})
 
-	reporter := NewReporter(collector, srv.URL, "mgmt-key", 1, true, false)
 	called := 0
-	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
-		called++
-		return map[string]caches.Stats{"proj1": {DirectEntries: 2}}
-	})
+	collector.AddProjectCache("proj1", &caches.ProjectAuthzCacheMock{StatsFunc: func(context.Context) caches.Stats { called++; return caches.Stats{DirectEntries: 2} }})
+	reporter := NewReporter(collector, srv.URL, "mgmt-key", 1, true)
 	reporter.report(context.Background())
 	require.Equal(t, 1, called, "sizes are read once per reporting window")
 
@@ -72,10 +69,9 @@ func TestReporterPostsSizesForIdleProject(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	reporter := NewReporter(NewCollector(), srv.URL, "key", 1, true, false)
-	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
-		return map[string]caches.Stats{"proj1": {IndirectEntries: 7}}
-	})
+	collector := NewCollector()
+	collector.AddProjectCache("proj1", &caches.ProjectAuthzCacheMock{StatsFunc: func(context.Context) caches.Stats { return caches.Stats{IndirectEntries: 7} }})
+	reporter := NewReporter(collector, srv.URL, "key", 1, true)
 	reporter.report(context.Background())
 
 	require.Empty(t, receivedBody.Metrics)
@@ -90,10 +86,9 @@ func TestReporterSkipsEmptySizes(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	reporter := NewReporter(NewCollector(), srv.URL, "key", 1, true, false)
-	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
-		return map[string]caches.Stats{"proj1": {}}
-	})
+	collector := NewCollector()
+	collector.AddProjectCache("proj1", &caches.ProjectAuthzCacheMock{})
+	reporter := NewReporter(collector, srv.URL, "key", 1, true)
 	reporter.report(context.Background())
 
 	require.False(t, called, "an idle project with nothing cached should not post")
@@ -109,12 +104,9 @@ func TestReporterDisabled(t *testing.T) {
 	collector := NewCollector()
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
 
-	reporter := NewReporter(collector, srv.URL, "key", 1, false, false)
 	statsRead := false
-	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
-		statsRead = true
-		return nil
-	})
+	collector.AddProjectCache("proj1", &caches.ProjectAuthzCacheMock{StatsFunc: func(context.Context) caches.Stats { statsRead = true; return caches.Stats{} }})
+	reporter := NewReporter(collector, srv.URL, "key", 1, false)
 	reporter.report(context.Background())
 
 	require.False(t, called, "disabled reporter should not post")
@@ -131,10 +123,9 @@ func TestReporterLogsOnly(t *testing.T) {
 
 	collector := NewCollector()
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
-	reporter := NewReporter(collector, srv.URL, "key", 1, false, true)
-	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
-		return map[string]caches.Stats{"proj1": {DirectEntries: 2}}
-	})
+	collector.AddProjectCache("proj1", &caches.ProjectAuthzCacheMock{StatsFunc: func(context.Context) caches.Stats { return caches.Stats{DirectEntries: 2} }})
+	reporter := NewReporter(collector, srv.URL, "key", 1, false)
+	reporter.logsEnabled = true
 	reporter.report(context.Background())
 
 	require.False(t, called, "logs-only mode must not post")
@@ -151,7 +142,7 @@ func TestReporterHandlesHTTPError(t *testing.T) {
 	collector := NewCollector()
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
 
-	reporter := NewReporter(collector, srv.URL, "key", 1, true, false)
+	reporter := NewReporter(collector, srv.URL, "key", 1, true)
 	// should not panic on 500
 	reporter.report(context.Background())
 	require.Equal(t, 1, callCount)
@@ -178,7 +169,7 @@ func TestReporterComputesAverages(t *testing.T) {
 		})
 	}
 
-	reporter := NewReporter(collector, srv.URL, "key", 1, true, false)
+	reporter := NewReporter(collector, srv.URL, "key", 1, true)
 	reporter.report(context.Background())
 
 	require.Len(t, receivedBody.Metrics, 1)
@@ -205,7 +196,7 @@ func TestReporterSkipsEmptySnapshot(t *testing.T) {
 	defer srv.Close()
 
 	collector := NewCollector()
-	reporter := NewReporter(collector, srv.URL, "key", 1, true, false)
+	reporter := NewReporter(collector, srv.URL, "key", 1, true)
 	reporter.report(context.Background())
 
 	require.False(t, called, "no metrics to report, should not post")
