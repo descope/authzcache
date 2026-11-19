@@ -58,7 +58,6 @@ type SizesPayload struct {
 	IndirectEntries int   `json:"indirect_entries"`
 	LookupEntries   int   `json:"lookup_entries"`
 	HeapInuseBytes  int64 `json:"heap_inuse_bytes"`
-	HeapAllocBytes  int64 `json:"heap_alloc_bytes"`
 }
 
 type metricsRequest struct {
@@ -132,7 +131,6 @@ func (r *Reporter) cacheSizes() map[string]*SizesPayload {
 			IndirectEntries: s.IndirectEntries,
 			LookupEntries:   s.LookupEntries,
 			HeapInuseBytes:  int64(m.HeapInuse), //nolint:gosec // heap stays far below MaxInt64
-			HeapAllocBytes:  int64(m.HeapAlloc), //nolint:gosec // heap stays far below MaxInt64
 		}
 	}
 	return sizes
