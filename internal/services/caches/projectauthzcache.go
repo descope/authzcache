@@ -433,11 +433,6 @@ func (pc *projectAuthzCache) addDirectRelation(ctx context.Context, r *descope.F
 	pc.directRelationCache.Add(ctx, key, grant)
 	resource := resource(r.Resource)
 	target := target(r.Target)
-	prev, indexed := pc.directKeyComponents[key]
-	if indexed && prev.r == resource && prev.t == target {
-		return // already indexed under these components
-	}
-	// colliding keys (":" in IDs) get indexed under every relation's buckets so invalidation still finds them
 	pc.directKeyComponents[key] = keyComponents{r: resource, t: target}
 	pc.addKeyToDirectResourceIndex(key, resource, target)
 	pc.addKeyToDirectTargetIndex(key, resource, target)
@@ -704,7 +699,6 @@ func (pc *projectAuthzCache) SetWhatCanTargetAccessCached(ctx context.Context, t
 	})
 }
 
-// Stats is O(1) so it never stalls requests on the lock.
 func (pc *projectAuthzCache) Stats(ctx context.Context) Stats {
 	pc.mutex.RLock()
 	defer pc.mutex.RUnlock()
