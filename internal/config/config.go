@@ -23,6 +23,8 @@ const (
 	ConfigKeyMetricsReportEnabled           = "AUTHZCACHE_METRICS_REPORT_ENABLED"             // TRUE/FALSE, default is TRUE
 	ConfigKeyMetricsReportIntervalInSeconds = "AUTHZCACHE_METRICS_REPORT_INTERVAL_IN_SECONDS" // interval in seconds, default is 60, min is 10
 	ConfigKeyMetricsLogsEnabled             = "AUTHZCACHE_METRICS_LOGS_ENABLED"               // TRUE/FALSE, default is FALSE
+	ConfigKeyMetricsEndpointEnabled         = "AUTHZCACHE_METRICS_ENDPOINT_ENABLED"           // TRUE/FALSE, default is FALSE
+	ConfigKeyMetricsEndpointPort            = "AUTHZCACHE_METRICS_ENDPOINT_PORT"              // default is 9189
 
 	// HTTP gateway configuration
 	ConfigKeyGatewayWriteTimeoutInSeconds = "AUTHZCACHE_HTTP_WRITE_TIMEOUT_IN_SECONDS" // gateway response-write timeout; default 30, the node-sdk cache-abort ceiling
@@ -74,6 +76,14 @@ func GetMetricsReportEnabled() bool {
 
 func GetMetricsLogsEnabled() bool {
 	return cconfig.GetBoolOrProvidedLocal(ConfigKeyMetricsLogsEnabled, false)
+}
+
+func GetMetricsEndpointEnabled() bool {
+	return cconfig.GetBoolOrProvidedLocal(ConfigKeyMetricsEndpointEnabled, false)
+}
+
+func GetMetricsEndpointPort() int {
+	return cconfig.GetIntOrProvidedLocal(ConfigKeyMetricsEndpointPort, 9189)
 }
 
 func GetMetricsReportIntervalInSeconds() int {

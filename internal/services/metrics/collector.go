@@ -3,6 +3,7 @@ package metrics
 import (
 	"math"
 	"sync"
+	"sync/atomic"
 )
 
 type APIName string
@@ -52,7 +53,8 @@ type projectMetrics struct {
 
 // Collector is a thread-safe per-project, per-API metrics accumulator.
 type Collector struct {
-	projects sync.Map // projectID -> *projectMetrics
+	projects sync.Map                    // projectID -> *projectMetrics
+	prom     atomic.Pointer[promMetrics] // nil unless the Prometheus endpoint is enabled
 }
 
 func NewCollector() *Collector {
@@ -61,6 +63,9 @@ func NewCollector() *Collector {
 
 // Record atomically accumulates metrics from a single call.
 func (c *Collector) Record(projectID string, api APIName, m CallMetrics) {
+	if pm := c.prom.Load(); pm != nil {
+		pm.record(projectID, api, m)
+	}
 	pm := c.getOrCreateProjectMetrics(projectID)
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
