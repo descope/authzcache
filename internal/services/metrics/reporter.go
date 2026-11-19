@@ -91,6 +91,7 @@ func NewReporter(collector *Collector, baseURL, managementKey string, intervalSe
 	}
 }
 
+// Start launches the background reporting goroutine.
 func (r *Reporter) Start(ctx context.Context) {
 	if !r.enabled && !r.logsEnabled {
 		return
