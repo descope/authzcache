@@ -119,6 +119,7 @@ func (r *Reporter) cacheSizes() map[string]*SizesPayload {
 		return nil
 	}
 	var m runtime.MemStats
+	// stops the world (https://github.com/golang/go/blob/go1.26.10/src/runtime/mstats.go#L358); fine once per interval
 	runtime.ReadMemStats(&m)
 	stats := r.cacheStats()
 	sizes := make(map[string]*SizesPayload, len(stats))
