@@ -176,7 +176,9 @@ func (r *Reporter) report(ctx context.Context) {
 			if agg.TotalCalls == 0 {
 				continue
 			}
-			payloads = append(payloads, buildPayload(api, agg))
+			p := buildPayload(api, agg)
+			cctx.Logger(ctx).Info().Str("project_id", projectID).Interface("metrics", p).Msg("FGA cache API metrics")
+			payloads = append(payloads, p)
 		}
 		body := metricsRequest{Metrics: payloads, Sizes: sizes[projectID]}
 		if !r.enabled || (len(body.Metrics) == 0 && body.Sizes == nil) {
