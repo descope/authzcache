@@ -215,6 +215,9 @@ func TestStats(t *testing.T) {
 	cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{direct})
 	s = cache.Stats(ctx)
 	assert.Equal(t, 0, s.DirectEntries)
+
+	cache.SetWhoCanAccessCached(ctx, "doc1", "viewer", "docs", []string{"user1", "user2"})
+	assert.Equal(t, 1, cache.Stats(ctx).LookupEntries)
 }
 
 func TestUpdateCacheWithAddedRelations_AddsToLookupCache(t *testing.T) {
