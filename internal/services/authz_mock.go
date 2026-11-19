@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 
+	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/go-sdk/descope"
 )
 
@@ -16,6 +17,14 @@ type AuthzCacheMock struct {
 	DeleteFGARelationsFunc  func(ctx context.Context, relations []*descope.FGARelation) error
 	WhoCanAccessFunc        func(ctx context.Context, resource, relationDefinition, namespace string, extraContext map[string]any) ([]string, error)
 	WhatCanTargetAccessFunc func(ctx context.Context, target string, extraContext map[string]any) ([]*descope.AuthzRelation, error)
+	CacheStatsFunc          func(ctx context.Context) map[string]caches.Stats
+}
+
+func (a *AuthzCacheMock) CacheStats(ctx context.Context) map[string]caches.Stats {
+	if a.CacheStatsFunc != nil {
+		return a.CacheStatsFunc(ctx)
+	}
+	return nil
 }
 
 func (a *AuthzCacheMock) Check(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error) {
