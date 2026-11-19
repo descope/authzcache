@@ -20,6 +20,7 @@ type AuthzCache interface {
 	Check(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error)
 	WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string, extraContext map[string]any) ([]string, error)
 	WhatCanTargetAccess(ctx context.Context, target string, extraContext map[string]any) ([]*descope.AuthzRelation, error)
+	CacheStats(ctx context.Context) map[string]caches.Stats
 }
 
 type RemoteClientCreator func(projectID string, logger logger.LoggerInterface) (sdk.Management, error)
@@ -177,6 +178,15 @@ func (a *authzCache) recordMetric(ctx context.Context, api metrics.APIName, cach
 	})
 }
 
+func (a *authzCache) CacheStats(ctx context.Context) map[string]caches.Stats {
+	stats := map[string]caches.Stats{}
+	a.projects.Range(func(key, value any) bool {
+		stats[key.(string)] = value.(project).cache.Stats(ctx)
+		return true
+	})
+	return stats
+}
+
 func (a *authzCache) WhoCanAccess(ctx context.Context, resource, relationDefinition, namespace string, extraContext map[string]any) ([]string, error) {
 	start := time.Now()
 	projectCache, mgmtSDK, err := a.getOrCreateProjectCache(ctx)
@@ -299,8 +309,5 @@ func (a *authzCache) getOrCreateProjectCache(ctx context.Context) (caches.Projec
 	}
 	projectCache.StartRemoteChangesPolling(ctx)
 	a.projects.Store(projectID, project{cache: projectCache, mgmtSDK: projectMgmtSDK})
-	if a.metricsCollector != nil {
-		a.metricsCollector.AddProjectCache(projectID, projectCache)
-	}
 	return projectCache, projectMgmtSDK, nil
 }

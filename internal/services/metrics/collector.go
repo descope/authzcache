@@ -3,8 +3,6 @@ package metrics
 import (
 	"math"
 	"sync"
-
-	"github.com/descope/authzcache/internal/services/caches"
 )
 
 type APIName string
@@ -54,13 +52,7 @@ type projectMetrics struct {
 
 // Collector is a thread-safe per-project, per-API metrics accumulator.
 type Collector struct {
-	projects      sync.Map // projectID -> *projectMetrics
-	projectCaches sync.Map // projectID -> caches.ProjectAuthzCache
-}
-
-// AddProjectCache makes the project's cache sizes part of every report.
-func (c *Collector) AddProjectCache(projectID string, cache caches.ProjectAuthzCache) {
-	c.projectCaches.Store(projectID, cache)
+	projects sync.Map // projectID -> *projectMetrics
 }
 
 func NewCollector() *Collector {
