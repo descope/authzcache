@@ -74,6 +74,7 @@ type Reporter struct {
 	managementKey string
 	interval      time.Duration
 	enabled       bool
+	logsEnabled   bool
 	httpClient    *http.Client
 	cacheStats    func() map[string]caches.Stats
 }
@@ -83,19 +84,22 @@ func (r *Reporter) SetCacheStatsProvider(f func() map[string]caches.Stats) {
 	r.cacheStats = f
 }
 
-func NewReporter(collector *Collector, baseURL, managementKey string, intervalSeconds int, enabled bool) *Reporter {
+func NewReporter(collector *Collector, baseURL, managementKey string, intervalSeconds int, enabled, logsEnabled bool) *Reporter {
 	return &Reporter{
 		collector:     collector,
 		customBaseURL: baseURL,
 		managementKey: managementKey,
 		interval:      time.Duration(intervalSeconds) * time.Second,
 		enabled:       enabled,
+		logsEnabled:   logsEnabled,
 		httpClient:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
-// Start launches the background reporting goroutine; when disabled it only logs.
 func (r *Reporter) Start(ctx context.Context) {
+	if !r.enabled && !r.logsEnabled {
+		return
+	}
 	cctx.Go(ctx, r.run)
 }
 
@@ -112,11 +116,8 @@ func (r *Reporter) run(ctx context.Context) {
 	}
 }
 
-// logCacheSizes reports exact counts plus the real process heap, so cost per answer can be divided out
-// of a measurement rather than estimated from assumed per-entry overheads. The denominator is cached
-// answers only, so whole-process heap — the indexes included — is charged to the answers that caused
-// it. That keeps index growth visible in the ratio instead of deflating it.
-func (r *Reporter) logCacheSizes(ctx context.Context) map[string]*SizesPayload {
+// Heap per cached answer is an upper bound: the heap covers the whole process.
+func (r *Reporter) cacheSizes(ctx context.Context) map[string]*SizesPayload {
 	if r.cacheStats == nil {
 		return nil
 	}
@@ -126,6 +127,9 @@ func (r *Reporter) logCacheSizes(ctx context.Context) map[string]*SizesPayload {
 	stats := r.cacheStats()
 	for projectID, s := range stats {
 		cachedAnswers += int64(s.DirectEntries + s.IndirectEntries + s.LookupEntries)
+		if !r.logsEnabled {
+			continue
+		}
 		cctx.Logger(ctx).Info().
 			Str("project_id", projectID).
 			Int("direct_entries", s.DirectEntries).
@@ -133,14 +137,16 @@ func (r *Reporter) logCacheSizes(ctx context.Context) map[string]*SizesPayload {
 			Int("lookup_entries", s.LookupEntries).
 			Msg("FGA cache sizes")
 	}
-	event := cctx.Logger(ctx).Info().
-		Float64("heap_inuse_mb", float64(m.HeapInuse)/(1<<20)).
-		Float64("heap_alloc_mb", float64(m.HeapAlloc)/(1<<20)).
-		Int64("cached_answers", cachedAnswers)
-	if cachedAnswers > 0 {
-		event = event.Float64("heap_bytes_per_answer_max", float64(m.HeapInuse)/float64(cachedAnswers))
+	if r.logsEnabled {
+		event := cctx.Logger(ctx).Info().
+			Float64("heap_inuse_mb", float64(m.HeapInuse)/(1<<20)).
+			Float64("heap_alloc_mb", float64(m.HeapAlloc)/(1<<20)).
+			Int64("cached_answers", cachedAnswers)
+		if cachedAnswers > 0 {
+			event = event.Float64("heap_bytes_per_answer_max", float64(m.HeapInuse)/float64(cachedAnswers))
+		}
+		event.Msg("FGA cache process memory")
 	}
-	event.Msg("FGA cache process memory")
 	sizes := make(map[string]*SizesPayload, len(stats))
 	for projectID, s := range stats {
 		if s == (caches.Stats{}) {
@@ -159,7 +165,7 @@ func (r *Reporter) logCacheSizes(ctx context.Context) map[string]*SizesPayload {
 }
 
 func (r *Reporter) report(ctx context.Context) {
-	sizes := r.logCacheSizes(ctx)
+	sizes := r.cacheSizes(ctx)
 	snapshot := r.collector.SnapshotAndReset()
 	// idle projects still report their sizes
 	projectIDs := make(map[string]struct{}, len(snapshot)+len(sizes))
@@ -177,7 +183,9 @@ func (r *Reporter) report(ctx context.Context) {
 				continue
 			}
 			p := buildPayload(api, agg)
-			cctx.Logger(ctx).Info().Str("project_id", projectID).Interface("metrics", p).Msg("FGA cache API metrics")
+			if r.logsEnabled {
+				cctx.Logger(ctx).Info().Str("project_id", projectID).Interface("metrics", p).Msg("FGA cache API metrics")
+			}
 			payloads = append(payloads, p)
 		}
 		body := metricsRequest{Metrics: payloads, Sizes: sizes[projectID]}

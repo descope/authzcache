@@ -38,6 +38,7 @@ func serve() {
 		remote.ManagementKey(),
 		config.GetMetricsReportIntervalInSeconds(),
 		config.GetMetricsReportEnabled(),
+		config.GetMetricsLogsEnabled(),
 	)
 
 	ctx, err := server.StartServerWithGatewayAndOptions(

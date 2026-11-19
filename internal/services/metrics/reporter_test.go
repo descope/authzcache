@@ -31,7 +31,7 @@ func TestReporterPostsMetrics(t *testing.T) {
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, CandidatesCount: 10, FilteredCount: 2, ResultSize: 8, DurationMs: 5})
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: false, CandidatesCount: 0, FilteredCount: 0, ResultSize: 3, DurationMs: 30})
 
-	reporter := NewReporter(collector, srv.URL, "mgmt-key", 1, true)
+	reporter := NewReporter(collector, srv.URL, "mgmt-key", 1, true, false)
 	called := 0
 	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
 		called++
@@ -74,7 +74,7 @@ func TestReporterPostsSizesForIdleProject(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	reporter := NewReporter(NewCollector(), srv.URL, "key", 1, true)
+	reporter := NewReporter(NewCollector(), srv.URL, "key", 1, true, false)
 	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
 		return map[string]caches.Stats{"proj1": {IndirectEntries: 7}}
 	})
@@ -92,7 +92,7 @@ func TestReporterSkipsEmptySizes(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	reporter := NewReporter(NewCollector(), srv.URL, "key", 1, true)
+	reporter := NewReporter(NewCollector(), srv.URL, "key", 1, true, false)
 	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
 		return map[string]caches.Stats{"proj1": {}}
 	})
@@ -111,7 +111,7 @@ func TestReporterDisabled(t *testing.T) {
 	collector := NewCollector()
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
 
-	reporter := NewReporter(collector, srv.URL, "key", 1, false)
+	reporter := NewReporter(collector, srv.URL, "key", 1, false, false)
 	statsRead := false
 	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
 		statsRead = true
@@ -120,7 +120,7 @@ func TestReporterDisabled(t *testing.T) {
 	reporter.report(context.Background())
 
 	require.False(t, called, "disabled reporter should not post")
-	require.True(t, statsRead, "disabled reporter still logs sizes")
+	require.True(t, statsRead, "sizes are read even when not posted")
 	require.Empty(t, collector.SnapshotAndReset(), "window is drained even when not posted")
 }
 
@@ -135,7 +135,7 @@ func TestReporterHandlesHTTPError(t *testing.T) {
 	collector := NewCollector()
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
 
-	reporter := NewReporter(collector, srv.URL, "key", 1, true)
+	reporter := NewReporter(collector, srv.URL, "key", 1, true, false)
 	// should not panic on 500
 	reporter.report(context.Background())
 	require.Equal(t, 1, callCount)
@@ -162,7 +162,7 @@ func TestReporterComputesAverages(t *testing.T) {
 		})
 	}
 
-	reporter := NewReporter(collector, srv.URL, "key", 1, true)
+	reporter := NewReporter(collector, srv.URL, "key", 1, true, false)
 	reporter.report(context.Background())
 
 	require.Len(t, receivedBody.Metrics, 1)
@@ -189,7 +189,7 @@ func TestReporterSkipsEmptySnapshot(t *testing.T) {
 	defer srv.Close()
 
 	collector := NewCollector()
-	reporter := NewReporter(collector, srv.URL, "key", 1, true)
+	reporter := NewReporter(collector, srv.URL, "key", 1, true, false)
 	reporter.report(context.Background())
 
 	require.False(t, called, "no metrics to report, should not post")
