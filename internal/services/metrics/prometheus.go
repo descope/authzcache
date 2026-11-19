@@ -15,11 +15,8 @@ import (
 
 // promMetrics are cumulative, as Prometheus counters must be; the reporter's window resets every interval.
 type promMetrics struct {
-	calls      *prometheus.CounterVec
-	duration   *prometheus.HistogramVec
-	candidates *prometheus.CounterVec
-	filtered   *prometheus.CounterVec
-	results    *prometheus.CounterVec
+	calls    *prometheus.CounterVec
+	duration *prometheus.HistogramVec
 }
 
 func (pm *promMetrics) record(projectID string, api APIName, m CallMetrics) {
@@ -30,9 +27,6 @@ func (pm *promMetrics) record(projectID string, api APIName, m CallMetrics) {
 	labels := []string{projectID, string(api), result}
 	pm.calls.WithLabelValues(labels...).Inc()
 	pm.duration.WithLabelValues(labels...).Observe(m.Duration.Seconds())
-	pm.candidates.WithLabelValues(labels...).Add(float64(m.CandidatesCount))
-	pm.filtered.WithLabelValues(labels...).Add(float64(m.FilteredCount))
-	pm.results.WithLabelValues(labels...).Add(float64(m.ResultSize))
 }
 
 // cacheEntries reads the cache sizes on each scrape.
@@ -54,19 +48,13 @@ func (c cacheEntries) Collect(ch chan<- prometheus.Metric) {
 // newPrometheusHandler starts recording calls into collector and returns the scrape handler.
 func newPrometheusHandler(collector *Collector, cacheStats func() map[string]caches.Stats) http.Handler {
 	labels := []string{"project_id", "api", "result"}
-	counter := func(name, help string) *prometheus.CounterVec {
-		return prometheus.NewCounterVec(prometheus.CounterOpts{Name: name, Help: help}, labels)
-	}
 	pm := &promMetrics{
-		calls:      counter("authzcache_calls_total", "API calls by cache outcome."),
-		duration:   prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "authzcache_call_duration_seconds", Help: "API call duration.", Buckets: prometheus.ExponentialBuckets(0.0001, 4, 10)}, labels),
-		candidates: counter("authzcache_call_candidates_total", "Candidates across API calls, as summed in the Descope report."),
-		filtered:   counter("authzcache_call_filtered_total", "Candidates filtered out across API calls."),
-		results:    counter("authzcache_call_results_total", "Results returned across API calls."),
+		calls:    prometheus.NewCounterVec(prometheus.CounterOpts{Name: "authzcache_calls_total", Help: "API calls by cache outcome."}, labels),
+		duration: prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "authzcache_call_duration_seconds", Help: "API call duration.", Buckets: prometheus.ExponentialBuckets(0.0001, 4, 10)}, labels),
 	}
 	// own registry: only our metrics, no Go runtime collectors
 	reg := prometheus.NewRegistry()
-	reg.MustRegister(pm.calls, pm.duration, pm.candidates, pm.filtered, pm.results, cacheEntries{
+	reg.MustRegister(pm.calls, pm.duration, cacheEntries{
 		desc:  prometheus.NewDesc("authzcache_cache_entries", "Entries per project cache.", []string{"project_id", "cache"}, nil),
 		stats: cacheStats,
 	})

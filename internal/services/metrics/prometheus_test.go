@@ -27,10 +27,6 @@ func TestPrometheusHandler(t *testing.T) {
 	for _, line := range []string{
 		`authzcache_calls_total{api="WhoCanAccess",project_id="p1",result="hit"} 1`,
 		`authzcache_calls_total{api="Check",project_id="p1",result="miss"} 1`,
-		`authzcache_call_candidates_total{api="WhoCanAccess",project_id="p1",result="hit"} 4`,
-		`authzcache_call_candidates_total{api="Check",project_id="p1",result="miss"} 7`,
-		`authzcache_call_filtered_total{api="WhoCanAccess",project_id="p1",result="hit"} 1`,
-		`authzcache_call_results_total{api="Check",project_id="p1",result="miss"} 7`,
 		`authzcache_call_duration_seconds_count{api="Check",project_id="p1",result="miss"} 1`,
 		`authzcache_call_duration_seconds_sum{api="Check",project_id="p1",result="miss"} 0.04`,
 		`authzcache_call_duration_seconds_sum{api="WhoCanAccess",project_id="p1",result="hit"} 0.0003`,
