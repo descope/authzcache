@@ -8,8 +8,8 @@ import (
 	"context"
 	"errors"
 
+	authzv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
 	grpcauthzcv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
-	grpcauthzv1 "github.com/descope/backend/authzservice/pkg/authzservice/proto/v1"
 	grpc "google.golang.org/grpc"
 )
 
@@ -17,35 +17,35 @@ type AuthzCacheClient struct {
 	CreateFGASchemaFailure bool
 	CreateFGASchemaError   error
 	CreateFGASchemaCount   int
-	CreateFGASchemaAssert  func(_ context.Context, req *grpcauthzv1.SaveDSLSchemaRequest, _ ...grpc.CallOption)
+	CreateFGASchemaAssert  func(_ context.Context, req *authzv1.SaveDSLSchemaRequest, _ ...grpc.CallOption)
 
 	CreateFGARelationsFailure bool
 	CreateFGARelationsError   error
 	CreateFGARelationsCount   int
-	CreateFGARelationsAssert  func(_ context.Context, req *grpcauthzv1.CreateTuplesRequest, _ ...grpc.CallOption)
+	CreateFGARelationsAssert  func(_ context.Context, req *authzv1.CreateTuplesRequest, _ ...grpc.CallOption)
 
 	DeleteFGARelationsFailure bool
 	DeleteFGARelationsError   error
 	DeleteFGARelationsCount   int
-	DeleteFGARelationsAssert  func(_ context.Context, req *grpcauthzv1.DeleteTuplesRequest, _ ...grpc.CallOption)
+	DeleteFGARelationsAssert  func(_ context.Context, req *authzv1.DeleteTuplesRequest, _ ...grpc.CallOption)
 
 	CheckFailure  bool
 	CheckError    error
 	CheckCount    int
-	CheckAssert   func(_ context.Context, req *grpcauthzv1.CheckRequest, _ ...grpc.CallOption)
-	CheckResponse *grpcauthzv1.CheckResponse
+	CheckAssert   func(_ context.Context, req *authzv1.CheckRequest, _ ...grpc.CallOption)
+	CheckResponse *authzv1.CheckResponse
 
 	WhoCanAccessFailure  bool
 	WhoCanAccessError    error
 	WhoCanAccessCount    int
-	WhoCanAccessAssert   func(_ context.Context, req *grpcauthzv1.WhoCanAccessRequest, _ ...grpc.CallOption)
-	WhoCanAccessResponse *grpcauthzv1.WhoCanAccessResponse
+	WhoCanAccessAssert   func(_ context.Context, req *authzv1.WhoCanAccessRequest, _ ...grpc.CallOption)
+	WhoCanAccessResponse *authzv1.WhoCanAccessResponse
 
 	WhatCanTargetAccessFailure  bool
 	WhatCanTargetAccessError    error
 	WhatCanTargetAccessCount    int
-	WhatCanTargetAccessAssert   func(_ context.Context, req *grpcauthzv1.WhatCanTargetAccessRequest, _ ...grpc.CallOption)
-	WhatCanTargetAccessResponse *grpcauthzv1.WhatCanTargetAccessResponse
+	WhatCanTargetAccessAssert   func(_ context.Context, req *authzv1.WhatCanTargetAccessRequest, _ ...grpc.CallOption)
+	WhatCanTargetAccessResponse *authzv1.WhatCanTargetAccessResponse
 }
 
 func (c *AuthzCacheClient) ResetMock() *AuthzCacheClient {
@@ -53,7 +53,7 @@ func (c *AuthzCacheClient) ResetMock() *AuthzCacheClient {
 	return c
 }
 
-func (c *AuthzCacheClient) CreateFGASchema(ctx context.Context, req *grpcauthzv1.SaveDSLSchemaRequest, opts ...grpc.CallOption) (*grpcauthzv1.SaveDSLSchemaResponse, error) {
+func (c *AuthzCacheClient) CreateFGASchema(ctx context.Context, req *authzv1.SaveDSLSchemaRequest, opts ...grpc.CallOption) (*authzv1.SaveDSLSchemaResponse, error) {
 	c.CreateFGASchemaCount++
 	if c.CreateFGASchemaAssert != nil {
 		c.CreateFGASchemaAssert(ctx, req, opts...)
@@ -64,10 +64,10 @@ func (c *AuthzCacheClient) CreateFGASchema(ctx context.Context, req *grpcauthzv1
 	if c.CreateFGASchemaFailure {
 		return nil, ErrAuthzcacheMock
 	}
-	return &grpcauthzv1.SaveDSLSchemaResponse{}, nil
+	return &authzv1.SaveDSLSchemaResponse{}, nil
 }
 
-func (c *AuthzCacheClient) CreateFGARelations(ctx context.Context, req *grpcauthzv1.CreateTuplesRequest, opts ...grpc.CallOption) (*grpcauthzv1.CreateTuplesResponse, error) {
+func (c *AuthzCacheClient) CreateFGARelations(ctx context.Context, req *authzv1.CreateTuplesRequest, opts ...grpc.CallOption) (*authzv1.CreateTuplesResponse, error) {
 	c.CreateFGARelationsCount++
 	if c.CreateFGARelationsAssert != nil {
 		c.CreateFGARelationsAssert(ctx, req, opts...)
@@ -78,10 +78,10 @@ func (c *AuthzCacheClient) CreateFGARelations(ctx context.Context, req *grpcauth
 	if c.CreateFGARelationsFailure {
 		return nil, ErrAuthzcacheMock
 	}
-	return &grpcauthzv1.CreateTuplesResponse{}, nil
+	return &authzv1.CreateTuplesResponse{}, nil
 }
 
-func (c *AuthzCacheClient) DeleteFGARelations(ctx context.Context, req *grpcauthzv1.DeleteTuplesRequest, opts ...grpc.CallOption) (*grpcauthzv1.DeleteTuplesResponse, error) {
+func (c *AuthzCacheClient) DeleteFGARelations(ctx context.Context, req *authzv1.DeleteTuplesRequest, opts ...grpc.CallOption) (*authzv1.DeleteTuplesResponse, error) {
 	c.DeleteFGARelationsCount++
 	if c.DeleteFGARelationsAssert != nil {
 		c.DeleteFGARelationsAssert(ctx, req, opts...)
@@ -92,10 +92,10 @@ func (c *AuthzCacheClient) DeleteFGARelations(ctx context.Context, req *grpcauth
 	if c.DeleteFGARelationsFailure {
 		return nil, ErrAuthzcacheMock
 	}
-	return &grpcauthzv1.DeleteTuplesResponse{}, nil
+	return &authzv1.DeleteTuplesResponse{}, nil
 }
 
-func (c *AuthzCacheClient) Check(ctx context.Context, req *grpcauthzv1.CheckRequest, opts ...grpc.CallOption) (*grpcauthzv1.CheckResponse, error) {
+func (c *AuthzCacheClient) Check(ctx context.Context, req *authzv1.CheckRequest, opts ...grpc.CallOption) (*authzv1.CheckResponse, error) {
 	c.CheckCount++
 	if c.CheckAssert != nil {
 		c.CheckAssert(ctx, req, opts...)
@@ -109,10 +109,10 @@ func (c *AuthzCacheClient) Check(ctx context.Context, req *grpcauthzv1.CheckRequ
 	if c.CheckResponse != nil {
 		return c.CheckResponse, nil
 	}
-	return &grpcauthzv1.CheckResponse{}, nil
+	return &authzv1.CheckResponse{}, nil
 }
 
-func (c *AuthzCacheClient) WhoCanAccess(ctx context.Context, req *grpcauthzv1.WhoCanAccessRequest, opts ...grpc.CallOption) (*grpcauthzv1.WhoCanAccessResponse, error) {
+func (c *AuthzCacheClient) WhoCanAccess(ctx context.Context, req *authzv1.WhoCanAccessRequest, opts ...grpc.CallOption) (*authzv1.WhoCanAccessResponse, error) {
 	c.WhoCanAccessCount++
 	if c.WhoCanAccessAssert != nil {
 		c.WhoCanAccessAssert(ctx, req, opts...)
@@ -126,10 +126,10 @@ func (c *AuthzCacheClient) WhoCanAccess(ctx context.Context, req *grpcauthzv1.Wh
 	if c.WhoCanAccessResponse != nil {
 		return c.WhoCanAccessResponse, nil
 	}
-	return &grpcauthzv1.WhoCanAccessResponse{}, nil
+	return &authzv1.WhoCanAccessResponse{}, nil
 }
 
-func (c *AuthzCacheClient) WhatCanTargetAccess(ctx context.Context, req *grpcauthzv1.WhatCanTargetAccessRequest, opts ...grpc.CallOption) (*grpcauthzv1.WhatCanTargetAccessResponse, error) {
+func (c *AuthzCacheClient) WhatCanTargetAccess(ctx context.Context, req *authzv1.WhatCanTargetAccessRequest, opts ...grpc.CallOption) (*authzv1.WhatCanTargetAccessResponse, error) {
 	c.WhatCanTargetAccessCount++
 	if c.WhatCanTargetAccessAssert != nil {
 		c.WhatCanTargetAccessAssert(ctx, req, opts...)
@@ -143,7 +143,7 @@ func (c *AuthzCacheClient) WhatCanTargetAccess(ctx context.Context, req *grpcaut
 	if c.WhatCanTargetAccessResponse != nil {
 		return c.WhatCanTargetAccessResponse, nil
 	}
-	return &grpcauthzv1.WhatCanTargetAccessResponse{}, nil
+	return &authzv1.WhatCanTargetAccessResponse{}, nil
 }
 
 // Ensures that all service methods defined in the AuthzCacheClient interface

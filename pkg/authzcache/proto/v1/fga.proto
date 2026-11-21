@@ -1,0 +1,180 @@
+syntax = "proto3";
+// Wire-compatible copy of the authzservice FGA messages; keep field numbers in sync.
+package authzv1;
+
+import "google/protobuf/struct.proto";
+import "validate.proto";
+
+option go_package = "github.com/descope/authzcache/pkg/authzcache/proto/v1";
+
+message UserQuery {
+  // If not empty then users must be members of at least one of these tenants
+  repeated string tenants = 1 [(validate).repeated.items.string = {tenant_id: true, optional: true}];
+  // If not empty then users must have one of the specified roles
+  repeated string roles = 2 [(validate).repeated.items.string = {std_len: true, optional: true}];
+  // Full text search across relevant columns (displayName, email, tenants, status)
+  string text = 3 [(validate).string = {max_len: 100, optional: true}];
+  // If not empty then users must be in one of the given statuses
+  repeated string statuses = 4 [(validate).repeated.items.string = {std_len: true, optional: true}];
+  // Return only users that have SSO external IDs
+  bool ssoOnly = 5;
+  // Return also users which are test users
+  bool withTestUser = 6;
+  // If provided, filter by these custom attributes
+  google.protobuf.Struct customAttributes = 7;
+}
+
+// Relation is specified between resource and target where target can be direct target (user or related resource), targetSet (anyone who has another relation), and list of users matching query
+message Relation {
+  // Relation is defined on the resource
+  string resource = 1 [(validate).string = {max_len: 1000}];
+  // The name of the relation definition
+  string relationDefinition = 2 [(validate).string = {max_len: 100}];
+  // The namespace of the relation definition
+  string namespace = 3 [(validate).string = {max_len: 100}];
+  // The target for given the relation
+  string target = 4 [(validate).string = {max_len: 1000, optional: true}];
+  // The target namespace for the relation
+  string targetNamespace = 9 [(validate).string = {max_len: 100, optional: true}];
+  // The targetSet target resource for the relation
+  string targetSetResource = 5 [(validate).string = {max_len: 1000, optional: true}];
+  // The targetSet target relation definition for the relation
+  string targetSetRelationDefinition = 6 [(validate).string = {max_len: 100, optional: true}];
+  // The targetSet target relation definition namespace for the relation
+  string targetSetRelationDefinitionNamespace = 7 [(validate).string = {max_len: 100, optional: true}];
+  // User query for a list of users target
+  UserQuery query = 8;
+}
+
+// Query the list of users who have the relation to the resource
+message WhoCanAccessRequest {
+  string resource = 1 [(validate).string = {max_len: 1000}];
+  string relationDefinition = 2 [(validate).string = {max_len: 100}];
+  string namespace = 3 [(validate).string = {max_len: 100}];
+  // Optional: when set, only targets of this type (namespace) are returned. Empty returns all targets.
+  string targetType = 4 [(validate).string = {max_len: 100, optional: true}];
+  // Optional flat key-value context for evaluating ABAC conditions and facts. Targets whose relation
+  // is gated by a condition are returned only when this context satisfies it (same semantics as Check).
+  google.protobuf.Struct context = 5;
+}
+
+message WhoCanAccessResponse {
+  repeated string targets = 1;
+}
+
+message WhatCanTargetAccessRequest {
+  string target = 1 [(validate).string = {max_len: 1000}];
+  // Optional flat key-value context for evaluating ABAC conditions and facts. Relations gated by a
+  // condition are returned only when this context satisfies it (same semantics as Check).
+  google.protobuf.Struct context = 2;
+}
+
+message WhatCanTargetAccessResponse {
+  repeated Relation relations = 1;
+}
+
+// New API
+message SaveDSLSchemaRequest {
+  string dsl = 1 [(validate).string = {max_len: 100000}];
+}
+
+message SaveDSLSchemaResponse {
+}
+
+message Tuple {
+  string resource = 1 [(validate).string = {max_len: 1000}];
+  string resourceType = 2 [(validate).string = {max_len: 100}];
+  string relation = 3 [(validate).string = {max_len: 100}];
+  string target = 4 [(validate).string = {max_len: 1000}];
+  string targetType = 5 [(validate).string = {max_len: 100, optional: true}]; // marked optional for backwards compatibility to allow deleting old tuples without defining targetType, but enforced as mandatory in code logic for other operations
+}
+
+// A tuple paired with an optional per-tuple ABAC context, for Check requests that need a distinct
+// context per tuple. When context is unset, the request-level CheckRequest.context applies.
+message CheckTuple {
+  Tuple tuple = 1 [(validate).message = {required: true}];
+  google.protobuf.Struct context = 2;
+}
+
+message CreateTuplesRequest {
+  repeated Tuple tuples = 1;
+}
+
+message CreateTuplesResponse {
+}
+
+message CheckRequest {
+  // Deprecated: prefer checkTuples; kept for backwards compatibility.
+  repeated Tuple tuples = 1;
+  bool computePaths = 2;
+  // Optional flat key-value context map for evaluating ABAC conditions; applies to all tuples unless a
+  // checkTuples entry carries its own context.
+  google.protobuf.Struct context = 3;
+  // Optional per-tuple-context variant. Set either tuples or checkTuples (not both); each checkTuple's
+  // context overrides the request-level context above.
+  repeated CheckTuple checkTuples = 4;
+  // When true, include per-tuple evaluated conditions and their results in the response
+  bool listConditions = 5;
+}
+
+message CheckResponseTuple {
+  bool allowed = 1;
+  Tuple tuple = 2;
+  CheckResponseInfo info = 3;
+}
+
+message CheckResponseInfo {
+	// A relation is considered "direct" if, based solely on the schema, its "allowed" state can only be
+	// changed by creating or deleting relations involving its resource, its target, or both (including itself)
+	bool direct = 1;
+	// if the check succeeded, includes the full path of intermediate relations between the target and the resource
+	CheckPath path = 2;
+	// true if the result was determined by evaluating a CEL condition
+	bool conditional = 3;
+	// when the condition could not be fully evaluated, lists the missing context variable names
+	repeated string missingContext = 4;
+	// when CEL condition evaluation failed (e.g. invalid context value type), contains the error message;
+	// the check still returns 200 with allowed=false
+	string conditionalErr = 5;
+	// per-tuple error when the tuple is invalid; currently surfaced via AuthZEN's context.error (spec §7.2.1)
+	CheckResponseError error = 6;
+	// true if a fact participated
+	bool factUsed = 7;
+	// Condition.id lists of conditions that evaluated true/false
+	repeated int32 trueConditions = 8;
+	repeated int32 falseConditions = 9;
+}
+
+message CheckResponseError {
+	int32 status = 1;
+	string message = 2;
+}
+
+message CheckPath {
+	repeated CheckPathStep steps = 1;
+}
+
+message CheckPathStep{
+	CheckPathStepType stepType = 1;
+	Tuple tuple = 2;
+	string permission = 3;
+	repeated CheckPath subPaths = 4;
+}
+
+enum CheckPathStepType {
+	UNKNOWN = 0;
+	RELATION = 1;
+	INTERSECTION = 2;
+}
+
+message CheckResponse {
+  repeated CheckResponseTuple tuples = 1;
+  string schemaVersion = 2;
+}
+
+message DeleteTuplesRequest {
+  repeated Tuple tuples = 1;
+}
+
+message DeleteTuplesResponse {
+}

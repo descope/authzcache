@@ -5,7 +5,7 @@ import "google/api/annotations.proto";
 import "mocker.proto";
 import "openapiv3/annotations.proto";
 import "validate.proto";
-import "v1/authz.proto";
+import "fga.proto";
 
 
 option go_package = "github.com/descope/authzcache/pkg/authzcache/proto/v1";

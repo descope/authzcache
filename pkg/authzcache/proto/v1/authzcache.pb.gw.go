@@ -14,7 +14,6 @@ import (
 	"io"
 	"net/http"
 
-	v1_1 "github.com/descope/backend/authzservice/pkg/authzservice/proto/v1"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/utilities"
 	"google.golang.org/grpc"
@@ -38,7 +37,7 @@ var (
 
 func request_AuthzCache_CreateFGASchema_0(ctx context.Context, marshaler runtime.Marshaler, client AuthzCacheClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq v1_1.SaveDSLSchemaRequest
+		protoReq SaveDSLSchemaRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -53,7 +52,7 @@ func request_AuthzCache_CreateFGASchema_0(ctx context.Context, marshaler runtime
 
 func local_request_AuthzCache_CreateFGASchema_0(ctx context.Context, marshaler runtime.Marshaler, server AuthzCacheServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq v1_1.SaveDSLSchemaRequest
+		protoReq SaveDSLSchemaRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -65,7 +64,7 @@ func local_request_AuthzCache_CreateFGASchema_0(ctx context.Context, marshaler r
 
 func request_AuthzCache_CreateFGARelations_0(ctx context.Context, marshaler runtime.Marshaler, client AuthzCacheClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq v1_1.CreateTuplesRequest
+		protoReq CreateTuplesRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -80,7 +79,7 @@ func request_AuthzCache_CreateFGARelations_0(ctx context.Context, marshaler runt
 
 func local_request_AuthzCache_CreateFGARelations_0(ctx context.Context, marshaler runtime.Marshaler, server AuthzCacheServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq v1_1.CreateTuplesRequest
+		protoReq CreateTuplesRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -92,7 +91,7 @@ func local_request_AuthzCache_CreateFGARelations_0(ctx context.Context, marshale
 
 func request_AuthzCache_DeleteFGARelations_0(ctx context.Context, marshaler runtime.Marshaler, client AuthzCacheClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq v1_1.DeleteTuplesRequest
+		protoReq DeleteTuplesRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -107,7 +106,7 @@ func request_AuthzCache_DeleteFGARelations_0(ctx context.Context, marshaler runt
 
 func local_request_AuthzCache_DeleteFGARelations_0(ctx context.Context, marshaler runtime.Marshaler, server AuthzCacheServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq v1_1.DeleteTuplesRequest
+		protoReq DeleteTuplesRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -119,7 +118,7 @@ func local_request_AuthzCache_DeleteFGARelations_0(ctx context.Context, marshale
 
 func request_AuthzCache_Check_0(ctx context.Context, marshaler runtime.Marshaler, client AuthzCacheClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq v1_1.CheckRequest
+		protoReq CheckRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -134,7 +133,7 @@ func request_AuthzCache_Check_0(ctx context.Context, marshaler runtime.Marshaler
 
 func local_request_AuthzCache_Check_0(ctx context.Context, marshaler runtime.Marshaler, server AuthzCacheServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq v1_1.CheckRequest
+		protoReq CheckRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -146,7 +145,7 @@ func local_request_AuthzCache_Check_0(ctx context.Context, marshaler runtime.Mar
 
 func request_AuthzCache_WhoCanAccess_0(ctx context.Context, marshaler runtime.Marshaler, client AuthzCacheClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq v1_1.WhoCanAccessRequest
+		protoReq WhoCanAccessRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -161,7 +160,7 @@ func request_AuthzCache_WhoCanAccess_0(ctx context.Context, marshaler runtime.Ma
 
 func local_request_AuthzCache_WhoCanAccess_0(ctx context.Context, marshaler runtime.Marshaler, server AuthzCacheServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq v1_1.WhoCanAccessRequest
+		protoReq WhoCanAccessRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -173,7 +172,7 @@ func local_request_AuthzCache_WhoCanAccess_0(ctx context.Context, marshaler runt
 
 func request_AuthzCache_WhatCanTargetAccess_0(ctx context.Context, marshaler runtime.Marshaler, client AuthzCacheClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq v1_1.WhatCanTargetAccessRequest
+		protoReq WhatCanTargetAccessRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
@@ -188,7 +187,7 @@ func request_AuthzCache_WhatCanTargetAccess_0(ctx context.Context, marshaler run
 
 func local_request_AuthzCache_WhatCanTargetAccess_0(ctx context.Context, marshaler runtime.Marshaler, server AuthzCacheServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq v1_1.WhatCanTargetAccessRequest
+		protoReq WhatCanTargetAccessRequest
 		metadata runtime.ServerMetadata
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {

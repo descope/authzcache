@@ -6,7 +6,6 @@ import (
 	"github.com/descope/authzcache/internal/services"
 	se "github.com/descope/authzcache/pkg/authzcache/errors"
 	authczv1 "github.com/descope/authzcache/pkg/authzcache/proto/v1"
-	authzv1 "github.com/descope/backend/authzservice/pkg/authzservice/proto/v1"
 	cctx "github.com/descope/backend/common/pkg/common/context"
 	"github.com/descope/go-sdk/descope"
 )
@@ -20,7 +19,7 @@ func New(authzCache services.AuthzCache) *authzController {
 	return &authzController{authzCache: authzCache}
 }
 
-func (ac *authzController) CreateFGASchema(ctx context.Context, req *authzv1.SaveDSLSchemaRequest) (*authzv1.SaveDSLSchemaResponse, error) {
+func (ac *authzController) CreateFGASchema(ctx context.Context, req *authczv1.SaveDSLSchemaRequest) (*authczv1.SaveDSLSchemaResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Saving authz DSL schema")
 
 	err := ac.authzCache.CreateFGASchema(ctx, req.Dsl)
@@ -28,10 +27,10 @@ func (ac *authzController) CreateFGASchema(ctx context.Context, req *authzv1.Sav
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
-	return &authzv1.SaveDSLSchemaResponse{}, err
+	return &authczv1.SaveDSLSchemaResponse{}, err
 }
 
-func (ac *authzController) CreateFGARelations(ctx context.Context, req *authzv1.CreateTuplesRequest) (*authzv1.CreateTuplesResponse, error) {
+func (ac *authzController) CreateFGARelations(ctx context.Context, req *authczv1.CreateTuplesRequest) (*authczv1.CreateTuplesResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Creating authz tuples")
 	relations := relationsFromTuples(req.Tuples)
 
@@ -40,10 +39,10 @@ func (ac *authzController) CreateFGARelations(ctx context.Context, req *authzv1.
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
-	return &authzv1.CreateTuplesResponse{}, nil
+	return &authczv1.CreateTuplesResponse{}, nil
 }
 
-func (ac *authzController) DeleteFGARelations(ctx context.Context, req *authzv1.DeleteTuplesRequest) (*authzv1.DeleteTuplesResponse, error) {
+func (ac *authzController) DeleteFGARelations(ctx context.Context, req *authczv1.DeleteTuplesRequest) (*authczv1.DeleteTuplesResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Deleting authz tuples")
 	relations := relationsFromTuples(req.Tuples)
 
@@ -52,10 +51,10 @@ func (ac *authzController) DeleteFGARelations(ctx context.Context, req *authzv1.
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
-	return &authzv1.DeleteTuplesResponse{}, nil
+	return &authczv1.DeleteTuplesResponse{}, nil
 }
 
-func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest) (*authzv1.CheckResponse, error) {
+func (ac *authzController) Check(ctx context.Context, req *authczv1.CheckRequest) (*authczv1.CheckResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Checking authz")
 	relations := relationsFromTuples(req.Tuples)
 	var extraContext map[string]any
@@ -68,11 +67,11 @@ func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest)
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
-	responseTuples := make([]*authzv1.CheckResponseTuple, len(checks))
+	responseTuples := make([]*authczv1.CheckResponseTuple, len(checks))
 	for i := range checks {
 		check := checks[i]
-		responseTuples[i] = &authzv1.CheckResponseTuple{
-			Tuple: &authzv1.Tuple{
+		responseTuples[i] = &authczv1.CheckResponseTuple{
+			Tuple: &authczv1.Tuple{
 				Resource:     check.Relation.Resource,
 				ResourceType: check.Relation.ResourceType,
 				Relation:     check.Relation.Relation,
@@ -80,7 +79,7 @@ func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest)
 				TargetType:   check.Relation.TargetType,
 			},
 			Allowed: check.Allowed,
-			Info: &authzv1.CheckResponseInfo{
+			Info: &authczv1.CheckResponseInfo{
 				Direct:         check.Info.Direct,
 				Conditional:    check.Info.Conditional,
 				MissingContext: check.Info.MissingContext,
@@ -89,10 +88,10 @@ func (ac *authzController) Check(ctx context.Context, req *authzv1.CheckRequest)
 		}
 	}
 
-	return &authzv1.CheckResponse{Tuples: responseTuples}, nil
+	return &authczv1.CheckResponse{Tuples: responseTuples}, nil
 }
 
-func (ac *authzController) WhoCanAccess(ctx context.Context, req *authzv1.WhoCanAccessRequest) (*authzv1.WhoCanAccessResponse, error) {
+func (ac *authzController) WhoCanAccess(ctx context.Context, req *authczv1.WhoCanAccessRequest) (*authczv1.WhoCanAccessResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Checking who can access")
 	var extraContext map[string]any
 	if req.Context != nil {
@@ -102,10 +101,10 @@ func (ac *authzController) WhoCanAccess(ctx context.Context, req *authzv1.WhoCan
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
-	return &authzv1.WhoCanAccessResponse{Targets: targets}, nil
+	return &authczv1.WhoCanAccessResponse{Targets: targets}, nil
 }
 
-func (ac *authzController) WhatCanTargetAccess(ctx context.Context, req *authzv1.WhatCanTargetAccessRequest) (*authzv1.WhatCanTargetAccessResponse, error) {
+func (ac *authzController) WhatCanTargetAccess(ctx context.Context, req *authczv1.WhatCanTargetAccessRequest) (*authczv1.WhatCanTargetAccessResponse, error) {
 	cctx.Logger(ctx).Info().Msg("Checking what can target access")
 	var extraContext map[string]any
 	if req.Context != nil {
@@ -115,15 +114,15 @@ func (ac *authzController) WhatCanTargetAccess(ctx context.Context, req *authzv1
 	if err != nil {
 		return nil, se.ServiceErrorFromSdkError(ctx, err)
 	}
-	protoRelations := make([]*authzv1.Relation, len(relations))
+	protoRelations := make([]*authczv1.Relation, len(relations))
 	for i, r := range relations {
 		protoRelations[i] = relationFromAuthzRelation(r)
 	}
-	return &authzv1.WhatCanTargetAccessResponse{Relations: protoRelations}, nil
+	return &authczv1.WhatCanTargetAccessResponse{Relations: protoRelations}, nil
 }
 
-func relationFromAuthzRelation(r *descope.AuthzRelation) *authzv1.Relation {
-	return &authzv1.Relation{
+func relationFromAuthzRelation(r *descope.AuthzRelation) *authczv1.Relation {
+	return &authczv1.Relation{
 		Resource:                             r.Resource,
 		RelationDefinition:                   r.RelationDefinition,
 		Namespace:                            r.Namespace,
@@ -134,7 +133,7 @@ func relationFromAuthzRelation(r *descope.AuthzRelation) *authzv1.Relation {
 	}
 }
 
-func relationsFromTuples(tuples []*authzv1.Tuple) []*descope.FGARelation {
+func relationsFromTuples(tuples []*authczv1.Tuple) []*descope.FGARelation {
 	relations := make([]*descope.FGARelation, len(tuples))
 	for i, t := range tuples {
 		relations[i] = &descope.FGARelation{
