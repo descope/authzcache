@@ -38,6 +38,7 @@ func serve() {
 		remote.ManagementKey(),
 		config.GetMetricsReportIntervalInSeconds(),
 		config.GetMetricsReportEnabled(),
+		config.GetMetricsLogsEnabled(),
 	)
 
 	ctx, err := server.StartServerWithGatewayAndOptions(
@@ -46,13 +47,14 @@ func serve() {
 				cctx.Logger(ctx).Info().
 					Str("git_sha", cconfig.GetGitSha()).
 					Msg("Starting authzcache")
-				reporter.Start(ctx)
 				//authz cache service init
 				as, err := services.New(ctx, caches.NewProjectAuthzCache, remote.NewDescopeClientWithProjectID, collector)
 				if err != nil {
 					cctx.Logger(ctx).Err(err).Msg("Failed creating authz cache")
 					return err
 				}
+				reporter.SetCacheStatsProvider(func() map[string]caches.Stats { return as.CacheStats(ctx) })
+				reporter.Start(ctx)
 				ctrl := controllers.New(as)
 				authzcv1.RegisterAuthzCacheServer(s, ctrl)
 				return nil

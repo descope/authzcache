@@ -196,6 +196,30 @@ func TestUpdateCacheWithAddedRelations_DropsStaleDenial(t *testing.T) {
 	assert.False(t, ok, "a cached denial must not survive the create that grants it")
 }
 
+func TestStats(t *testing.T) {
+	ctx := context.TODO()
+	cache, _ := setup(t)
+	assert.Equal(t, Stats{}, cache.Stats(ctx))
+
+	direct := &descope.FGARelation{Resource: "folder1", Target: "u1", Relation: "owner"}
+	indirect := &descope.FGARelation{Resource: "folder2", Target: "u2", Relation: "can_edit"}
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{
+		{Allowed: true, Relation: direct, Info: &descope.FGACheckInfo{Direct: true}},
+		{Allowed: true, Relation: indirect, Info: &descope.FGACheckInfo{Direct: false}},
+	})
+
+	s := cache.Stats(ctx)
+	assert.Equal(t, 1, s.DirectEntries)
+	assert.Equal(t, 1, s.IndirectEntries)
+
+	cache.UpdateCacheWithDeletedRelations(ctx, []*descope.FGARelation{direct})
+	s = cache.Stats(ctx)
+	assert.Equal(t, 0, s.DirectEntries)
+
+	cache.SetWhoCanAccessCached(ctx, "doc1", "viewer", "docs", []string{"user1", "user2"})
+	assert.Equal(t, 1, cache.Stats(ctx).LookupEntries)
+}
+
 func TestUpdateCacheWithAddedRelations_AddsToLookupCache(t *testing.T) {
 	ctx := context.TODO()
 	cache, _ := setup(t)

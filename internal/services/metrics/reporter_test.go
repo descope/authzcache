@@ -6,9 +6,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/descope/authzcache/internal/services/caches"
 	"github.com/descope/backend/common/pkg/common/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,8 +33,14 @@ func TestReporterPostsMetrics(t *testing.T) {
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, CandidatesCount: 10, FilteredCount: 2, ResultSize: 8, DurationMs: 5})
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: false, CandidatesCount: 0, FilteredCount: 0, ResultSize: 3, DurationMs: 30})
 
-	reporter := NewReporter(collector, srv.URL, "mgmt-key", 1, true)
+	reporter := NewReporter(collector, srv.URL, "mgmt-key", 1, true, false)
+	called := 0
+	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
+		called++
+		return map[string]caches.Stats{"proj1": {DirectEntries: 2}}
+	})
 	reporter.report(context.Background())
+	require.Equal(t, 1, called, "sizes are read once per reporting window")
 
 	require.Equal(t, "Bearer proj1:mgmt-key", receivedAuth)
 	require.Len(t, receivedBody.Metrics, 1)
@@ -52,6 +60,45 @@ func TestReporterPostsMetrics(t *testing.T) {
 	require.Equal(t, int64(30), m.MaxDurationMissMs)
 	require.Equal(t, int64(5), m.MinDurationMs)
 	require.Equal(t, int64(30), m.MaxDurationMs)
+
+	require.NotNil(t, receivedBody.Sizes)
+	require.Equal(t, 2, receivedBody.Sizes.DirectEntries)
+}
+
+func TestReporterPostsSizesForIdleProject(t *testing.T) {
+	var receivedBody metricsRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = utils.Unmarshal(body, &receivedBody)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	reporter := NewReporter(NewCollector(), srv.URL, "key", 1, true, false)
+	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
+		return map[string]caches.Stats{"proj1": {IndirectEntries: 7}}
+	})
+	reporter.report(context.Background())
+
+	require.Empty(t, receivedBody.Metrics)
+	require.NotNil(t, receivedBody.Sizes)
+	require.Equal(t, 7, receivedBody.Sizes.IndirectEntries)
+}
+
+func TestReporterSkipsEmptySizes(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called = true
+	}))
+	defer srv.Close()
+
+	reporter := NewReporter(NewCollector(), srv.URL, "key", 1, true, false)
+	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
+		return map[string]caches.Stats{"proj1": {}}
+	})
+	reporter.report(context.Background())
+
+	require.False(t, called, "an idle project with nothing cached should not post")
 }
 
 func TestReporterDisabled(t *testing.T) {
@@ -64,13 +111,60 @@ func TestReporterDisabled(t *testing.T) {
 	collector := NewCollector()
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
 
-	reporter := NewReporter(collector, srv.URL, "key", 1, false)
-	ctx, cancel := context.WithCancel(context.Background())
-	reporter.Start(ctx)
-	cancel()
-	time.Sleep(50 * time.Millisecond)
+	reporter := NewReporter(collector, srv.URL, "key", 1, false, false)
+	statsRead := false
+	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
+		statsRead = true
+		return nil
+	})
+	reporter.report(context.Background())
 
 	require.False(t, called, "disabled reporter should not post")
+	require.True(t, statsRead, "sizes are read even when not posted")
+	require.Empty(t, collector.SnapshotAndReset(), "window is drained even when not posted")
+}
+
+func TestReporterLogsOnly(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called = true
+	}))
+	defer srv.Close()
+
+	collector := NewCollector()
+	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
+	reporter := NewReporter(collector, srv.URL, "key", 1, false, true)
+	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
+		return map[string]caches.Stats{"proj1": {DirectEntries: 2}}
+	})
+	reporter.report(context.Background())
+
+	require.False(t, called, "logs-only mode must not post")
+}
+
+func TestReporterLogsAndReportingDisabled(t *testing.T) {
+	var called, statsRead atomic.Bool
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		called.Store(true)
+	}))
+	defer srv.Close()
+
+	collector := NewCollector()
+	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
+	reporter := NewReporter(collector, srv.URL, "key", 1, false, false)
+	reporter.interval = 10 * time.Millisecond
+	reporter.SetCacheStatsProvider(func() map[string]caches.Stats {
+		statsRead.Store(true)
+		return nil
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	reporter.Start(ctx)
+	time.Sleep(50 * time.Millisecond)
+
+	require.False(t, called.Load(), "nothing is posted")
+	require.False(t, statsRead.Load(), "the reporting loop does not run")
+	require.NotEmpty(t, collector.SnapshotAndReset(), "the window is never drained")
 }
 
 func TestReporterHandlesHTTPError(t *testing.T) {
@@ -84,7 +178,7 @@ func TestReporterHandlesHTTPError(t *testing.T) {
 	collector := NewCollector()
 	collector.Record("proj1", APIWhoCanAccess, CallMetrics{CacheHit: true, DurationMs: 1})
 
-	reporter := NewReporter(collector, srv.URL, "key", 1, true)
+	reporter := NewReporter(collector, srv.URL, "key", 1, true, false)
 	// should not panic on 500
 	reporter.report(context.Background())
 	require.Equal(t, 1, callCount)
@@ -111,7 +205,7 @@ func TestReporterComputesAverages(t *testing.T) {
 		})
 	}
 
-	reporter := NewReporter(collector, srv.URL, "key", 1, true)
+	reporter := NewReporter(collector, srv.URL, "key", 1, true, false)
 	reporter.report(context.Background())
 
 	require.Len(t, receivedBody.Metrics, 1)
@@ -138,7 +232,7 @@ func TestReporterSkipsEmptySnapshot(t *testing.T) {
 	defer srv.Close()
 
 	collector := NewCollector()
-	reporter := NewReporter(collector, srv.URL, "key", 1, true)
+	reporter := NewReporter(collector, srv.URL, "key", 1, true, false)
 	reporter.report(context.Background())
 
 	require.False(t, called, "no metrics to report, should not post")
