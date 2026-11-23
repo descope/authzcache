@@ -103,6 +103,11 @@ func (a *authzCache) DeleteFGARelations(ctx context.Context, relations []*descop
 }
 
 func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any) ([]*descope.FGACheck, error) {
+	return a.check(ctx, relations, extraContext, true)
+}
+
+// check skips the Check metric when it filters a lookup's candidates, so the lookup isn't counted twice.
+func (a *authzCache) check(ctx context.Context, relations []*descope.FGARelation, extraContext map[string]any, recordMetric bool) ([]*descope.FGACheck, error) {
 	// nothing to do: never reaches the backend, so don't create a project or record metrics for it
 	if len(relations) == 0 {
 		return nil, nil
@@ -118,7 +123,9 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 	// if all relations were found in cache, return
 	if len(toCheckViaSDK) == 0 {
 		// candidatesCount = 0 (nothing sent to SDK); filteredCount = 0 (Check doesn't filter, every relation gets an answer)
-		a.recordMetric(ctx, metrics.APICheck, true, 0, 0, len(cachedChecks), start)
+		if recordMetric {
+			a.recordMetric(ctx, metrics.APICheck, true, 0, 0, len(cachedChecks), start)
+		}
 		return cachedChecks, nil
 	}
 	// fetch missing relations from sdk
@@ -143,7 +150,9 @@ func (a *authzCache) Check(ctx context.Context, relations []*descope.FGARelation
 		}
 	}
 	// candidatesCount = relations sent to SDK (not in cache); filteredCount = 0 (Check doesn't filter, every relation gets an answer)
-	a.recordMetric(ctx, metrics.APICheck, false, len(toCheckViaSDK), 0, len(result), start)
+	if recordMetric {
+		a.recordMetric(ctx, metrics.APICheck, false, len(toCheckViaSDK), 0, len(result), start)
+	}
 	return result, nil
 }
 
@@ -233,7 +242,7 @@ func (a *authzCache) filterWhoCanAccessCandidates(ctx context.Context, resource,
 			TargetType:   "*", // WhoCanAccess is TargetType-agnostic
 		}
 	}
-	checks, err := a.Check(ctx, relations, extraContext)
+	checks, err := a.check(ctx, relations, extraContext, false)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +295,7 @@ func (a *authzCache) filterWhatCanTargetAccessCandidates(ctx context.Context, ta
 			TargetType:   "*", // WhatCanTargetAccess is TargetType-agnostic
 		}
 	}
-	checks, err := a.Check(ctx, relations, extraContext)
+	checks, err := a.check(ctx, relations, extraContext, false)
 	if err != nil {
 		return nil, err
 	}
