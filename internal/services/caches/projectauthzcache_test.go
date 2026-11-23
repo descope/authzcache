@@ -1396,3 +1396,36 @@ func TestUpdateCacheWithAddedRelations_DoesNotPreCacheDirect(t *testing.T) {
 	assert.Empty(t, checks, "created tuple must not be served as a direct grant")
 	assert.Len(t, unchecked, 1)
 }
+
+func TestRemotePolling_DoesNotBlockReadsDuringFetch(t *testing.T) {
+	ctx := context.TODO()
+	cache, remote := setup(t)
+	rel := &descope.FGARelation{Resource: "doc1", Target: "u1", Relation: "owner"}
+	cache.UpdateCacheWithChecks(ctx, []*descope.FGACheck{{Allowed: true, Relation: rel, Info: &descope.FGACheckInfo{Direct: true}}})
+	entered, release := make(chan struct{}), make(chan struct{})
+	remote.GetModifiedFunc = func(_ context.Context, _ time.Time) (*descope.AuthzModified, error) {
+		close(entered)
+		<-release
+		return &descope.AuthzModified{}, nil
+	}
+	polled := make(chan struct{})
+	go func() {
+		cache.updateCacheWithRemotePolling(ctx)
+		close(polled)
+	}()
+	<-entered
+
+	read := make(chan bool)
+	go func() {
+		_, _, ok := checkRelation(ctx, cache, rel)
+		read <- ok
+	}()
+	select {
+	case ok := <-read:
+		assert.True(t, ok, "the cached relation is served while the poll is in flight")
+	case <-time.After(time.Second):
+		t.Fatal("a cache read waited for the remote poll")
+	}
+	close(release)
+	<-polled
+}
