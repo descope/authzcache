@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/descope/authzcache/internal/services/caches"
@@ -35,6 +36,7 @@ func (pm *promMetrics) record(projectID string, api APIName, m CallMetrics) {
 type cacheEntries struct {
 	desc  *prometheus.Desc
 	stats func() map[string]caches.Stats
+	seen  *sync.Map // project IDs that ever had entries; they keep reporting 0 after a purge
 }
 
 func (c cacheEntries) Describe(ch chan<- *prometheus.Desc) { ch <- c.desc }
@@ -42,7 +44,11 @@ func (c cacheEntries) Describe(ch chan<- *prometheus.Desc) { ch <- c.desc }
 func (c cacheEntries) Collect(ch chan<- prometheus.Metric) {
 	for projectID, s := range c.stats() {
 		if s == (caches.Stats{}) {
-			continue // never cached anything, e.g. a bogus project ID
+			if _, ok := c.seen.Load(projectID); !ok {
+				continue // never cached anything, e.g. a bogus project ID
+			}
+		} else {
+			c.seen.Store(projectID, struct{}{})
 		}
 		for cache, n := range map[string]int{"direct": s.DirectEntries, "indirect": s.IndirectEntries, "lookup": s.LookupEntries} {
 			ch <- prometheus.MustNewConstMetric(c.desc, prometheus.GaugeValue, float64(n), projectID, cache)
@@ -62,6 +68,7 @@ func newPrometheusHandler(collector *Collector, cacheStats func() map[string]cac
 	reg.MustRegister(pm.calls, pm.duration, cacheEntries{
 		desc:  prometheus.NewDesc("authzcache_cache_entries", "Entries per project cache.", []string{"project_id", "cache"}, nil),
 		stats: cacheStats,
+		seen:  &sync.Map{},
 	})
 	collector.prom.Store(pm)
 	return promhttp.HandlerFor(reg, promhttp.HandlerOpts{})

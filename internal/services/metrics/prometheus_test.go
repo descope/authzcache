@@ -41,3 +41,19 @@ func TestPrometheusHandler(t *testing.T) {
 	assert.NotContains(t, body, "go_memstats", "no Go runtime collectors")
 	assert.NotContains(t, body, `project_id="bogus"`, "projects that never cached anything have no series")
 }
+
+func TestPrometheusCacheEntriesKeepZeroAfterPurge(t *testing.T) {
+	stats := map[string]caches.Stats{"p1": {DirectEntries: 3}}
+	handler := newPrometheusHandler(NewCollector(), func() map[string]caches.Stats { return stats })
+	scrape := func() string {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+		return rec.Body.String()
+	}
+	assert.Contains(t, scrape(), `authzcache_cache_entries{cache="direct",project_id="p1"} 3`)
+
+	stats = map[string]caches.Stats{"p1": {}, "bogus": {}} // p1 purged
+	body := scrape()
+	assert.Contains(t, body, `authzcache_cache_entries{cache="direct",project_id="p1"} 0`, "a purged project reads 0, not missing")
+	assert.NotContains(t, body, `project_id="bogus"`)
+}
