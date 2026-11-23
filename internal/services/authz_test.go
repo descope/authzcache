@@ -186,7 +186,7 @@ func TestCheckEmptyRelations(t *testing.T) {
 	result, err = ac.Check(context.TODO(), []*descope.FGARelation{}, nil)
 	require.NoError(t, err)
 	require.Empty(t, result)
-	require.True(t, mockCache.pollingStarted)
+	require.False(t, mockCache.pollingStarted, "an empty check must not create a project cache")
 }
 
 func TestCheckAllInCache(t *testing.T) {

@@ -3,11 +3,13 @@ package metrics
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/descope/authzcache/internal/services/caches"
+	cconfig "github.com/descope/backend/common/pkg/common/config"
 	cctx "github.com/descope/backend/common/pkg/common/context"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -39,6 +41,9 @@ func (c cacheEntries) Describe(ch chan<- *prometheus.Desc) { ch <- c.desc }
 
 func (c cacheEntries) Collect(ch chan<- prometheus.Metric) {
 	for projectID, s := range c.stats() {
+		if s == (caches.Stats{}) {
+			continue // never cached anything, e.g. a bogus project ID
+		}
 		for cache, n := range map[string]int{"direct": s.DirectEntries, "indirect": s.IndirectEntries, "lookup": s.LookupEntries} {
 			ch <- prometheus.MustNewConstMetric(c.desc, prometheus.GaugeValue, float64(n), projectID, cache)
 		}
@@ -66,10 +71,18 @@ func newPrometheusHandler(collector *Collector, cacheStats func() map[string]cac
 func ServePrometheus(ctx context.Context, port int, collector *Collector, cacheStats func() map[string]caches.Stats) {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", newPrometheusHandler(collector, cacheStats))
-	srv := &http.Server{Addr: ":" + strconv.Itoa(port), Handler: mux, ReadHeaderTimeout: 10 * time.Second}
-	cctx.Go(ctx, func(ctx context.Context) {
-		<-ctx.Done()
-		_ = srv.Close()
+	srv := &http.Server{Addr: net.JoinHostPort(cconfig.GetHTTPHost(), strconv.Itoa(port)), Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	// drain like the gateway does, so a /metrics read isn't cut off on SIGTERM
+	cctx.ShutdownHandler(ctx).AddPreShutdownStep(func(ctx context.Context) error {
+		if timeout := time.Duration(cconfig.GetGracefulShutdownDrainTimeout()) * time.Second; timeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, timeout)
+			defer cancel()
+		}
+		if err := srv.Shutdown(ctx); err != nil {
+			_ = srv.Close() // notest
+		}
+		return nil
 	})
 	cctx.Go(ctx, func(ctx context.Context) {
 		cctx.Logger(ctx).Info().Int("port", port).Msg("Serving Prometheus metrics")

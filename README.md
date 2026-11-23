@@ -55,7 +55,7 @@ New entries, however, do not appear until the TTL expires. A relation granted af
 
 ### Prometheus metrics
 
-With `AUTHZCACHE_METRICS_ENDPOINT_ENABLED=TRUE`, the metrics are served at `GET /metrics` on `AUTHZCACHE_METRICS_ENDPOINT_PORT`, separate from the API port. The endpoint has no authentication, so don't expose that port outside the cluster. Counters accumulate from startup.
+With `AUTHZCACHE_METRICS_ENDPOINT_ENABLED=TRUE`, the metrics are served at `GET /metrics` on `AUTHZCACHE_METRICS_ENDPOINT_PORT`, separate from the API port and bound to `HTTP_HOST` like the API (default `127.0.0.1`); set `HTTP_HOST=0.0.0.0` to scrape it from other pods. The endpoint has no authentication, so don't expose that port outside the cluster. Counters accumulate from startup.
 
 | Metric | Type | Labels |
 |---|---|---|

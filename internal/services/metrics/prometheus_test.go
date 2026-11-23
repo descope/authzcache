@@ -15,7 +15,7 @@ func TestPrometheusHandler(t *testing.T) {
 	collector := NewCollector()
 	collector.Record("p1", APICheck, CallMetrics{CacheHit: true, DurationMs: 1}) // before the endpoint: not counted
 	handler := newPrometheusHandler(collector, func() map[string]caches.Stats {
-		return map[string]caches.Stats{"p1": {DirectEntries: 3, IndirectEntries: 2}}
+		return map[string]caches.Stats{"p1": {DirectEntries: 3, IndirectEntries: 2}, "bogus": {}}
 	})
 	collector.Record("p1", APIWhoCanAccess, CallMetrics{CacheHit: true, CandidatesCount: 4, FilteredCount: 1, ResultSize: 3, Duration: 300 * time.Microsecond})
 	collector.Record("p1", APICheck, CallMetrics{CandidatesCount: 7, ResultSize: 7, Duration: 40 * time.Millisecond})
@@ -39,4 +39,5 @@ func TestPrometheusHandler(t *testing.T) {
 	}
 	assert.NotContains(t, body, `authzcache_calls_total{api="Check",project_id="p1",result="hit"}`, "calls before the endpoint started are not counted")
 	assert.NotContains(t, body, "go_memstats", "no Go runtime collectors")
+	assert.NotContains(t, body, `project_id="bogus"`, "projects that never cached anything have no series")
 }
