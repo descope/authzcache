@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/descope/authzcache/internal/services/caches"
 	cconfig "github.com/descope/backend/common/pkg/common/config"
 	cctx "github.com/descope/backend/common/pkg/common/context"
 	"github.com/descope/backend/common/pkg/common/utils"
@@ -50,34 +51,49 @@ type APIMetricsPayload struct {
 	MaxDurationMissMs int64   `json:"max_duration_miss_ms"`
 }
 
-type metricsRequest struct {
-	Metrics []APIMetricsPayload `json:"metrics"`
+type SizesPayload struct {
+	DirectEntries   int `json:"direct_entries"`
+	IndirectEntries int `json:"indirect_entries"`
+	LookupEntries   int `json:"lookup_entries"`
 }
 
-// Reporter is a background goroutine that periodically snapshots metrics and POSTs them.
+type metricsRequest struct {
+	Metrics []APIMetricsPayload `json:"metrics"`
+	Sizes   *SizesPayload       `json:"sizes,omitempty"`
+}
+
+// Reporter is a background goroutine that periodically snapshots metrics, then POSTs and/or logs them.
 type Reporter struct {
 	collector     *Collector
 	customBaseURL string
 	managementKey string
 	interval      time.Duration
 	enabled       bool
+	logsEnabled   bool
 	httpClient    *http.Client
+	cacheStats    func() map[string]caches.Stats
 }
 
-func NewReporter(collector *Collector, baseURL, managementKey string, intervalSeconds int, enabled bool) *Reporter {
+// SetCacheStatsProvider must be called before Start, since the reporting goroutine reads the field.
+func (r *Reporter) SetCacheStatsProvider(f func() map[string]caches.Stats) {
+	r.cacheStats = f
+}
+
+func NewReporter(collector *Collector, baseURL, managementKey string, intervalSeconds int, enabled, logsEnabled bool) *Reporter {
 	return &Reporter{
 		collector:     collector,
 		customBaseURL: baseURL,
 		managementKey: managementKey,
 		interval:      time.Duration(intervalSeconds) * time.Second,
 		enabled:       enabled,
+		logsEnabled:   logsEnabled,
 		httpClient:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
 // Start launches the background reporting goroutine.
 func (r *Reporter) Start(ctx context.Context) {
-	if !r.enabled {
+	if !r.enabled && !r.logsEnabled {
 		return
 	}
 	cctx.Go(ctx, r.run)
@@ -96,12 +112,38 @@ func (r *Reporter) run(ctx context.Context) {
 	}
 }
 
-func (r *Reporter) report(ctx context.Context) {
-	snapshot := r.collector.SnapshotAndReset()
-	for projectID, byAPI := range snapshot {
-		if len(byAPI) == 0 {
-			continue
+func (r *Reporter) cacheSizes() map[string]*SizesPayload {
+	if r.cacheStats == nil {
+		return nil
+	}
+	stats := r.cacheStats()
+	sizes := make(map[string]*SizesPayload, len(stats))
+	for projectID, s := range stats {
+		if s == (caches.Stats{}) {
+			continue // nothing cached, nothing to report
 		}
+		sizes[projectID] = &SizesPayload{
+			DirectEntries:   s.DirectEntries,
+			IndirectEntries: s.IndirectEntries,
+			LookupEntries:   s.LookupEntries,
+		}
+	}
+	return sizes
+}
+
+func (r *Reporter) report(ctx context.Context) {
+	sizes := r.cacheSizes()
+	snapshot := r.collector.SnapshotAndReset()
+	// idle projects still report their sizes
+	projectIDs := make(map[string]struct{}, len(snapshot)+len(sizes))
+	for projectID := range snapshot {
+		projectIDs[projectID] = struct{}{}
+	}
+	for projectID := range sizes {
+		projectIDs[projectID] = struct{}{}
+	}
+	for projectID := range projectIDs {
+		byAPI := snapshot[projectID]
 		payloads := make([]APIMetricsPayload, 0, len(byAPI))
 		for api, agg := range byAPI {
 			if agg.TotalCalls == 0 {
@@ -109,10 +151,17 @@ func (r *Reporter) report(ctx context.Context) {
 			}
 			payloads = append(payloads, buildPayload(api, agg))
 		}
-		if len(payloads) == 0 {
+		body := metricsRequest{Metrics: payloads, Sizes: sizes[projectID]}
+		if len(body.Metrics) == 0 && body.Sizes == nil {
 			continue
 		}
-		if err := r.post(ctx, projectID, payloads); err != nil {
+		if r.logsEnabled {
+			cctx.Logger(ctx).Info().Str("project_id", projectID).Interface("report", body).Msg("FGA cache metrics report")
+		}
+		if !r.enabled {
+			continue
+		}
+		if err := r.post(ctx, projectID, body); err != nil {
 			cctx.Logger(ctx).Error().Err(err).Str("project_id", projectID).Msg("Failed to report FGA cache metrics; metrics for this window are lost")
 		}
 	}
@@ -164,8 +213,8 @@ func buildPayload(api APIName, agg *AggregatedMetrics) APIMetricsPayload {
 	return p
 }
 
-func (r *Reporter) post(ctx context.Context, projectID string, payloads []APIMetricsPayload) error {
-	body, err := utils.Marshal(metricsRequest{Metrics: payloads})
+func (r *Reporter) post(ctx context.Context, projectID string, payload metricsRequest) error {
+	body, err := utils.Marshal(payload)
 	if err != nil {
 		return err
 	}

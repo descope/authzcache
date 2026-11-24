@@ -180,8 +180,24 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/authzv1.Tuple'
+                    description: 'Deprecated: prefer checkTuples; kept for backwards compatibility.'
                 computePaths:
                     type: boolean
+                context:
+                    type: object
+                    description: |-
+                        Optional flat key-value context map for evaluating ABAC conditions; applies to all tuples unless a
+                         checkTuples entry carries its own context.
+                checkTuples:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/authzv1.CheckTuple'
+                    description: |-
+                        Optional per-tuple-context variant. Set either tuples or checkTuples (not both); each checkTuple's
+                         context overrides the request-level context above.
+                listConditions:
+                    type: boolean
+                    description: When true, include per-tuple evaluated conditions and their results in the response
         authzv1.CheckResponse:
             type: object
             properties:
@@ -189,6 +205,16 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/authzv1.CheckResponseTuple'
+                schemaVersion:
+                    type: string
+        authzv1.CheckResponseError:
+            type: object
+            properties:
+                status:
+                    type: integer
+                    format: int32
+                message:
+                    type: string
         authzv1.CheckResponseInfo:
             type: object
             properties:
@@ -201,6 +227,37 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/authzv1.CheckPath'
                     description: if the check succeeded, includes the full path of intermediate relations between the target and the resource
+                conditional:
+                    type: boolean
+                    description: true if the result was determined by evaluating a CEL condition
+                missingContext:
+                    type: array
+                    items:
+                        type: string
+                    description: when the condition could not be fully evaluated, lists the missing context variable names
+                conditionalErr:
+                    type: string
+                    description: |-
+                        when CEL condition evaluation failed (e.g. invalid context value type), contains the error message;
+                         the check still returns 200 with allowed=false
+                error:
+                    allOf:
+                        - $ref: '#/components/schemas/authzv1.CheckResponseError'
+                    description: per-tuple error when the tuple is invalid; currently surfaced via AuthZEN's context.error (spec §7.2.1)
+                factUsed:
+                    type: boolean
+                    description: true if a fact participated
+                trueConditions:
+                    type: array
+                    items:
+                        type: integer
+                        format: int32
+                    description: Condition.id lists of conditions that evaluated true/false
+                falseConditions:
+                    type: array
+                    items:
+                        type: integer
+                        format: int32
         authzv1.CheckResponseTuple:
             type: object
             properties:
@@ -210,6 +267,16 @@ components:
                     $ref: '#/components/schemas/authzv1.Tuple'
                 info:
                     $ref: '#/components/schemas/authzv1.CheckResponseInfo'
+        authzv1.CheckTuple:
+            type: object
+            properties:
+                tuple:
+                    $ref: '#/components/schemas/authzv1.Tuple'
+                context:
+                    type: object
+            description: |-
+                A tuple paired with an optional per-tuple ABAC context, for Check requests that need a distinct
+                 context per tuple. When context is unset, the request-level CheckRequest.context applies.
         authzv1.CreateTuplesRequest:
             type: object
             properties:
@@ -319,6 +386,11 @@ components:
             properties:
                 target:
                     type: string
+                context:
+                    type: object
+                    description: |-
+                        Optional flat key-value context for evaluating ABAC conditions and facts. Relations gated by a
+                         condition are returned only when this context satisfies it (same semantics as Check).
         authzv1.WhatCanTargetAccessResponse:
             type: object
             properties:
@@ -335,6 +407,14 @@ components:
                     type: string
                 namespace:
                     type: string
+                targetType:
+                    type: string
+                    description: 'Optional: when set, only targets of this type (namespace) are returned. Empty returns all targets.'
+                context:
+                    type: object
+                    description: |-
+                        Optional flat key-value context for evaluating ABAC conditions and facts. Targets whose relation
+                         is gated by a condition are returned only when this context satisfies it (same semantics as Check).
             description: Query the list of users who have the relation to the resource
         authzv1.WhoCanAccessResponse:
             type: object

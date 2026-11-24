@@ -65,6 +65,12 @@ type cachedGrant struct {
 	cond    *conditionalCert
 }
 
+type Stats struct {
+	DirectEntries   int
+	IndirectEntries int
+	LookupEntries   int
+}
+
 type projectAuthzCache struct {
 	schemaCache *descope.FGASchema // schema
 
@@ -105,6 +111,7 @@ type ProjectAuthzCache interface {
 	GetWhatCanTargetAccessCached(ctx context.Context, target string) (relations []*descope.AuthzRelation, ok bool)
 	SetWhatCanTargetAccessCached(ctx context.Context, target string, relations []*descope.AuthzRelation)
 	InvalidateLookupCache(ctx context.Context)
+	Stats(ctx context.Context) Stats
 }
 
 var _ ProjectAuthzCache = &projectAuthzCache{} // ensure projectAuthzCache implements ProjectAuthzCache
@@ -690,6 +697,19 @@ func (pc *projectAuthzCache) SetWhatCanTargetAccessCached(ctx context.Context, t
 		CachedAt:  now,
 		ExpiresAt: now.Add(pc.lookupCacheTTL),
 	})
+}
+
+func (pc *projectAuthzCache) Stats(ctx context.Context) Stats {
+	pc.mutex.RLock()
+	defer pc.mutex.RUnlock()
+	s := Stats{
+		DirectEntries:   pc.directRelationCache.Len(ctx),
+		IndirectEntries: pc.indirectRelationCache.Len(ctx),
+	}
+	if pc.lookupCache != nil {
+		s.LookupEntries = pc.lookupCache.Len(ctx)
+	}
+	return s
 }
 
 func (pc *projectAuthzCache) InvalidateLookupCache(ctx context.Context) {
