@@ -623,6 +623,7 @@ func TestWhoCanAccess_MetricsRecorded_CacheHit(t *testing.T) {
 	require.NoError(t, err)
 	snapshot := collector.SnapshotAndReset()
 	require.Contains(t, snapshot, "proj1")
+	require.NotContains(t, snapshot["proj1"], metrics.APICheck, "the lookup's candidate filtering isn't a separate Check call")
 	agg := snapshot["proj1"][metrics.APIWhoCanAccess]
 	require.NotNil(t, agg)
 	require.Equal(t, int64(1), agg.TotalCalls)
@@ -678,6 +679,7 @@ func TestWhatCanTargetAccess_MetricsRecorded_CacheHit(t *testing.T) {
 	require.NoError(t, err)
 	snapshot := collector.SnapshotAndReset()
 	require.Contains(t, snapshot, "proj1")
+	require.NotContains(t, snapshot["proj1"], metrics.APICheck, "the lookup's candidate filtering isn't a separate Check call")
 	agg := snapshot["proj1"][metrics.APIWhatCanTargetAccess]
 	require.NotNil(t, agg)
 	require.Equal(t, int64(1), agg.TotalCalls)
