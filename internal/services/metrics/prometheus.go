@@ -79,7 +79,6 @@ func ServePrometheus(ctx context.Context, port int, collector *Collector, cacheS
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", newPrometheusHandler(collector, cacheStats))
 	srv := &http.Server{Addr: net.JoinHostPort(cconfig.GetHTTPHost(), strconv.Itoa(port)), Handler: mux, ReadHeaderTimeout: 10 * time.Second}
-	// drain like the gateway does, so a /metrics read isn't cut off on SIGTERM
 	cctx.ShutdownHandler(ctx).AddPreShutdownStep(func(ctx context.Context) error {
 		if timeout := time.Duration(cconfig.GetGracefulShutdownDrainTimeout()) * time.Second; timeout > 0 {
 			var cancel context.CancelFunc
