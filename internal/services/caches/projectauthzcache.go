@@ -367,18 +367,20 @@ func (pc *projectAuthzCache) StartRemoteChangesPolling(ctx context.Context) {
 }
 
 func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
-	pc.mutex.Lock()
-	defer pc.mutex.Unlock()
-	// in case of no cached relations, we skip the server call but invalidate the schema cache to make sure we don't miss schema changes
-	if noRelations := pc.directRelationCache.Len(ctx) == 0 && pc.indirectRelationCache.Len(ctx) == 0; noRelations {
-		pc.remoteChanges.lastPollTime = time.Now()
-		pc.setSchema(ctx, nil)
-		cctx.Logger(ctx).Debug().Msg("No cached relations, skipping remote changes check")
+	since, ok := pc.remotePollStart(ctx)
+	if !ok {
 		return
 	}
-	// get the changes since the last poll time
+	// fetch without the lock, so a slow remote doesn't block cache reads; one poller per project, so fetches never overlap
 	cctx.Logger(ctx).Debug().Msg("Checking for remote changes...")
-	remoteChanges, err := pc.fetchRemoteChanges(ctx)
+	// get the current time BEFORE polling to use as the last poll time after the poll
+	currPollTime := time.Now()
+	remoteChanges, err := pc.remoteChanges.remote.GetModified(ctx, since)
+	pc.mutex.Lock()
+	defer pc.mutex.Unlock()
+	if err == nil {
+		pc.remoteChanges.lastPollTime = currPollTime
+	}
 	// if there was an error, purge all caches after cooldown (if configured) or immediately
 	if err != nil {
 		if isTooManyModifiedRelationsError(err) {
@@ -414,18 +416,18 @@ func (pc *projectAuthzCache) updateCacheWithRemotePolling(ctx context.Context) {
 	}
 }
 
-func (pc *projectAuthzCache) fetchRemoteChanges(ctx context.Context) (*descope.AuthzModified, error) {
-	// get the current time BEFORE polling to use as the last poll time after the poll
-	currPollTime := time.Now()
-	// get changes from remote since last poll time
-	remoteChanges, err := pc.remoteChanges.remote.GetModified(ctx, pc.remoteChanges.lastPollTime)
-	if err != nil {
-		return nil, err
+// remotePollStart returns the time to poll changes since, or false when nothing is cached to poll for.
+func (pc *projectAuthzCache) remotePollStart(ctx context.Context) (time.Time, bool) {
+	pc.mutex.Lock()
+	defer pc.mutex.Unlock()
+	// in case of no cached relations, we skip the server call but invalidate the schema cache to make sure we don't miss schema changes
+	if noRelations := pc.directRelationCache.Len(ctx) == 0 && pc.indirectRelationCache.Len(ctx) == 0; noRelations {
+		pc.remoteChanges.lastPollTime = time.Now()
+		pc.setSchema(ctx, nil)
+		cctx.Logger(ctx).Debug().Msg("No cached relations, skipping remote changes check")
+		return time.Time{}, false
 	}
-	// update the last poll time
-	pc.remoteChanges.lastPollTime = currPollTime
-	// return the remote changes
-	return remoteChanges, nil
+	return pc.remoteChanges.lastPollTime, true
 }
 
 func (pc *projectAuthzCache) addDirectRelation(ctx context.Context, r *descope.FGARelation, grant *cachedGrant) {
