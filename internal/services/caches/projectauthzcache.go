@@ -699,9 +699,8 @@ func (pc *projectAuthzCache) SetWhatCanTargetAccessCached(ctx context.Context, t
 	})
 }
 
+// Stats skips pc.mutex so a slow remote poll doesn't block it; the LRUs lock themselves.
 func (pc *projectAuthzCache) Stats(ctx context.Context) Stats {
-	pc.mutex.RLock()
-	defer pc.mutex.RUnlock()
 	s := Stats{
 		DirectEntries:   pc.directRelationCache.Len(ctx),
 		IndirectEntries: pc.indirectRelationCache.Len(ctx),

@@ -53,8 +53,12 @@ func serve() {
 					cctx.Logger(ctx).Err(err).Msg("Failed creating authz cache")
 					return err
 				}
-				reporter.SetCacheStatsProvider(func() map[string]caches.Stats { return as.CacheStats(ctx) })
+				cacheStats := func() map[string]caches.Stats { return as.CacheStats(ctx) }
+				reporter.SetCacheStatsProvider(cacheStats)
 				reporter.Start(ctx)
+				if config.GetMetricsEndpointEnabled() {
+					metrics.ServePrometheus(ctx, config.GetMetricsEndpointPort(), collector, cacheStats)
+				}
 				ctrl := controllers.New(as)
 				authzcv1.RegisterAuthzCacheServer(s, ctrl)
 				return nil
