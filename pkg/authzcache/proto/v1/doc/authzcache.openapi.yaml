@@ -163,7 +163,11 @@ components:
             type: object
             properties:
                 stepType:
-                    type: integer
+                    enum:
+                        - UNKNOWN
+                        - RELATION
+                        - INTERSECTION
+                    type: string
                     format: enum
                 tuple:
                     $ref: '#/components/schemas/authzv1.Tuple'
