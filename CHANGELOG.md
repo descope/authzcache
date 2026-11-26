@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.3.0](https://github.com/descope/authzcache/compare/v1.2.4...v1.3.0) (2026-11-26)
+
+
+### Features
+
+* **metrics:** report cache sizes + expose metrics in logs ([#908](https://github.com/descope/authzcache/issues/908)) ([c90bddb](https://github.com/descope/authzcache/commit/c90bddb8959eaab2b30f0b8ac24b2d4fc6457142))
+
+
+### Bug Fixes
+
+* **deps:** update github.com/descope/backend digest to 92064af ([#1004](https://github.com/descope/authzcache/issues/1004)) ([5633f35](https://github.com/descope/authzcache/commit/5633f359f0a712209f8cdd8334d20437aa8e9bc9))
+* **deps:** update module github.com/grpc-ecosystem/grpc-gateway/v2 to v2.32.0 ([#999](https://github.com/descope/authzcache/issues/999)) ([34d993c](https://github.com/descope/authzcache/commit/34d993c5bac51982fea5bfa183c0eb77409ed4f0))
+* **deps:** update module github.com/grpc-ecosystem/grpc-gateway/v2 to v2.33.0 ([#1014](https://github.com/descope/authzcache/issues/1014)) ([c603b83](https://github.com/descope/authzcache/commit/c603b8381d7e1dcb92c440f8313588d79947eda7))
+* **deps:** update module google.golang.org/grpc to v1.85.0 ([#1013](https://github.com/descope/authzcache/issues/1013)) ([3835c54](https://github.com/descope/authzcache/commit/3835c54a532e5b2b795dc8815292f54439918c45))
+* **gateway:** forward project ID header after grpc-gateway v2.33.0 ([#1015](https://github.com/descope/authzcache/issues/1015)) ([8256a5d](https://github.com/descope/authzcache/commit/8256a5d69c34e1469addf87ad278e77bef5d8f0e))
+
 ## [1.2.4](https://github.com/descope/authzcache/compare/v1.2.3...v1.2.4) (2026-10-22)
 
 
